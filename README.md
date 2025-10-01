@@ -132,8 +132,9 @@ frontend/
 
 1.  **Clone the repository:**
     ```sh
-    git clone [https://github.com/](https://github.com/)[Your-GitHub-Username]/sam-project.git
-    cd sam-project
+    git clone https://github.com/SihoonSung/SBU_25F_CSE416.git
+    cd SBU_25F_CSE416
+
     ```
 2.  **Configure Backend:**
     Update `backend/src/main/resources/application.yml` with your local MySQL database credentials.
