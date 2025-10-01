@@ -12,45 +12,43 @@
 
 ---
 
-## 📝 Table of Contents
+##  Table of Contents
 
 1.  [**Core Concepts**](#-core-concepts)
 2.  [**Key Features**](#-key-features)
 3.  [**Tech Stack & Architecture**](#-tech-stack--architecture)
 4.  [**Project Structure**](#-project-structure)
-5.  [**Auto-Planner Algorithm**](#-auto-planner-algorithm)
-6.  [**API Endpoints**](#-api-endpoints)
-7.  [**Getting Started**](#-getting-started)
-8.  [**Team**](#-team)
-9.  [**License**](#-license)
+5.  [**Getting Started**](#-getting-started)
+6.  [**Team**](#-team)
+
 
 ---
 
-## 🏛️ Core Concepts
+##  Core Concepts
 
 SAM is built around four fundamental concepts that model the key academic processes at a university.
 
--   **Session:** Manages secure, role-based access via Google SSO. [cite_start]After login, the UI adapts to show only the features relevant to the user's role (Student, Instructor, Advisor, or Registrar)[cite: 847, 862].
--   [cite_start]**Registration:** Governs how students add, enroll in, and drop classes[cite: 888]. [cite_start]The system provides immediate validation feedback in the course cart, checking for prerequisites, time conflicts, credit limits, and registration holds before final submission[cite: 902, 915].
--   [cite_start]**Overrides:** Provides a structured workflow for handling exceptions to registration rules[cite: 936]. [cite_start]Requests for prerequisite waivers, credit overloads, or time conflicts are routed to the appropriate approvers (advisors and/or instructors) and tracked in an audit log[cite: 952, 953].
--   [cite_start]**Degree Requirement:** Tracks a student's progress toward graduation[cite: 982]. [cite_start]The system evaluates a student's academic history against university, major, and minor requirements, clearly displaying which are satisfied, in-progress, or unmet[cite: 982, 983].
+-   **Session:** Manages secure, role-based access via Google SSO. After login, the UI adapts to show only the features relevant to the user's role (Student, Instructor, Advisor, or Registrar).
+-   **Registration:** Governs how students add, enroll in, and drop classes. The system provides immediate validation feedback in the course cart, checking for prerequisites, time conflicts, credit limits, and registration holds before final submission.
+-   **Overrides:** Provides a structured workflow for handling exceptions to registration rules. Requests for prerequisite waivers, credit overloads, or time conflicts are routed to the appropriate approvers (advisors and/or instructors) and tracked in an audit log.
+-   **Degree Requirement:** Tracks a student's progress toward graduation. The system evaluates a student's academic history against university, major, and minor requirements, clearly displaying which are satisfied, in-progress, or unmet.
 
 ---
 
 ## ✨ Key Features
 
--   [cite_start]**Role-Based Dashboards:** Customized interfaces for each user role (Student, Instructor, Advisor, Registrar) to streamline relevant tasks and focus on essential information[cite: 63, 51].
--   [cite_start]**Auto-Planner:** An intelligent course planning tool that generates optimal schedules based on a student's degree requirements, course preferences, and credit limits[cite: 449].
--   [cite_start]**Real-Time Registration Validation:** The course cart immediately flags potential issues like missing prerequisites or time conflicts, allowing students to resolve them or request an override directly[cite: 59, 60].
--   [cite_start]**Comprehensive Student Profiles:** A centralized view of a student's academic progress, including GPA, class schedules, declared majors/minors, registration holds, and a detailed audit log of all changes[cite: 399, 413].
--   [cite_start]**Data Management for Registrars:** Tools for registrars to import user data, course catalogs, and academic calendars, as well as manage class capacities and degree requirements[cite: 359, 368, 383, 391].
--   [cite_start]**Concurrency Control:** The system is designed to handle simultaneous user actions, using techniques like row-level locking and optimistic concurrency control to prevent data inconsistencies like over-enrollment in a class[cite: 1491, 1511, 1513].
+-   **Role-Based Dashboards:** Customized interfaces for each user role (Student, Instructor, Advisor, Registrar) to streamline relevant tasks and focus on essential information.
+-   **Auto-Planner:** An intelligent course planning tool that generates optimal schedules based on a student's degree requirements, course preferences, and credit limits.
+-   **Real-Time Registration Validation:** The course cart immediately flags potential issues like missing prerequisites or time conflicts, allowing students to resolve them or request an override directly.
+-   **Comprehensive Student Profiles:** A centralized view of a student's academic progress, including GPA, class schedules, declared majors/minors, registration holds, and a detailed audit log of all changes.
+-   **Data Management for Registrars:** Tools for registrars to import user data, course catalogs, and academic calendars, as well as manage class capacities and degree requirements.
+-   **Concurrency Control:** The system is designed to handle simultaneous user actions, using techniques like row-level locking and optimistic concurrency control to prevent data inconsistencies like over-enrollment in a class.
 
 ---
 
-## 🛠️ Tech Stack & Architecture
+##  Tech Stack & Architecture
 
-[cite_start]SAM is a modern web application utilizing a robust and scalable technology stack[cite: 1522, 1523, 1529].
+SAM is a modern web application utilizing a robust and scalable technology stack.
 
 | Category               | Technology                                                                                                                                                                                                                                                                                               |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -59,9 +57,9 @@ SAM is built around four fundamental concepts that model the key academic proces
 | **Database** | <img src="https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white"> <img src="https://img.shields.io/badge/Spring_Data_JPA-6DB33F?style=for-the-badge&logo=spring&logoColor=white">                                                                                        |
 | **Authentication** | <img src="https://img.shields.io/badge/Google_OAuth_2.0-4285F4?style=for-the-badge&logo=google&logoColor=white">                                                                                                                                                                                         |
 | **CI/CD & Deployment** | <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white"> <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white"> <img src="https://img.shields.io/badge/Amazon_AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white"> |
-| **Testing** | [cite_start]**JUnit**, **RestAssured**, **Vitest**, **React Testing Library**, **Playwright** [cite: 1525, 1526]                                                                                                                                                                                                      |
+| **Testing** | **JUnit**, **RestAssured**, **Vitest**, **React Testing Library**, **Playwright** |
 
-[cite_start]The back-end primarily uses **JPQL (Java Persistence Query Language)** with Spring Data JPA for object-oriented database queries that are independent of the underlying SQL database[cite: 1109, 1110].
+The back-end primarily uses **JPQL (Java Persistence Query Language)** with Spring Data JPA for object-oriented database queries that are independent of the underlying SQL database.
 
 ---
 
@@ -121,52 +119,6 @@ frontend/
 
 ---
 
-## 🤖 Auto-Planner Algorithm
-
-[cite_start]The core of the auto-planner is a **hybrid algorithm** that combines **Dynamic Programming (DP)** with **Beam Search**[cite: 72, 485]. [cite_start]It treats the course selection challenge as a variation of the **0/1 Knapsack problem**, where the goal is to maximize student preferences ("value") without exceeding credit limits ("capacity") or violating constraints[cite: 73, 486].
-
--   [cite_start]**Hard Constraints:** Prerequisites, time conflicts, and major policies are treated as absolute rules that filter out impossible options[cite: 74, 487].
--   [cite_start]**Soft Constraints:** Student preferences (e.g., desired courses, preferred time slots) are converted into a numerical score to guide the search[cite: 75, 488].
--   [cite_start]**Efficiency:** To avoid a combinatorial explosion of possible schedules, the algorithm uses a **beam search** to "prune" the search space at each step of the DP process[cite: 77, 490]. [cite_start]It keeps only the top-`T` most promising partial schedules, ensuring a near-optimal solution can be found efficiently[cite: 78, 491, 492].
-
----
-
-## 📡 API Endpoints
-
-[cite_start]The back-end is organized into four main API sections[cite: 1114]. All communication uses JSON.
-
-### Course API
-
-[cite_start]Handles the general course catalog[cite: 1117].
-
--   [cite_start]`GET /api/courses/{course_id}`: Retrieves details for a specific course[cite: 1119].
--   [cite_start]`POST /api/courses`: Allows a registrar to upload the entire course catalog[cite: 1138, 1140].
-
-### Class API
-
-[cite_start]Manages specific course offerings for a given term[cite: 1198].
-
--   `GET /api/classes/{class_id}`: Retrieves details for a specific class section.
--   [cite_start]`PUT /api/classes/{class_id}/capacity`: Allows a registrar to edit class capacity[cite: 1228].
--   [cite_start]`POST /api/classes/{class_id}/grades`: Allows an instructor to submit grades[cite: 1248].
-
-### Student API
-
-[cite_start]Manages all student-specific data and academic plans[cite: 1326].
-
--   [cite_start]`GET /api/students/{studentId}/profile`: Retrieves a student's complete profile[cite: 1327].
--   [cite_start]`GET /api/students/{studentId}/plan`: Retrieves a student's course plan[cite: 1346].
--   [cite_start]`PUT /api/students/{studentId}/plan`: Updates a student's course plan[cite: 1398].
--   [cite_start]`GET /api/students/{studentId}/class-schedule`: Retrieves a student's full class history[cite: 1431].
-
-### Audit Log API
-
-[cite_start]Provides access to logged historical changes[cite: 1472].
-
--   [cite_start]`GET /api/students/{studentId}/audit-log`: Retrieves the profile change history for a student[cite: 1473].
-
----
-
 ## ⚙️ Getting Started
 
 ### Prerequisites
@@ -195,17 +147,14 @@ frontend/
 
 ## 👨‍👩‍👧‍👦 Team (404 found)
 
-| Role      | Name          |
+| Position  | Name          |
 | --------- | ------------- |
-| Backend   | Minseo Kim    |
-| Backend   | Jaeseong Yoon |
-| Frontend  | Sihoon Sung   |
-| Frontend  | Seongbeen Na  |
+| Member    | Minseo Kim    |
+| Member    | Jaeseong Yoon |
+| Member    | Sihoon Sung   |
+| Member    | Seongbeen Na  |
 
-[cite_start]*(Members listed as per design documents [cite: 4, 482])*
+
 
 ---
 
-## 📄 License
-
-This project is licensed under the **MIT License**.
