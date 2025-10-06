@@ -1,5 +1,6 @@
 import {useEffect, useState } from 'react'
 import './App.css'
+import NavigationBar from './components/NavigationBar'
 
 function App() {
   const [title, setTitle] = useState('Default value')
@@ -12,9 +13,12 @@ function App() {
   }, [])
 
   return (
-    <>
-      <h1>React + {title}</h1>
-    </>
+    <div>
+      <NavigationBar />
+      <main className="main-content">
+        <h1>React + {title}</h1>
+      </main>
+    </div>
   )
 }
 
