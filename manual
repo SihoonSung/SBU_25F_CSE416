@@ -9,6 +9,6 @@
 
 5. Go to ..\SBU_25F_CSE416\backend\src\main\java\edu\sbu\cse416\sam_system\SamSystemApplication.java and press "Run Java" button, which is located in upper right side
 
-6. Go to ..\SAM\SBU_25F_CSE416\frontend and install packages using "npm install"
+6. Go to ..\SBU_25F_CSE416\frontend and install packages using "npm install"
 
 7. run by typing "npm run dev"
