@@ -1,9 +1,9 @@
-import { useState, type FC } from 'react';
+import { useState} from 'react';
 import './NavigationBar.css';
 
 
 
-const NavigationBar: FC = () => {
+function NavigationBar() {
  
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);

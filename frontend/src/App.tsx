@@ -1,7 +1,7 @@
 import {useEffect, useState } from 'react'
 import './App.css'
 import NavigationBar from './components/NavigationBar'
-import Dashboard from './components/Dashboard.tsx'
+import Dashboard from './pages/Dashboard'
 
 function App() {
   const [title, setTitle] = useState('Default value')
