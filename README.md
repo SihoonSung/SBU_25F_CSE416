@@ -2,7 +2,7 @@
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Java](https://img.shields.io/badge/Java-17-blue)](https://www.java.com)
+[![Java](https://img.shields.io/badge/Java-25-blue)](https://www.java.com)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.0-green)](https://spring.io/projects/spring-boot)
 [![React](https://img.shields.io/badge/React-18-blue.svg?logo=react)](https://reactjs.org/)
 
@@ -123,7 +123,7 @@ frontend/
 
 ### Prerequisites
 
--   Java 17+
+-   Java 25+
 -   Node.js & npm
 -   MySQL
 -   Docker
@@ -158,4 +158,5 @@ frontend/
 
 
 ---
+
 
