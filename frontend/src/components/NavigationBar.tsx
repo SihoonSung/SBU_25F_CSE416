@@ -1,6 +1,6 @@
 import { useState} from 'react';
 import './NavigationBar.css';
-
+import { Link } from 'react-router-dom';
 
 
 function NavigationBar() {
@@ -23,13 +23,14 @@ function NavigationBar() {
     <nav className="navbar">
       <div className="navbar-content">
         {/* Logo Section */}
-        <div className="navbar-logo"><a href= "/home">
+        <div className="navbar-logo">
+          <Link to = "/home">
           <div className="logo-main">SAM</div>
           <div className="logo-subtitle">
             <div className="university-name">Stony Brook University</div>
             <div className="system-name">Academics Management</div>
           </div>
-          </a>
+          </Link>
         </div>
 
         {/* TP : Used Cursor making Hamburger Menu Toggle */}
@@ -45,9 +46,9 @@ function NavigationBar() {
         {/* TP : Used Cursor making menus depend on roles */}
         <div className={`navbar-links ${isMenuOpen ? 'is-open' : ''}`}>
           {navbar_menus[role]?.map((Item : string, idx : number) => (
-            <a key={idx} href = {urlConverter(Item)} className="nav-link">
+            <Link key={idx} to = {urlConverter(Item)} className="nav-link">
               {Item}
-            </a>
+            </Link>
           ))}
         </div>
    
