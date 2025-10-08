@@ -1,9 +1,11 @@
 import { useState} from 'react';
 import './NavigationBar.css';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { isAuthenticated, signOut } from '../utils/auth';
 
 
 function NavigationBar() {
+  const navigate = useNavigate();
  
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -45,11 +47,23 @@ function NavigationBar() {
     
         {/* TP : Used Cursor making menus depend on roles */}
         <div className={`navbar-links ${isMenuOpen ? 'is-open' : ''}`}>
-          {navbar_menus[role]?.map((Item : string, idx : number) => (
-            <Link key={idx} to = {urlConverter(Item)} className="nav-link">
-              {Item}
-            </Link>
-          ))}
+          {navbar_menus[role]?.map((Item : string, idx : number) => {
+            const path = urlConverter(Item);
+            if (Item === 'Sign out') {
+              return isAuthenticated() ? (
+                <button key={idx} className="nav-link" onClick={() => { signOut(); navigate('/login'); }}>
+                  Sign out
+                </button>
+              ) : (
+                <Link key={idx} to="/login" className="nav-link">Sign in</Link>
+              );
+            }
+            return (
+              <Link key={idx} to={path} className="nav-link">
+                {Item}
+              </Link>
+            );
+          })}
         </div>
    
 

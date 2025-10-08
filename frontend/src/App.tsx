@@ -1,8 +1,10 @@
 import {useEffect, useState } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import './App.css'
 import NavigationBar from './components/NavigationBar'
 import Dashboard from './pages/Dashboard'
+import Login from './pages/Login'
+import { isAuthenticated } from './utils/auth'
 
 function App() {
   const [title, setTitle] = useState('Default value')
@@ -15,14 +17,18 @@ function App() {
   }, [])
 
   // Created Router path for each page
+  const location = useLocation()
+  const isLoginRoute = location.pathname === '/login'
+
   return (
     <div>
-      <NavigationBar />
+      {!isLoginRoute && <NavigationBar />}
       <main className="main-content">
-        <h1>React + {title}</h1>
+        {!isLoginRoute && <h1>React + {title}</h1>}
         <Routes>
-          <Route path="/" element= {<Dashboard/>} />
-          <Route path="/home" element={<Dashboard/>} />
+          <Route path="/login" element={<Login/>} />
+          <Route path="/" element={isAuthenticated() ? <Dashboard/> : <Navigate to="/login" replace />} />
+          <Route path="/home" element={isAuthenticated() ? <Dashboard/> : <Navigate to="/login" replace />} />
 
           
         </Routes>
