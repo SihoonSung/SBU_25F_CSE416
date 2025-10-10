@@ -1,0 +1,408 @@
+/* Course Registration Page */
+
+/*
+ * TP: Used Cursor to make it consistent with the codebase.
+ */
+
+.course-registration-page {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+  padding: 2rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  display: grid;
+  grid-template-columns: 7fr 3fr;
+  gap: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Search Section */
+.search-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-section h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 1.5rem 0;
+}
+
+.search-container {
+  background-color: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Search Bar */
+.search-bar {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.search-bar input {
+  width: 80%;
+  padding: 0.75rem 1rem 0.75rem 3rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: #f7fafc;
+  color: #4a5568;
+}
+
+.search-bar input::placeholder {
+  color: #a0aec0;
+}
+
+.search-bar input:focus {
+  outline: none;
+  border-color: #4299e1;
+  background-color: white;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a0aec0;
+  font-size: 16px;
+}
+
+/* Search Results */
+.search-results {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.search-result-card {
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-height: 80px;
+}
+
+.search-result-card .course-info {
+  flex: 1;
+}
+
+.search-result-card .course-code {
+  font-weight: 600;
+  font-size: 16px;
+  color: #2d3748;
+  margin-bottom: 0.25rem;
+}
+
+.search-result-card .course-title {
+  font-size: 14px;
+  color: #4a5568;
+  margin-bottom: 0.25rem;
+}
+
+.search-result-card .course-schedule,
+.search-result-card .course-instructor {
+  font-size: 12px;
+  color: #718096;
+  margin-bottom: 0.125rem;
+}
+
+.add-to-cart-btn {
+  background-color: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+  width: 50px;
+  height: 100%;
+  margin-left: auto;
+}
+
+.add-to-cart-btn:hover {
+  background-color: #c53030;
+}
+
+.add-to-cart-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-text {
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* Cart Section */
+.cart-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.cart-section h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 1.5rem 0;
+}
+
+.cart-container {
+  background-color: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Conflict Warning */
+.conflict-warning {
+  background-color: #fed7d7;
+  border: 1px solid #feb2b2;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.warning-icon {
+  background-color: #e53e3e;
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.conflict-warning span {
+  color: #c53030;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Cart Courses */
+.cart-courses {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.cart-course-card {
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position: relative;
+  min-height: 100px;
+}
+
+.cart-course-card .course-info {
+  flex: 1;
+}
+
+.cart-course-card .course-code {
+  font-weight: 600;
+  font-size: 16px;
+  color: #2d3748;
+  margin-bottom: 0.25rem;
+}
+
+.cart-course-card .course-title {
+  font-size: 14px;
+  color: #4a5568;
+  margin-bottom: 0.25rem;
+}
+
+.cart-course-card .course-schedule,
+.cart-course-card .course-instructor {
+  font-size: 12px;
+  color: #718096;
+  margin-bottom: 0.125rem;
+}
+
+/* Status Tag */
+.status-tag {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
+/* Drop Button */
+.drop-btn {
+  background-color: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.25rem 0.75rem;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+}
+
+.status-tag.enrolled {
+  background-color: #bee3f8;
+  color: #2b6cb0;
+}
+
+.status-tag.waitlisted {
+  background-color: #faf089;
+  color: #d69e2e;
+}
+
+.status-tag.conflict {
+  background-color: #fed7d7;
+  color: #c53030;
+}
+
+.status-tag.added {
+  background-color: #c6f6d5;
+  color: #2f855a;
+}
+
+.drop-btn {
+  background-color: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.25rem 0.75rem;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.drop-btn:hover {
+  background-color: #c53030;
+}
+
+/* Submit Registration Button */
+.submit-registration-btn {
+  background-color: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 1rem;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  width: 100%;
+}
+
+.submit-registration-btn:hover {
+  background-color: #c53030;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .course-registration-page {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+  
+  .search-bar input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .course-registration-page {
+    padding: 1rem;
+  }
+  
+  .search-container,
+  .cart-container {
+    padding: 1rem;
+  }
+  
+  .search-result-card,
+  .cart-course-card {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .course-actions {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+  
+  .add-to-cart-btn {
+    flex-direction: row;
+    height: auto;
+    width: auto;
+    padding: 0.5rem 1rem;
+    margin-left: 0;
+  }
+  
+  .status-tag,
+  .drop-btn {
+    position: static;
+  }
+  
+  .btn-text {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .course-registration-page {
+    padding: 0.5rem;
+  }
+  
+  .search-section h2,
+  .cart-section h2 {
+    font-size: 1.75rem;
+  }
+  
+  .search-result-card,
+  .cart-course-card {
+    padding: 0.75rem;
+  }
+}
