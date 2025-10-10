@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * TP: Used Cursor to make it consistent with the codebase.
  */
@@ -278,3 +279,279 @@
     height: 14px;
   }
 }
+=======
+.course-search {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.course-search-content {
+  display: flex;
+  gap: 20px;
+  min-height: 600px;
+}
+
+/* Filters Sidebar */
+.filters-sidebar {
+  width: 250px;
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.filters-sidebar h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 15px 0;
+}
+
+.filter-group {
+  margin-bottom: 20px;
+}
+
+.filter-group label {
+  display: block;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.filter-group input,
+.filter-group select {
+  width: calc(100% + 4px);
+  margin-left: -2px;
+  padding: 12px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #f8f9fa;
+  transition: border-color 0.2s, background-color 0.2s;
+  height: 44px;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.filter-group input:focus,
+.filter-group select:focus {
+  outline: none;
+  border-color: #007bff;
+  background-color: white;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.filter-group input::placeholder {
+  color: #999;
+}
+
+.filter-group select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 40px;
+}
+
+/* Results Container */
+.results-container {
+  flex: 1;
+  background: #f8f9fa;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  padding: 25px;
+}
+
+.results-container h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 20px 0;
+}
+
+.results-table {
+  width: 100%;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 120px 1fr 80px 1fr 150px 120px 100px 140px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  border-radius: 8px 8px 0 0;
+  font-weight: 600;
+  color: #495057;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+}
+
+.header-cell {
+  padding: 20px 10px;
+  border-right: 1px solid #dee2e6;
+}
+
+.header-cell:last-child {
+  border-right: none;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 80px 1fr 150px 120px 100px 140px;
+  height : 150px;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: background-color 0.2s, box-shadow 0.2s;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.table-row:hover {
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.table-cell {
+  padding: 20px 12px;
+  border-right: 1px solid #e9ecef;
+  font-size: 14px;
+  color: #333;
+  display: flex;
+  align-items: center;
+}
+
+.table-cell:last-child {
+  border-right: none;
+}
+
+.course-code {
+  font-weight: 600;
+  color: #333;
+}
+
+.course-title {
+  font-weight: 500;
+}
+
+.course-credits {
+  text-align: center;
+  font-weight: 500;
+}
+
+.course-prerequisites {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.course-instructor {
+  font-weight: 500;
+}
+
+.course-seats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: #333;
+}
+
+/* Buttons */
+.view-details-btn {
+  background: none;
+  border: none;
+  color: #333;
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.view-details-btn:hover {
+  color: #333;
+}
+
+.add-to-cart-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 12px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.2s;
+  width: 100%;
+  justify-content: center;
+  min-width: 120px;
+}
+
+.add-to-cart-btn:hover {
+  background: #c82333;
+}
+
+.add-to-cart-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .course-search-content {
+    flex-direction: column;
+  }
+  
+  .filters-sidebar {
+    width: 100%;
+    margin-bottom: 20px;
+  }
+  
+  .table-header,
+  .table-row {
+    grid-template-columns: 100px 1fr 60px 1fr 120px 100px 80px 120px;
+  }
+}
+
+@media (max-width: 768px) {
+  .course-search {
+    padding: 15px;
+  }
+  
+  .table-header,
+  .table-row {
+    grid-template-columns: 80px 1fr 50px 1fr 100px 80px 60px 100px;
+  }
+  
+  .table-cell {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+  
+  .header-cell {
+    padding: 10px 8px;
+    font-size: 11px;
+  }
+  
+  .add-to-cart-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+  
+  .add-to-cart-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+>>>>>>> 6d52a85 (Course Search)
