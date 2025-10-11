@@ -1,13 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './CourseRegistration.css'
 
 /*
- * TP: Used Cursor to make it consistent with the codebase.
+ * Course Registration Page Component
+ * Allows students to search for classes and add them to their cart.
+ * Includes expandable course details and real-time search.
+ * 
+ * TP: Used Cursor to implement frontend-backend integration and UI components.
  */
 
 function CourseRegistration() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCourse, setSelectedCourse] = useState(null)
+  const [searchResults, setSearchResults] = useState([])
   const [cart, setCart] = useState([
     {
       id: 'CSE101',
@@ -35,55 +40,114 @@ function CourseRegistration() {
     }
   ])
 
-  const [searchResults] = useState([
-    {
-      id: 'CSE355',
-      code: 'CSE355',
-      courseId: '89378',
-      title: 'Computational Geometry',
-      schedule: 'Mon/Wed 11:00 AM - 12:20 PM',
-      instructor: 'Joe Mitchell',
-      location: 'Javits Lecture Hall',
-      prerequisites: 'AMS 301; programming knowledge of C or C++ or Java'
-    },
-    {
-      id: 'CSE373',
-      code: 'CSE373',
-      courseId: '89123',
-      title: 'Data Structures and Algorithms',
-      schedule: 'Tue/Thu 2:00 PM - 3:20 PM',
-      instructor: 'Richard McKenna',
-      location: 'Frey Hall 317',
-      prerequisites: 'CSE 114; CSE 214'
-    },
-    {
-      id: 'CSE312',
-      code: 'CSE312',
-      courseId: '89456',
-      title: 'Programming Languages',
-      schedule: 'Mon/Wed 3:30 PM - 4:50 PM',
-      instructor: 'Paul Fodor',
-      location: 'Computer Science 312B',
-      prerequisites: 'CSE 214; CSE 373'
-    }
-  ])
+  /**
+   * Fetch all classes from backend on component mount
+   */
+  useEffect(() => {
+    fetchClasses()
+  }, [])
 
+  /**
+   * Fetch all classes from the backend API
+   * Transforms data to frontend format (e.g., CSE101.01)
+   */
+  const fetchClasses = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/classes')
+      const data = await response.json()
+      
+      // Transform backend data to frontend format
+      const transformedData = data.map((cls: any) => ({
+        id: cls.classId,
+        code: `${cls.department}${cls.courseNum}.${cls.section}`,
+        courseId: cls.classId.toString(),
+        department: cls.department,
+        courseNum: cls.courseNum,
+        section: cls.section,
+        title: cls.title,
+        schedule: cls.schedule,
+        instructor: cls.instructor,
+        location: cls.location,
+        prerequisites: cls.prerequisites,
+        credits: cls.credits,
+        semester: cls.semester,
+        year: cls.year
+      }))
+      
+      setSearchResults(transformedData)
+    } catch (error) {
+      console.error('Error fetching classes:', error)
+    }
+  }
+
+  /**
+   * Handle search functionality
+   * If search term is empty, fetch all classes
+   * Otherwise, search using the backend API
+   */
+  const handleSearch = async (term: string) => {
+    if (!term.trim()) {
+      fetchClasses()
+      return
+    }
+    
+    try {
+      const response = await fetch(`http://localhost:8080/api/classes/search?q=${encodeURIComponent(term)}`)
+      const data = await response.json()
+      
+      // Transform backend data to frontend format
+      const transformedData = data.map((cls: any) => ({
+        id: cls.classId,
+        code: `${cls.department}${cls.courseNum}.${cls.section}`,
+        courseId: cls.classId.toString(),
+        department: cls.department,
+        courseNum: cls.courseNum,
+        section: cls.section,
+        title: cls.title,
+        schedule: cls.schedule,
+        instructor: cls.instructor,
+        location: cls.location,
+        prerequisites: cls.prerequisites,
+        credits: cls.credits,
+        semester: cls.semester,
+        year: cls.year
+      }))
+      
+      setSearchResults(transformedData)
+    } catch (error) {
+      console.error('Error searching classes:', error)
+    }
+  }
+
+  /**
+   * Handle course selection to show details
+   */
   const handleCourseSelect = (course: any) => {
     setSelectedCourse(course)
   }
 
+  /**
+   * Go back to search results from course details
+   */
   const handleBackToSearch = () => {
     setSelectedCourse(null)
   }
 
+  /**
+   * Add a course to the cart
+   */
   const handleAddToCart = (course: any) => {
     setCart([...cart, { ...course, status: 'Added' }])
   }
 
+  /**
+   * Remove a course from the cart
+   */
   const handleDropCourse = (courseId: string) => {
     setCart(cart.filter(course => course.id !== courseId))
   }
 
+  // Check if there are any time conflicts in the cart
   const hasConflict = cart.some(course => course.status === 'Conflict')
 
   return (
@@ -99,7 +163,10 @@ function CourseRegistration() {
               type="text"
               placeholder="Search by course code, title, or instructor..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                handleSearch(e.target.value)
+              }}
             />
           </div>
           {/* Search Results */}

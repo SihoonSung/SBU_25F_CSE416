@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import './CourseSearch.css'
 
+/*
+ * Course Search Page Component
+ * Displays course catalog with filtering options.
+ * 
+ * TP: Used Cursor to implement backend integration and filtering logic.
+ */
+
 interface Course {
   code: string
   title: string
@@ -9,66 +16,64 @@ interface Course {
   instructor: string
   time: string
   seatsOpen: number
+  classId?: number
+  department?: string
+  courseNum?: number
+  section?: string
+  schedule?: string
+  location?: string
 }
 
 function CourseSearch() {
   const [filters, setFilters] = useState({
-    subject: 'CSE',
+    subject: '',
     courseNumber: '',
     sbc: 'Any',
     instructor: '',
     daysTime: 'Any'
   })
 
-  const [courses, setCourses] = useState<Course[]>([
-    {
-      code: 'CSE101',
-      title: 'Computer Science Principles',
-      credits: 4,
-      prerequisites: 'Level 2+ or higher on the mathematics placement examination;',
-      instructor: 'Jalaa Hoblos',
-      time: 'View details',
-      seatsOpen: 47
-    },
-    {
-      code: 'CSE103',
-      title: 'Data Science Principles',
-      credits: 4,
-      prerequisites: 'Level 3 or higher on the mathematics placement examination;',
-      instructor: 'Kevin McDonnell',
-      time: 'View details',
-      seatsOpen: 24
-    },
-    {
-      code: 'CSE114',
-      title: 'Introduction to Object-Oriented Programming',
-      credits: 4,
-      prerequisites: 'CSE 101 or CSE 110 or ISE 108;',
-      instructor: 'Anita Wasilewska',
-      time: 'View details',
-      seatsOpen: 32
-    },
-    {
-      code: 'CSE214',
-      title: 'Data Structures',
-      credits: 4,
-      prerequisites: 'CSE 114 or ISE 218;',
-      instructor: 'Paul Fodor',
-      time: 'View details',
-      seatsOpen: 28
-    },
-    {
-      code: 'CSE300',
-      title: 'Technical Communications',
-      credits: 3,
-      prerequisites: 'WRT 102;',
-      instructor: 'Richard McKenna',
-      time: 'View details',
-      seatsOpen: 15
-    }
-  ])
+  const [courses, setCourses] = useState<Course[]>([])
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([])
 
-  const [filteredCourses, setFilteredCourses] = useState<Course[]>(courses)
+  /**
+   * Fetch all classes from backend on component mount
+   */
+  useEffect(() => {
+    fetchAllClasses()
+  }, [])
+
+  /**
+   * Fetch all classes from the backend API
+   */
+  const fetchAllClasses = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/classes')
+      const data = await response.json()
+      
+      // Transform backend data to frontend format
+      const transformedData = data.map((cls: any) => ({
+        code: `${cls.department}${cls.courseNum}.${cls.section}`,
+        title: cls.title,
+        credits: cls.credits,
+        prerequisites: cls.prerequisites || 'None',
+        instructor: cls.instructor,
+        time: cls.schedule || 'View details',
+        seatsOpen: Math.floor(Math.random() * 50) + 1, // Temporary random seats
+        classId: cls.classId,
+        department: cls.department,
+        courseNum: cls.courseNum,
+        section: cls.section,
+        schedule: cls.schedule,
+        location: cls.location
+      }))
+      
+      setCourses(transformedData)
+      setFilteredCourses(transformedData)
+    } catch (error) {
+      console.error('Error fetching classes:', error)
+    }
+  }
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters(prev => ({
@@ -87,24 +92,30 @@ function CourseSearch() {
     // TODO: Implement view details functionality
   }
 
+  /**
+   * Apply filters to courses whenever filters or courses change
+   */
   useEffect(() => {
     let filtered = courses.filter(course => {
-      // Subject filter
-      if (filters.subject && !course.code.startsWith(filters.subject)) {
-        return false
-      }
-      
-      // Course number filter
-      if (filters.courseNumber) {
-        const courseNumber = course.code.replace(/[A-Z]/g, '')
-        if (!courseNumber.includes(filters.courseNumber)) {
+      // Subject/Department filter (case insensitive)
+      if (filters.subject && filters.subject.trim() !== '' && course.department) {
+        if (!course.department.toLowerCase().includes(filters.subject.toLowerCase())) {
           return false
         }
       }
       
-      // Instructor filter
-      if (filters.instructor && !course.instructor.toLowerCase().includes(filters.instructor.toLowerCase())) {
-        return false
+      // Course number filter
+      if (filters.courseNumber && course.courseNum) {
+        if (!course.courseNum.toString().includes(filters.courseNumber)) {
+          return false
+        }
+      }
+      
+      // Instructor filter (case insensitive)
+      if (filters.instructor && filters.instructor.trim() !== '') {
+        if (!course.instructor.toLowerCase().includes(filters.instructor.toLowerCase())) {
+          return false
+        }
       }
       
       return true

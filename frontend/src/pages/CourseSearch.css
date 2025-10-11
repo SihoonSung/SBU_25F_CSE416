@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to make it consistent with the codebase.
+ */
+
 .course-search {
   padding: 20px;
   max-width: 1400px;
@@ -14,10 +18,13 @@
 /* Filters Sidebar */
 .filters-sidebar {
   width: 250px;
+  min-width: 250px;
+  max-width: 250px;
   background: white;
   padding: 25px;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
 }
 
 .filters-sidebar h2 {
@@ -41,16 +48,15 @@
 
 .filter-group input,
 .filter-group select {
-  width: calc(100% + 4px);
-  margin-left: -2px;
+  width: 100%;
   padding: 12px 14px;
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 14px;
   background: #f8f9fa;
   transition: border-color 0.2s, background-color 0.2s;
-  height: 44px;
   box-sizing: border-box;
+  height: 44px;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -79,9 +85,9 @@
 /* Results Container */
 .results-container {
   flex: 1;
-  background: #f8f9fa;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   padding: 25px;
 }
@@ -124,17 +130,17 @@
   display: grid;
   grid-template-columns: 120px 1fr 80px 1fr 150px 120px 100px 140px;
   height : 150px;
-  border: 1px solid #e9ecef;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   margin-bottom: 8px;
   transition: background-color 0.2s, box-shadow 0.2s;
   background: white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .table-row:hover {
   background-color: #f8f9fa;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .table-cell {
