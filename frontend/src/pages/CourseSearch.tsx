@@ -71,32 +71,8 @@ function CourseSearch() {
       }))
       
       setCourses(transformedData)
-      setFilteredCourses(transformedData)
     } catch (error) {
       console.error('Error fetching classes:', error)
-      // Fallback to sample data if backend is not available
-      const sampleCourses: Course[] = [
-        {
-          code: 'CSE101.01',
-          title: 'Computer Science Principles',
-          credits: 4,
-          prerequisites: 'Level 2+ or higher on the mathematics placement examination',
-          instructor: 'Jalaa Hoblos',
-          time: 'View details',
-          seatsOpen: 47
-        },
-        {
-          code: 'CSE114.01',
-          title: 'Introduction to Object-Oriented Programming',
-          credits: 4,
-          prerequisites: 'CSE 101 or CSE 110 or ISE 108',
-          instructor: 'Anita Wasilewska',
-          time: 'View details',
-          seatsOpen: 32
-        }
-      ]
-      setCourses(sampleCourses)
-      setFilteredCourses(sampleCourses)
     }
   }
 
@@ -286,7 +262,7 @@ function CourseSearch() {
             </div>
             
             {currentItems.map((course, index) => (
-              <div key={course.code} className="table-row">
+              <div key={course.classId || course.code} className="table-row">
                 <div className="table-cell course-code">{course.code}</div>
                 <div className="table-cell course-title">{course.title}</div>
                 <div className="table-cell course-credits">{course.credits}</div>

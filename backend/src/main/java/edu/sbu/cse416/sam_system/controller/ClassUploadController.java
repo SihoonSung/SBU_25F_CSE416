@@ -15,15 +15,19 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * REST Controller for registrar operations.
+ * REST Controller for class upload and management operations.
  * Handles PDF upload for class schedule import and class capacity management.
+ * 
+ * Note: Previously named "RegistrarController" - "Registrar" is the standard university term
+ * for the administrative office responsible for course registration and records.
+ * Renamed to "ClassUploadController" for clarity.
  * 
  * TP: Used Cursor to implement registrar functionality and file upload handling.
  */
 @RestController
 @RequestMapping("/api/registrar")
 @CrossOrigin(origins = "http://localhost:5173")
-public class RegistrarController {
+public class ClassUploadController {
     
     @Autowired
     private PdfParserService pdfParserService;
