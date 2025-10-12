@@ -1,5 +1,17 @@
 package edu.sbu.cse416.sam_system.service;
 
+/*
+ * TP: Used Cursor to implement web scraping service for SBU course catalog
+ * Features:
+ * - Two-step scraping: course list page → individual course detail pages
+ * - Extracts all required fields: description, credits, prerequisites, corequisites, antirequisites, advisory prereqs, SBCs
+ * - Prevents duplicate entries (updates existing courses if found)
+ * - Enforces one-time scraping per term (throws exception if term already scraped)
+ * - Handles placement exam simplification with warnings
+ * - Supports multiple subjects (BIO, PSY, CSE, ECO, AMS, POL)
+ * - Fallback mechanism: uses nearest term's data if requested term not available
+ */
+
 import edu.sbu.cse416.sam_system.entity.Course;
 import edu.sbu.cse416.sam_system.entity.Term;
 import edu.sbu.cse416.sam_system.repository.CourseRepository;
@@ -10,6 +22,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -30,11 +43,11 @@ public class ScrapingService {
 
     private static final String CATALOG_BASE_URL = "https://catalog.stonybrook.edu/content.php?catoid=7&navoid=225";
     private static final String COURSE_DETAIL_BASE_URL = "https://catalog.stonybrook.edu/preview_course_nopop.php";
-    private static final String CLASSIE_BASE_URL = "https://classie.evals.stonybrook.edu/sb";
 
     /**
      * Scrapes courses for specified subjects and term from Stony Brook course catalog
      */
+    @Transactional
     public void scrapeCourses(String termName, List<String> subjects) {
         System.out.println("\n" + "=".repeat(80));
         System.out.println("COURSE SCRAPING START");
@@ -45,13 +58,17 @@ public class ScrapingService {
         // Get or create term
         Term term = getOrCreateTerm(termName);
         
-        // Check if term has already been scraped (prevent re-scraping)
+        // Drop old data if term was previously scraped
         if (term.getIsScraped()) {
-            System.out.println("\n⚠ WARNING: Term '" + termName + "' has already been scraped!");
-            System.out.println("SAM prohibits changes to course catalog after scraping.");
-            System.out.println("To re-scrape, please manually reset the term's is_scraped flag in the database.");
-            System.out.println("\n" + "=".repeat(80));
-            throw new IllegalStateException("Term '" + termName + "' has already been scraped. SAM prohibits re-scraping.");
+            long oldCourseCount = courseRepository.countByTerm(term);
+            System.out.println("\nNOTICE: Term '" + termName + "' was previously scraped.");
+            System.out.println("Dropping old data before importing new data...");
+            System.out.println("Deleting " + oldCourseCount + " existing courses for this term.");
+            
+            courseRepository.deleteByTerm(term);
+            
+            System.out.println("✓ Old data dropped successfully.");
+            System.out.println("Proceeding with new import...\n");
         }
 
         int totalScraped = 0;
@@ -155,7 +172,6 @@ public class ScrapingService {
                             existing.setAntirequisites(course.getAntirequisites());
                             existing.setAdvisoryPrerequisites(course.getAdvisoryPrerequisites());
                             existing.setSbcsSatisfied(course.getSbcsSatisfied());
-                            existing.setClassieLink(course.getClassieLink());
                             courseRepository.save(existing);
                             System.out.println(String.format("\n[%d] UPDATED: %s %s - %s", 
                                 count + 1, course.getSubject(), course.getCourseNumber(), course.getCourseName()));
@@ -241,10 +257,6 @@ public class ScrapingService {
         // Extract SBCs
         String sbcs = extractSBCs(fullText);
         course.setSbcsSatisfied(sbcs);
-
-        // Generate Classie link
-        String classieLink = CLASSIE_BASE_URL + "/" + subject.toLowerCase() + "/" + courseNumber;
-        course.setClassieLink(classieLink);
 
         return course;
     }

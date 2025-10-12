@@ -188,4 +188,56 @@ public class ScrapingController {
             return ResponseEntity.status(500).body(errorResponse);
         }
     }
+
+    /**
+     * Clear all courses and terms (for testing/reset)
+     */
+    @DeleteMapping("/clear-all")
+    public ResponseEntity<Map<String, Object>> clearAllData() {
+        try {
+            long coursesDeleted = courseRepository.count();
+            long termsDeleted = termRepository.count();
+            
+            courseRepository.deleteAll();
+            termRepository.deleteAll();
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "All data cleared successfully");
+            response.put("coursesDeleted", coursesDeleted);
+            response.put("termsDeleted", termsDeleted);
+            
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Error clearing data: " + e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    /**
+     * Get database status
+     */
+    @GetMapping("/db-status")
+    public ResponseEntity<Map<String, Object>> getDbStatus() {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            long termCount = termRepository.count();
+            long courseCount = courseRepository.count();
+            
+            response.put("status", "OK");
+            response.put("totalTerms", termCount);
+            response.put("totalCourses", courseCount);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("status", "ERROR");
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
 }

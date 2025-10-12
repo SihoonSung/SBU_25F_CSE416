@@ -5,7 +5,7 @@ package edu.sbu.cse416.sam_system.entity;
  * Features:
  * - Stores course details: subject, number, name, description, credits
  * - Handles prerequisites, corequisites, antirequisites, advisory prerequisites
- * - Tracks SBCs satisfied and Classie evaluation link
+ * - Tracks SBCs satisfied
  * - Links to Term entity for catalog version tracking
  */
 
@@ -52,9 +52,6 @@ public class Course {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "term_id", nullable = false)
     private Term term;
-    
-    @Column(name = "classie_link")
-    private String classieLink; // Link to Classie evaluations
     
     // Constructors
     public Course() {}
@@ -163,25 +160,9 @@ public class Course {
         this.term = term;
     }
     
-    public String getClassieLink() {
-        return classieLink;
-    }
-    
-    public void setClassieLink(String classieLink) {
-        this.classieLink = classieLink;
-    }
-    
     // Helper methods
     public String getFullCourseCode() {
         return subject + " " + courseNumber;
-    }
-    
-    public String getClassieUrl() {
-        if (classieLink != null && !classieLink.isEmpty()) {
-            return classieLink;
-        }
-        // Default Classie URL format - this may need to be updated based on actual Classie structure
-        return "https://classie.evals.stonybrook.edu/sb/" + subject + "/" + courseNumber;
     }
     
     @Override

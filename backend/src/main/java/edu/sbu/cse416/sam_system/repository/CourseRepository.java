@@ -71,4 +71,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     
     // Count courses by term
     long countByTerm(Term term);
+    
+    // Delete all courses for a specific term
+    void deleteByTerm(Term term);
 }
