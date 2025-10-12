@@ -35,6 +35,8 @@ function CourseSearch() {
 
   const [courses, setCourses] = useState<Course[]>([])
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
 
   /**
    * Fetch all classes from backend on component mount
@@ -116,7 +118,35 @@ function CourseSearch() {
   }
 
   /**
+   * Calculate pagination for search results
+   * Shows 10 courses per page
+   */
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentItems = filteredCourses.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(filteredCourses.length / itemsPerPage)
+
+  /**
+   * Navigate to next page
+   */
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1)
+    }
+  }
+
+  /**
+   * Navigate to previous page
+   */
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1)
+    }
+  }
+
+  /**
    * Apply filters to courses whenever filters or courses change
+   * Also sorts results by Department → Course Number → Section
    */
   useEffect(() => {
     let filtered = courses.filter(course => {
@@ -144,7 +174,22 @@ function CourseSearch() {
       return true
     })
     
+    // Sort by Department → Course Number → Section
+    filtered.sort((a, b) => {
+      // Sort by Department first
+      if (a.department !== b.department) {
+        return a.department.localeCompare(b.department)
+      }
+      // Then by Course Number
+      if (a.courseNum !== b.courseNum) {
+        return a.courseNum - b.courseNum
+      }
+      // Finally by Section
+      return a.section.localeCompare(b.section)
+    })
+    
     setFilteredCourses(filtered)
+    setCurrentPage(1) // Reset to first page when filters change
   }, [filters, courses])
 
   return (
@@ -240,7 +285,7 @@ function CourseSearch() {
               <div className="header-cell">ACTION</div>
             </div>
             
-            {filteredCourses.map((course, index) => (
+            {currentItems.map((course, index) => (
               <div key={course.code} className="table-row">
                 <div className="table-cell course-code">{course.code}</div>
                 <div className="table-cell course-title">{course.title}</div>
@@ -279,6 +324,29 @@ function CourseSearch() {
               </div>
             ))}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="pagination">
+                <button 
+                  className="pagination-btn"
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1}
+                >
+                  ← Previous
+                </button>
+                <span className="pagination-info">
+                  Page {currentPage} of {totalPages} ({filteredCourses.length} results)
+                </span>
+                <button 
+                  className="pagination-btn"
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import CourseSearch from './pages/CourseSearch'
 import CourseRegistration from './pages/CourseRegistration'
 import UserManagement from './pages/UserManagement'
+import PdfUpload from './pages/PdfUpload'
 import { isAuthenticated } from './utils/auth'
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
           <Route path="/course-registration" element={<CourseRegistration/>} />
           <Route path="/registration" element={<CourseRegistration/>} />
           <Route path="/user-management" element={<UserManagement/>} />
+          <Route path="/pdf-upload" element={<PdfUpload/>} />
         </Routes>
       </main>
     </div>

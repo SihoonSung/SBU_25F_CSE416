@@ -83,13 +83,20 @@
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
 
-		<!-- YAML processing for user data import -->
-		<dependency>
-			<groupId>org.yaml</groupId>
-			<artifactId>snakeyaml</artifactId>
-		</dependency>
+	<!-- YAML processing for user data import -->
+	<dependency>
+		<groupId>org.yaml</groupId>
+		<artifactId>snakeyaml</artifactId>
+	</dependency>
 
-	</dependencies>
+	<!-- Apache PDFBox for PDF parsing -->
+	<dependency>
+		<groupId>org.apache.pdfbox</groupId>
+		<artifactId>pdfbox</artifactId>
+		<version>3.0.3</version>
+	</dependency>
+
+</dependencies>
 
 	<build>
 		<plugins>

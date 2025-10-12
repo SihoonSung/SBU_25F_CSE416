@@ -13,9 +13,8 @@ import jakarta.persistence.*;
 @Table(name = "classes")
 public class ClassEntity {
     
-    // Primary key - auto-generated class ID
+    // Primary key - class ID from course catalog (5-digit number)
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "class_id")
     private Long classId;
     
@@ -27,9 +26,13 @@ public class ClassEntity {
     @Column(name = "course_num", nullable = false)
     private Integer courseNum;
     
-    // Section number (e.g., "01", "02")
+    // Section number (e.g., "01", "02", "L01")
     @Column(name = "section")
     private String section;
+    
+    // Section type (e.g., "LEC", "LAB", "REC")
+    @Column(name = "section_type")
+    private String sectionType;
     
     // Semester (e.g., "Spring", "Fall")
     @Column(name = "semester")
@@ -59,9 +62,33 @@ public class ClassEntity {
     @Column(name = "location")
     private String location;
     
+    // Lecture schedule (for courses with LAB sections)
+    @Column(name = "lec_schedule")
+    private String lecSchedule;
+    
+    // Lecture location (for courses with LAB sections)
+    @Column(name = "lec_location")
+    private String lecLocation;
+    
     // Prerequisites (e.g., "CSE 114")
     @Column(name = "prerequisites")
     private String prerequisites;
+    
+    // Corequisites (courses that must be taken concurrently)
+    @Column(name = "corequisites")
+    private String corequisites;
+    
+    // Antirequisites (courses that cannot be taken together)
+    @Column(name = "antirequisites")
+    private String antirequisites;
+    
+    // SBC (Stony Brook Curriculum) codes (e.g., "ARTS", "GLO", "HUM")
+    @Column(name = "sbc")
+    private String sbc;
+    
+    // Class capacity (maximum number of students)
+    @Column(name = "capacity")
+    private Integer capacity;
     
     // Constructors
     public ClassEntity() {
@@ -124,6 +151,14 @@ public class ClassEntity {
         this.section = section;
     }
     
+    public String getSectionType() {
+        return sectionType;
+    }
+    
+    public void setSectionType(String sectionType) {
+        this.sectionType = sectionType;
+    }
+    
     public String getSemester() {
         return semester;
     }
@@ -180,12 +215,60 @@ public class ClassEntity {
         this.location = location;
     }
     
+    public String getLecSchedule() {
+        return lecSchedule;
+    }
+    
+    public void setLecSchedule(String lecSchedule) {
+        this.lecSchedule = lecSchedule;
+    }
+    
+    public String getLecLocation() {
+        return lecLocation;
+    }
+    
+    public void setLecLocation(String lecLocation) {
+        this.lecLocation = lecLocation;
+    }
+    
     public String getPrerequisites() {
         return prerequisites;
     }
     
     public void setPrerequisites(String prerequisites) {
         this.prerequisites = prerequisites;
+    }
+    
+    public String getCorequisites() {
+        return corequisites;
+    }
+    
+    public void setCorequisites(String corequisites) {
+        this.corequisites = corequisites;
+    }
+    
+    public String getAntirequisites() {
+        return antirequisites;
+    }
+    
+    public void setAntirequisites(String antirequisites) {
+        this.antirequisites = antirequisites;
+    }
+    
+    public String getSbc() {
+        return sbc;
+    }
+    
+    public void setSbc(String sbc) {
+        this.sbc = sbc;
+    }
+    
+    public Integer getCapacity() {
+        return capacity;
+    }
+    
+    public void setCapacity(Integer capacity) {
+        this.capacity = capacity;
     }
 }
 

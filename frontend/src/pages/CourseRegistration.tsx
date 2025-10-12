@@ -13,6 +13,8 @@ function CourseRegistration() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCourse, setSelectedCourse] = useState(null)
   const [searchResults, setSearchResults] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
   const [cart, setCart] = useState([
     {
       id: 'CSE101',
@@ -64,15 +66,32 @@ function CourseRegistration() {
         department: cls.department,
         courseNum: cls.courseNum,
         section: cls.section,
+        sectionType: cls.sectionType, // LEC, LAB, REC
         title: cls.title,
         schedule: cls.schedule,
         instructor: cls.instructor,
         location: cls.location,
+        lecSchedule: cls.lecSchedule, // LEC schedule
+        lecLocation: cls.lecLocation, // LEC location
         prerequisites: cls.prerequisites,
+        corequisites: cls.corequisites,
+        antirequisites: cls.antirequisites,
         credits: cls.credits,
         semester: cls.semester,
         year: cls.year
       }))
+      .sort((a: any, b: any) => {
+        // Sort by Department first
+        if (a.department !== b.department) {
+          return a.department.localeCompare(b.department)
+        }
+        // Then by Course Number
+        if (a.courseNum !== b.courseNum) {
+          return a.courseNum - b.courseNum
+        }
+        // Finally by Section
+        return a.section.localeCompare(b.section)
+      })
       
       setSearchResults(transformedData)
     } catch (error) {
@@ -103,19 +122,64 @@ function CourseRegistration() {
         department: cls.department,
         courseNum: cls.courseNum,
         section: cls.section,
+        sectionType: cls.sectionType, // LEC, LAB, REC
         title: cls.title,
         schedule: cls.schedule,
         instructor: cls.instructor,
         location: cls.location,
+        lecSchedule: cls.lecSchedule, // LEC schedule
+        lecLocation: cls.lecLocation, // LEC location
         prerequisites: cls.prerequisites,
+        corequisites: cls.corequisites,
+        antirequisites: cls.antirequisites,
         credits: cls.credits,
         semester: cls.semester,
         year: cls.year
       }))
+      .sort((a: any, b: any) => {
+        // Sort by Department first
+        if (a.department !== b.department) {
+          return a.department.localeCompare(b.department)
+        }
+        // Then by Course Number
+        if (a.courseNum !== b.courseNum) {
+          return a.courseNum - b.courseNum
+        }
+        // Finally by Section
+        return a.section.localeCompare(b.section)
+      })
       
       setSearchResults(transformedData)
+      setCurrentPage(1) // Reset to first page on new search
     } catch (error) {
       console.error('Error searching classes:', error)
+    }
+  }
+
+  /**
+   * Calculate pagination for search results
+   * Shows 10 classes per page
+   */
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentItems = searchResults.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(searchResults.length / itemsPerPage)
+
+  /**
+   * Navigate to next page
+   */
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1)
+    }
+  }
+
+  /**
+   * Navigate to previous page
+   */
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1)
     }
   }
 
@@ -171,7 +235,7 @@ function CourseRegistration() {
           </div>
           {/* Search Results */}
           <div className="search-results">
-            {searchResults.map((course) => (
+            {currentItems.map((course) => (
               <div key={course.id} className="course-item-container">
                 {selectedCourse && selectedCourse.id === course.id ? (
                   <div 
@@ -203,22 +267,66 @@ function CourseRegistration() {
                         <span className="detail-label">Title:</span>
                         <span className="detail-value">{course.title}</span>
                       </div>
-                      <div className="detail-row">
-                        <span className="detail-label">Schedule:</span>
-                        <span className="detail-value">{course.schedule}</span>
+                      
+                      {/* Show LEC info first if available (priority) */}
+                      {course.lecSchedule && (
+                        <div className="detail-section lec-section">
+                          <div className="section-title">📚 Lecture Section (Required)</div>
+                          <div className="detail-row">
+                            <span className="detail-label">Schedule:</span>
+                            <span className="detail-value">{course.lecSchedule}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="detail-label">Location:</span>
+                            <span className="detail-value">{course.lecLocation}</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Show current section (LAB/REC/etc) */}
+                      <div className="detail-section">
+                        <div className="section-title">
+                          {course.sectionType === 'LAB' && '🔬 Lab Section'}
+                          {course.sectionType === 'REC' && '📝 Recitation Section'}
+                          {course.sectionType === 'LEC' && '📚 Lecture Section'}
+                          {!course.sectionType && 'Section'}
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">Schedule:</span>
+                          <span className="detail-value">{course.schedule}</span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">Location:</span>
+                          <span className="detail-value">{course.location}</span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">Instructor:</span>
+                          <span className="detail-value">{course.instructor}</span>
+                        </div>
                       </div>
-                      <div className="detail-row">
-                        <span className="detail-label">Instructor:</span>
-                        <span className="detail-value">{course.instructor}</span>
+                      
+                      {/* Requisites Section */}
+                      <div className="requisites-section">
+                        {course.prerequisites && course.prerequisites !== 'None' && (
+                          <div className="detail-row">
+                            <span className="detail-label">Prerequisites:</span>
+                            <span className="detail-value">{course.prerequisites}</span>
+                          </div>
+                        )}
+                        {course.corequisites && course.corequisites !== 'None' && (
+                          <div className="detail-row">
+                            <span className="detail-label">Corequisites:</span>
+                            <span className="detail-value">{course.corequisites}</span>
+                          </div>
+                        )}
+                        {course.antirequisites && course.antirequisites !== 'None' && (
+                          <div className="detail-row">
+                            <span className="detail-label">Antirequisites:</span>
+                            <span className="detail-value">{course.antirequisites}</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="detail-row">
-                        <span className="detail-label">Location:</span>
-                        <span className="detail-value">{course.location}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-label">Prerequisites:</span>
-                        <span className="detail-value">{course.prerequisites}</span>
-                      </div>
+                      
                       {/* External link to Classie-Evals for course evaluations */}
                       <div className="detail-row">
                         <a 
@@ -262,6 +370,29 @@ function CourseRegistration() {
               </div>
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button 
+                className="pagination-btn"
+                onClick={handlePrevPage}
+                disabled={currentPage === 1}
+              >
+                ← Previous
+              </button>
+              <span className="pagination-info">
+                Page {currentPage} of {totalPages} ({searchResults.length} results)
+              </span>
+              <button 
+                className="pagination-btn"
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
