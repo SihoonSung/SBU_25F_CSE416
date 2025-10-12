@@ -9,7 +9,7 @@ function NavigationBar() {
  
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [role, setRole] = useState("student"); 
+  const [role, setRole] = useState("registrar"); 
 
   //Role based navbar menus
    const navbar_menus : Record<string, string[]>  = {

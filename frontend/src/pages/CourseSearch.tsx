@@ -269,6 +269,7 @@ export default CourseSearch
 import React, { useState, useEffect } from 'react'
 import './CourseSearch.css'
 
+// TP : used cursor to implemnet course -serach
 interface Course {
   code: string
   title: string
