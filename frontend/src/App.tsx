@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import CourseSearch from './pages/CourseSearch'
 import CourseRegistration from './pages/CourseRegistration'
+import UserManagement from './pages/UserManagement'
 import { isAuthenticated } from './utils/auth'
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
           <Route path="/course-search" element={<CourseSearch/>} />
           <Route path="/course-registration" element={<CourseRegistration/>} />
           <Route path="/registration" element={<CourseRegistration/>} />
+          <Route path="/user-management" element={<UserManagement/>} />
         </Routes>
       </main>
     </div>

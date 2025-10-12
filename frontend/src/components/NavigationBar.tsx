@@ -16,7 +16,7 @@ function NavigationBar() {
     "student" : ["Course Search", "Registration", "Planner", "Degree Audit", "Sign out"],
     "professor" :["Course Search", "Roaster", "Grades", "Sign out"],
     "academic_advisor" : ["Course Search", "Registration Overrides", "Roaster", "Degree Audit", "Sign out"],
-    "registrar" : ["Course Search", "Registration Management", "Roaster", "Grades", "Admin", "Sign out"]
+    "registrar" : ["Course Search", "Registration Management", "User Management", "Roaster", "Grades", "Admin", "Sign out"]
 
   }
 

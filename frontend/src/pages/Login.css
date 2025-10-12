@@ -12,15 +12,28 @@
   background: #ffffff;
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  padding: 32px;
+  padding: 40px 32px;
+  text-align: center;
 }
 
-.login-title {
-  margin: 0 0 16px;
-  font-size: 24px;
+.login-header {
+  margin-bottom: 32px;
+}
+
+.sbu-title {
+  margin: 0 0 8px;
+  font-size: 28px;
   font-weight: 700;
   color: #111827;
-  text-align: center;
+  line-height: 1.2;
+}
+
+.sbu-subtitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: #B91C1C;
+  line-height: 1.4;
 }
 
 .login-form {
@@ -80,23 +93,40 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 44px;
-  gap: 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #ffffff;
-  color: #111827;
+  height: 48px;
+  gap: 12px;
+  border: none;
+  border-radius: 12px;
+  background: #B91C1C;
+  color: #ffffff;
   font-weight: 600;
+  font-size: 16px;
   text-decoration: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(185, 28, 28, 0.2);
 }
 
 .google-button:hover {
-  background: #f9fafb;
+  background: #991b1b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(185, 28, 28, 0.3);
 }
 
 .google-icon {
   width: 20px;
   height: 20px;
+}
+
+.login-footer {
+  margin-top: 32px;
+  display: flex;
+  justify-content: center;
+}
+
+.sbu-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 
