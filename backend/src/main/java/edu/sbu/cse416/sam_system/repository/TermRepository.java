@@ -1,5 +1,14 @@
 package edu.sbu.cse416.sam_system.repository;
 
+/*
+ * TP: Used Cursor to implement Term repository for academic term management
+ * Features:
+ * - Find term by name (e.g., "Fall 2025")
+ * - Find all scraped terms ordered by date (for fallback logic)
+ * - Find terms with courses for a specific subject (fallback support)
+ * - Standard JPA repository methods (save, findAll, etc.)
+ */
+
 import edu.sbu.cse416.sam_system.entity.Term;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
