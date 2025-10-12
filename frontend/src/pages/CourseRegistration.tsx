@@ -219,8 +219,17 @@ function CourseRegistration() {
                         <span className="detail-label">Prerequisites:</span>
                         <span className="detail-value">{course.prerequisites}</span>
                       </div>
+                      {/* External link to Classie-Evals for course evaluations */}
                       <div className="detail-row">
-                        <span className="detail-link">Link</span>
+                        <a 
+                          href={`https://classie-evals.stonybrook.edu/?SearchKeyword=${course.department}${course.courseNum}&SearchTerm=ALL`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="detail-link"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          📊 View Course Evaluations
+                        </a>
                       </div>
                     </div>
                   </div>
