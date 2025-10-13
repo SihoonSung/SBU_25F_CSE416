@@ -25,7 +25,43 @@
   font-size: 2rem;
   font-weight: 700;
   color: #2d3748;
-  margin: 0 0 1.5rem 0;
+  margin: 0 0 1rem 0;
+}
+
+/* Term Selection */
+.term-selection {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.term-selection label {
+  font-weight: 600;
+  color: #4a5568;
+  font-size: 14px;
+}
+
+.term-selection select {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #f8f9fa;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+  min-width: 120px;
+}
+
+.term-selection select:focus {
+  outline: none;
+  border-color: #4299e1;
+  background-color: white;
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.25);
 }
 
 .search-container {
@@ -278,6 +314,12 @@
   font-size: 14px;
   color: #2d3748;
   flex: 1;
+}
+
+.detail-value.sbc-badges {
+  font-weight: 600;
+  color: #2563eb;
+  font-size: 13px;
 }
 
 /* Detail Section (for LAB/LEC separation) */

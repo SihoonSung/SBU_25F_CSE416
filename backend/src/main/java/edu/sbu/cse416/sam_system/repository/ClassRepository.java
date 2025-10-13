@@ -47,12 +47,25 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
         @Param("year") Integer year
     );
     
-    // General search (search across code, title, and instructor) - case insensitive
+    // General search (search across class_id, code, title, and instructor) - case insensitive
     @Query("SELECT c FROM ClassEntity c WHERE " +
+           "CAST(c.classId AS string) LIKE CONCAT('%', :searchTerm, '%') OR " +
            "LOWER(c.department) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
            "LOWER(CONCAT(c.department, CAST(c.courseNum AS string))) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
            "LOWER(c.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
            "LOWER(c.instructor) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
     List<ClassEntity> generalSearch(@Param("searchTerm") String searchTerm);
+    
+    // Delete all classes for a specific semester and year (bulk delete)
+    @Modifying
+    @org.springframework.transaction.annotation.Transactional
+    void deleteBySemesterAndYear(String semester, Integer year);
+    
+    // Find all classes for a specific semester and year
+    List<ClassEntity> findBySemesterAndYear(String semester, Integer year);
+    
+    // Get all distinct semester/year combinations
+    @Query("SELECT DISTINCT c.semester, c.year FROM ClassEntity c ORDER BY c.year DESC, c.semester")
+    List<Object[]> findDistinctSemesterYear();
 }
 

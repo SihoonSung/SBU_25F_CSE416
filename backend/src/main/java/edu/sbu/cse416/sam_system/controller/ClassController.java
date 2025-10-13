@@ -8,6 +8,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Optional;
 
 /**
@@ -96,7 +99,8 @@ public class ClassController {
             classEntity.setSection(classDetails.getSection());
             classEntity.setSemester(classDetails.getSemester());
             classEntity.setYear(classDetails.getYear());
-            classEntity.setCredits(classDetails.getCredits());
+            classEntity.setMinCredits(classDetails.getMinCredits());
+            classEntity.setMaxCredits(classDetails.getMaxCredits());
             classEntity.setTitle(classDetails.getTitle());
             classEntity.setInstructor(classDetails.getInstructor());
             classEntity.setSchedule(classDetails.getSchedule());
@@ -115,6 +119,31 @@ public class ClassController {
     public ResponseEntity<Void> deleteClass(@PathVariable Long id) {
         classService.deleteClass(id);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+    
+    // Get classes by semester and year
+    @GetMapping("/by-term")
+    public ResponseEntity<List<ClassEntity>> getClassesByTerm(
+            @RequestParam String semester,
+            @RequestParam Integer year) {
+        List<ClassEntity> classes = classService.getClassesBySemesterAndYear(semester, year);
+        return new ResponseEntity<>(classes, HttpStatus.OK);
+    }
+    
+    // Get all available semester/year combinations
+    @GetMapping("/terms")
+    public ResponseEntity<List<Map<String, Object>>> getAvailableTerms() {
+        List<Object[]> terms = classService.getDistinctSemesterYear();
+        List<Map<String, Object>> result = new ArrayList<>();
+        
+        for (Object[] term : terms) {
+            Map<String, Object> termMap = new HashMap<>();
+            termMap.put("semester", term[0]);
+            termMap.put("year", term[1]);
+            result.add(termMap);
+        }
+        
+        return new ResponseEntity<>(result, HttpStatus.OK);
     }
 }
 

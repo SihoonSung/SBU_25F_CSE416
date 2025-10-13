@@ -16,6 +16,8 @@ interface Course {
   instructor: string
   time: string
   seatsOpen: number
+  capacity?: number
+  sbc?: string
   classId?: number
   department?: string
   courseNum?: number
@@ -26,6 +28,7 @@ interface Course {
 
 function CourseSearch() {
   const [filters, setFilters] = useState({
+    classId: '',
     subject: '',
     courseNumber: '',
     sbc: 'Any',
@@ -37,16 +40,80 @@ function CourseSearch() {
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
+  const [availableTerms, setAvailableTerms] = useState([])
+  const [selectedSemester, setSelectedSemester] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
 
   /**
-   * Fetch all classes from backend on component mount
+   * Fetch available terms on component mount
    */
   useEffect(() => {
-    fetchAllClasses()
+    fetchAvailableTerms()
   }, [])
+  
+  /**
+   * Fetch classes when term selection changes
+   */
+  useEffect(() => {
+    if (selectedSemester && selectedYear) {
+      fetchClassesByTerm(selectedSemester, selectedYear)
+    }
+  }, [selectedSemester, selectedYear])
 
   /**
-   * Fetch all classes from the backend API
+   * Fetch available semester/year combinations from backend
+   */
+  const fetchAvailableTerms = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/classes/terms')
+      const data = await response.json()
+      setAvailableTerms(data)
+      
+      // Auto-select the first term if available
+      if (data.length > 0) {
+        setSelectedSemester(data[0].semester)
+        setSelectedYear(data[0].year)
+      }
+    } catch (error) {
+      console.error('Error fetching terms:', error)
+    }
+  }
+  
+  /**
+   * Fetch classes by semester and year
+   */
+  const fetchClassesByTerm = async (semester: string, year: number) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/classes/by-term?semester=${semester}&year=${year}`)
+      const data = await response.json()
+      
+      // Transform backend data to frontend format
+      const transformedData = data.map((cls: any) => ({
+        code: `${cls.department}${cls.courseNum}.${cls.section}`,
+        title: cls.title,
+        credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
+        prerequisites: cls.prerequisites || 'None',
+        instructor: cls.instructor,
+        time: cls.schedule || 'View details',
+        seatsOpen: cls.capacity || 0,
+        capacity: cls.capacity,
+        sbc: cls.sbc,
+        classId: cls.classId,
+        department: cls.department,
+        courseNum: cls.courseNum,
+        section: cls.section,
+        schedule: cls.schedule,
+        location: cls.location
+      }))
+      
+      setCourses(transformedData)
+    } catch (error) {
+      console.error('Error fetching classes:', error)
+    }
+  }
+  
+  /**
+   * Fetch all classes from the backend API (deprecated)
    */
   const fetchAllClasses = async () => {
     try {
@@ -57,11 +124,13 @@ function CourseSearch() {
       const transformedData = data.map((cls: any) => ({
         code: `${cls.department}${cls.courseNum}.${cls.section}`,
         title: cls.title,
-        credits: cls.credits,
+        credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
         prerequisites: cls.prerequisites || 'None',
         instructor: cls.instructor,
         time: cls.schedule || 'View details',
-        seatsOpen: Math.floor(Math.random() * 50) + 1, // Temporary random seats
+        seatsOpen: cls.capacity || 0, // Use capacity from backend
+        capacity: cls.capacity,
+        sbc: cls.sbc,
         classId: cls.classId,
         department: cls.department,
         courseNum: cls.courseNum,
@@ -126,6 +195,13 @@ function CourseSearch() {
    */
   useEffect(() => {
     let filtered = courses.filter(course => {
+      // Class ID filter
+      if (filters.classId && filters.classId.trim() !== '' && course.classId) {
+        if (!course.classId.toString().includes(filters.classId)) {
+          return false
+        }
+      }
+      
       // Subject/Department filter (case insensitive)
       if (filters.subject && filters.subject.trim() !== '' && course.department) {
         if (!course.department.toLowerCase().includes(filters.subject.toLowerCase())) {
@@ -170,10 +246,50 @@ function CourseSearch() {
 
   return (
     <div className="course-search">
+      {/* Term Selection */}
+      <div className="term-selection-bar">
+        <label htmlFor="semester-select">Semester:</label>
+        <select
+          id="semester-select"
+          value={selectedSemester}
+          onChange={(e) => setSelectedSemester(e.target.value)}
+        >
+          {availableTerms.map((term: any) => (
+            <option key={`${term.semester}-${term.year}`} value={term.semester}>
+              {term.semester}
+            </option>
+          ))}
+        </select>
+        
+        <label htmlFor="year-select">Year:</label>
+        <select
+          id="year-select"
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(Number(e.target.value))}
+        >
+          {availableTerms.map((term: any) => (
+            <option key={`${term.semester}-${term.year}`} value={term.year}>
+              {term.year}
+            </option>
+          ))}
+        </select>
+      </div>
+      
       <div className="course-search-content">
         {/* Filters Sidebar */}
         <div className="filters-sidebar">
           <h2>Filters</h2>
+          <div className="filter-group">
+            <label htmlFor="classId">Class ID:</label>
+            <input
+              type="text"
+              id="classId"
+              value={filters.classId}
+              onChange={(e) => handleFilterChange('classId', e.target.value)}
+              placeholder="e.g. 85429"
+            />
+          </div>
+          
           <div className="filter-group">
             <label htmlFor="subject">Subject:</label>
             <input
@@ -254,9 +370,9 @@ function CourseSearch() {
               <div className="header-cell">COURSE CODE</div>
               <div className="header-cell">TITLE</div>
               <div className="header-cell">CREDITS</div>
+              <div className="header-cell">SBC</div>
               <div className="header-cell">PREREQUISITES</div>
               <div className="header-cell">INSTRUCTOR</div>
-              <div className="header-cell">TIME</div>
               <div className="header-cell">SEATS OPEN</div>
               <div className="header-cell">ACTION</div>
             </div>
@@ -266,16 +382,9 @@ function CourseSearch() {
                 <div className="table-cell course-code">{course.code}</div>
                 <div className="table-cell course-title">{course.title}</div>
                 <div className="table-cell course-credits">{course.credits}</div>
+                <div className="table-cell course-sbc">{course.sbc || 'N/A'}</div>
                 <div className="table-cell course-prerequisites">{course.prerequisites}</div>
                 <div className="table-cell course-instructor">{course.instructor}</div>
-                <div className="table-cell course-time">
-                  <button 
-                    className="view-details-btn"
-                    onClick={() => handleViewDetails(course.code)}
-                  >
-                    View details
-                  </button>
-                </div>
                 <div className="table-cell course-seats">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="9" cy="21" r="1"></circle>

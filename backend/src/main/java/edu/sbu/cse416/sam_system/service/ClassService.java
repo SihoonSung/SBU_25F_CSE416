@@ -122,5 +122,15 @@ public class ClassService {
     public void deleteClass(Long classId) {
         classRepository.deleteById(classId);
     }
+    
+    // Get classes by semester and year
+    public List<ClassEntity> getClassesBySemesterAndYear(String semester, Integer year) {
+        return classRepository.findBySemesterAndYear(semester, year);
+    }
+    
+    // Get all distinct semester/year combinations
+    public List<Object[]> getDistinctSemesterYear() {
+        return classRepository.findDistinctSemesterYear();
+    }
 }
 

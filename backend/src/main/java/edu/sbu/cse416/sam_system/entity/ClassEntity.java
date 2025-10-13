@@ -7,10 +7,13 @@ import jakarta.persistence.*;
  * Maps to the 'classes' table in the database.
  * Contains information about courses available for registration.
  * 
+ * Composite index on semester and year for fast filtering and deletion.
+ * 
  * TP: Used Cursor to implement JPA entity and database mapping.
  */
 @Entity
-@Table(name = "classes")
+@Table(name = "classes", 
+       indexes = @Index(name = "idx_semester_year", columnList = "semester, year"))
 public class ClassEntity {
     
     // Primary key - class ID from course catalog (5-digit number)
@@ -42,9 +45,13 @@ public class ClassEntity {
     @Column(name = "year")
     private Integer year;
     
-    // Number of credits
-    @Column(name = "credits")
-    private Integer credits;
+    // Minimum number of credits (for variable credit courses)
+    @Column(name = "min_credits")
+    private Integer minCredits;
+    
+    // Maximum number of credits (for variable credit courses, null if fixed)
+    @Column(name = "max_credits")
+    private Integer maxCredits;
     
     // Course title
     @Column(name = "title")
@@ -71,15 +78,18 @@ public class ClassEntity {
     private String lecLocation;
     
     // Prerequisites (e.g., "CSE 114")
-    @Column(name = "prerequisites")
+    // Using TEXT type to support long prerequisite descriptions
+    @Column(name = "prerequisites", columnDefinition = "TEXT")
     private String prerequisites;
     
     // Corequisites (courses that must be taken concurrently)
-    @Column(name = "corequisites")
+    // Using TEXT type to support long corequisite descriptions
+    @Column(name = "corequisites", columnDefinition = "TEXT")
     private String corequisites;
     
     // Antirequisites (courses that cannot be taken together)
-    @Column(name = "antirequisites")
+    // Using TEXT type to support long antirequisite descriptions
+    @Column(name = "antirequisites", columnDefinition = "TEXT")
     private String antirequisites;
     
     // SBC (Stony Brook Curriculum) codes (e.g., "ARTS", "GLO", "HUM")
@@ -95,14 +105,15 @@ public class ClassEntity {
     }
     
     public ClassEntity(String department, Integer courseNum, String section, String semester, 
-                  Integer year, Integer credits, String title,
+                  Integer year, Integer minCredits, Integer maxCredits, String title,
                   String instructor, String schedule, String location, String prerequisites) {
         this.department = department;
         this.courseNum = courseNum;
         this.section = section;
         this.semester = semester;
         this.year = year;
-        this.credits = credits;
+        this.minCredits = minCredits;
+        this.maxCredits = maxCredits;
         this.title = title;
         this.instructor = instructor;
         this.schedule = schedule;
@@ -175,12 +186,31 @@ public class ClassEntity {
         this.year = year;
     }
     
-    public Integer getCredits() {
-        return credits;
+    public Integer getMinCredits() {
+        return minCredits;
     }
     
-    public void setCredits(Integer credits) {
-        this.credits = credits;
+    public void setMinCredits(Integer minCredits) {
+        this.minCredits = minCredits;
+    }
+    
+    public Integer getMaxCredits() {
+        return maxCredits;
+    }
+    
+    public void setMaxCredits(Integer maxCredits) {
+        this.maxCredits = maxCredits;
+    }
+    
+    /**
+     * Get credits as a string (e.g., "3" or "1-6")
+     * @return Credits string
+     */
+    public String getCreditsDisplay() {
+        if (maxCredits != null && !maxCredits.equals(minCredits)) {
+            return minCredits + "-" + maxCredits;
+        }
+        return String.valueOf(minCredits);
     }
     
     public String getTitle() {

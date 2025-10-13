@@ -15,6 +15,9 @@ function CourseRegistration() {
   const [searchResults, setSearchResults] = useState([])
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
+  const [availableTerms, setAvailableTerms] = useState([])
+  const [selectedSemester, setSelectedSemester] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
   const [cart, setCart] = useState([
     {
       id: 'CSE101',
@@ -43,14 +46,95 @@ function CourseRegistration() {
   ])
 
   /**
-   * Fetch all classes from backend on component mount
+   * Fetch available terms and classes on component mount
    */
   useEffect(() => {
-    fetchClasses()
+    fetchAvailableTerms()
   }, [])
+  
+  /**
+   * Fetch classes when term selection changes
+   */
+  useEffect(() => {
+    if (selectedSemester && selectedYear) {
+      fetchClassesByTerm(selectedSemester, selectedYear)
+    }
+  }, [selectedSemester, selectedYear])
 
   /**
-   * Fetch all classes from the backend API
+   * Fetch available semester/year combinations from backend
+   */
+  const fetchAvailableTerms = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/classes/terms')
+      const data = await response.json()
+      setAvailableTerms(data)
+      
+      // Auto-select the first term if available
+      if (data.length > 0) {
+        setSelectedSemester(data[0].semester)
+        setSelectedYear(data[0].year)
+      }
+    } catch (error) {
+      console.error('Error fetching terms:', error)
+    }
+  }
+  
+  /**
+   * Fetch classes by semester and year
+   * Transforms data to frontend format (e.g., CSE101.01)
+   */
+  const fetchClassesByTerm = async (semester: string, year: number) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/classes/by-term?semester=${semester}&year=${year}`)
+      const data = await response.json()
+      
+      // Transform backend data to frontend format
+      const transformedData = data.map((cls: any) => ({
+        id: cls.classId,
+        code: `${cls.department}${cls.courseNum}.${cls.section}`,
+        courseId: cls.classId.toString(),
+        department: cls.department,
+        courseNum: cls.courseNum,
+        section: cls.section,
+        sectionType: cls.sectionType, // LEC, LAB, REC
+        title: cls.title,
+        schedule: cls.schedule,
+        instructor: cls.instructor,
+        location: cls.location,
+        lecSchedule: cls.lecSchedule, // LEC schedule
+        lecLocation: cls.lecLocation, // LEC location
+        prerequisites: cls.prerequisites,
+        corequisites: cls.corequisites,
+        antirequisites: cls.antirequisites,
+        sbc: cls.sbc, // SBC codes
+        minCredits: cls.minCredits,
+        maxCredits: cls.maxCredits,
+        credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
+        semester: cls.semester,
+        year: cls.year
+      }))
+      .sort((a: any, b: any) => {
+        // Sort by Department first
+        if (a.department !== b.department) {
+          return a.department.localeCompare(b.department)
+        }
+        // Then by Course Number
+        if (a.courseNum !== b.courseNum) {
+          return a.courseNum - b.courseNum
+        }
+        // Finally by Section
+        return a.section.localeCompare(b.section)
+      })
+      
+      setSearchResults(transformedData)
+    } catch (error) {
+      console.error('Error fetching classes:', error)
+    }
+  }
+  
+  /**
+   * Fetch all classes from the backend API (deprecated - use fetchClassesByTerm)
    * Transforms data to frontend format (e.g., CSE101.01)
    */
   const fetchClasses = async () => {
@@ -76,7 +160,10 @@ function CourseRegistration() {
         prerequisites: cls.prerequisites,
         corequisites: cls.corequisites,
         antirequisites: cls.antirequisites,
-        credits: cls.credits,
+        sbc: cls.sbc, // SBC codes
+        minCredits: cls.minCredits,
+        maxCredits: cls.maxCredits,
+        credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
         semester: cls.semester,
         year: cls.year
       }))
@@ -101,12 +188,14 @@ function CourseRegistration() {
 
   /**
    * Handle search functionality
-   * If search term is empty, fetch all classes
-   * Otherwise, search using the backend API
+   * If search term is empty, fetch classes for selected term
+   * Otherwise, search using the backend API (filtered by selected term)
    */
   const handleSearch = async (term: string) => {
     if (!term.trim()) {
-      fetchClasses()
+      if (selectedSemester && selectedYear) {
+        fetchClassesByTerm(selectedSemester, selectedYear)
+      }
       return
     }
     
@@ -132,10 +221,17 @@ function CourseRegistration() {
         prerequisites: cls.prerequisites,
         corequisites: cls.corequisites,
         antirequisites: cls.antirequisites,
-        credits: cls.credits,
+        sbc: cls.sbc, // SBC codes
+        minCredits: cls.minCredits,
+        maxCredits: cls.maxCredits,
+        credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
         semester: cls.semester,
         year: cls.year
       }))
+      .filter((cls: any) => {
+        // Filter by selected semester and year
+        return cls.semester === selectedSemester && cls.year === selectedYear
+      })
       .sort((a: any, b: any) => {
         // Sort by Department first
         if (a.department !== b.department) {
@@ -219,13 +315,43 @@ function CourseRegistration() {
       {/* Search Section */}
       <div className="search-section">
         <h2>Course Search</h2>
+        
+        {/* Term Selection */}
+        <div className="term-selection">
+          <label htmlFor="semester">Semester:</label>
+          <select
+            id="semester"
+            value={selectedSemester}
+            onChange={(e) => setSelectedSemester(e.target.value)}
+          >
+            {availableTerms.map((term: any) => (
+              <option key={`${term.semester}-${term.year}`} value={term.semester}>
+                {term.semester}
+              </option>
+            ))}
+          </select>
+          
+          <label htmlFor="year">Year:</label>
+          <select
+            id="year"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+          >
+            {availableTerms.map((term: any) => (
+              <option key={`${term.semester}-${term.year}`} value={term.year}>
+                {term.year}
+              </option>
+            ))}
+          </select>
+        </div>
+        
         <div className="search-container">
           {/* Search Bar */}
           <div className="search-bar">
             <div className="search-icon">🔍</div>
             <input
               type="text"
-              placeholder="Search by course code, title, or instructor..."
+              placeholder="Search by class ID, course code, title, or instructor..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value)
@@ -267,6 +393,18 @@ function CourseRegistration() {
                         <span className="detail-label">Title:</span>
                         <span className="detail-value">{course.title}</span>
                       </div>
+                      
+                      <div className="detail-row">
+                        <span className="detail-label">Credits:</span>
+                        <span className="detail-value">{course.credits}</span>
+                      </div>
+                      
+                      {course.sbc && course.sbc !== 'None' && (
+                        <div className="detail-row">
+                          <span className="detail-label">SBC:</span>
+                          <span className="detail-value sbc-badges">{course.sbc}</span>
+                        </div>
+                      )}
                       
                       {/* Show LEC info first if available (priority) */}
                       {course.lecSchedule && (

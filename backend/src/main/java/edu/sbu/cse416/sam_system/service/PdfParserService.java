@@ -29,6 +29,8 @@ public class PdfParserService {
     
     /**
      * Parse uploaded PDF and import classes to database
+     * Deletes existing classes for the same semester/year before importing new ones.
+     * Uses @Transactional to ensure data consistency (rollback on failure).
      * 
      * @param file The uploaded PDF file
      * @param subjects Optional set of subjects to filter (null = import all)
@@ -37,8 +39,12 @@ public class PdfParserService {
      * @return Number of classes imported
      * @throws IOException if PDF parsing fails
      */
+    @org.springframework.transaction.annotation.Transactional
     public int parsePdfAndImportClasses(MultipartFile file, Set<String> subjects, 
                                         String semester, Integer year) throws IOException {
+        // Delete existing classes for this semester/year (bulk delete)
+        classRepository.deleteBySemesterAndYear(semester, year);
+        
         // Extract text from PDF
         String pdfText = extractTextFromPdf(file);
         
@@ -76,8 +82,9 @@ public class PdfParserService {
         
         // Pattern for course header line
         // Example: "AAS  110 G Appreciating Indian Music Credit(s): 3 SBC: ARTS"
+        // Also handles ranges like "Credit(s): 1 to 6"
         Pattern courseHeaderPattern = Pattern.compile(
-            "^([A-Z]{3})\\s+(\\d{3})\\s+([A-Z]?)\\s+(.+?)\\s+Credit\\(s\\):\\s+(\\d+)(?:\\s+SBC:\\s+(.+?))?$"
+            "^([A-Z]{3})\\s+(\\d{3})\\s+([A-Z]?)\\s+(.+?)\\s+Credit\\(s\\):\\s+(\\d+(?:\\s+to\\s+\\d+)?)(?:\\s+SBC:\\s+(.+?))?$"
         );
         
         // Pattern for class detail line with class ID
@@ -95,7 +102,8 @@ public class PdfParserService {
         String currentDept = null;
         Integer currentCourseNum = null;
         String currentTitle = null;
-        Integer currentCredits = null;
+        Integer currentMinCredits = null;
+        Integer currentMaxCredits = null;
         String currentSbc = null;
         String currentPrerequisites = "None";
         String currentCorequisites = "None";
@@ -105,6 +113,9 @@ public class PdfParserService {
         String lecSchedule = null;
         String lecLocation = null;
         String lecInstructor = null;
+        
+        // Track processed class IDs to avoid duplicates
+        java.util.Set<Long> processedClassIds = new java.util.HashSet<>();
         
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
@@ -119,7 +130,20 @@ public class PdfParserService {
                 currentDept = courseHeaderMatcher.group(1).trim();
                 currentCourseNum = Integer.parseInt(courseHeaderMatcher.group(2).trim());
                 currentTitle = courseHeaderMatcher.group(4).trim();
-                currentCredits = Integer.parseInt(courseHeaderMatcher.group(5).trim());
+                
+                // Parse credits - handle ranges like "1 to 6"
+                String creditsStr = courseHeaderMatcher.group(5).trim();
+                if (creditsStr.contains("to")) {
+                    // Extract both min and max from range (e.g., "1 to 6" -> min=1, max=6)
+                    String[] parts = creditsStr.split("\\s+to\\s+");
+                    currentMinCredits = Integer.parseInt(parts[0].trim());
+                    currentMaxCredits = Integer.parseInt(parts[1].trim());
+                } else {
+                    // Fixed credit (e.g., "3" -> min=3, max=3)
+                    currentMinCredits = Integer.parseInt(creditsStr);
+                    currentMaxCredits = Integer.parseInt(creditsStr);
+                }
+                
                 // Extract SBC if present (group 6)
                 currentSbc = courseHeaderMatcher.groupCount() >= 6 && courseHeaderMatcher.group(6) != null 
                     ? courseHeaderMatcher.group(6).trim() : null;
@@ -135,7 +159,8 @@ public class PdfParserService {
                     currentDept = null;
                     currentCourseNum = null;
                     currentTitle = null;
-                    currentCredits = null;
+                    currentMinCredits = null;
+                    currentMaxCredits = null;
                     currentSbc = null;
                     currentPrerequisites = "None";
                     currentCorequisites = "None";
@@ -146,9 +171,10 @@ public class PdfParserService {
             
             // Check if this is a prerequisite/corequisite/antirequisite line
             // Handles multi-line requisites (e.g., text wrapped across multiple lines)
-            if (line.startsWith("Prerequisite:") || line.startsWith("Advisory Prerequisite:") || 
-                line.startsWith("Corequisite:") || line.startsWith("Advisory Corequisite:") ||
-                line.startsWith("Antirequisite:") || line.contains("Anti-requisite:")) {
+            // Support both singular and plural forms (Prerequisite/Prerequisites)
+            if (line.startsWith("Prerequisite") || line.startsWith("Advisory Prerequisite") || 
+                line.startsWith("Corequisite") || line.startsWith("Advisory Corequisite") ||
+                line.startsWith("Antirequisite") || line.contains("Anti-requisite")) {
                 
                 if (currentDept != null) {
                     // Collect the full text including continuation on next lines
@@ -157,48 +183,110 @@ public class PdfParserService {
                     // Check next lines for continuation (lines that don't start with a new section/course)
                     while (i + 1 < lines.length) {
                         String nextLine = lines[i + 1].trim();
-                        // If next line looks like a continuation (doesn't start with capital dept code or number)
-                        if (!nextLine.isEmpty() && 
-                            !nextLine.matches("^[A-Z]{3}\\s+\\d{3}.*") && 
-                            !nextLine.matches("^\\d{5}\\s.*") &&
-                            !nextLine.matches("^[A-Z]{3}\\s+\\d{2}\\s.*") &&
-                            !nextLine.startsWith("Note:") &&
-                            !nextLine.startsWith("Prerequisite:") &&
-                            !nextLine.startsWith("Corequisite:") &&
-                            !nextLine.startsWith("Antirequisite:") &&
-                            !nextLine.startsWith("Advisory") &&
-                            !nextLine.startsWith("_")) {
+                        
+                        // Stop if we hit a new course header (DEPT NUM Title)
+                        if (nextLine.matches("^[A-Z]{3}\\s+\\d{3}.*") || 
+                            nextLine.matches("^[A-Z]{3}\\s+\\d{2}\\s.*")) {
+                            break;
+                        }
+                        
+                        // Stop if we hit a class detail line (5-digit ID followed by section type)
+                        if (nextLine.matches("^\\d{5}\\s+(LEC|LAB|REC|TUT|SEM|STU|IND|PRA|CLN|FLD|INT|THE|WKS).*")) {
+                            break;
+                        }
+                        
+                        // Stop if we hit table headers or separators
+                        if (nextLine.startsWith("DEPT CRS") || 
+                            nextLine.startsWith("DEPT") && nextLine.contains("CRS") ||
+                            nextLine.contains("Cls Nbr") ||
+                            nextLine.contains("Cls_Nbr") ||
+                            nextLine.startsWith("_") ||
+                            nextLine.matches("^_+$") ||
+                            nextLine.startsWith("Undergraduate Courses") ||
+                            nextLine.startsWith("Graduate Courses")) {
+                            break;
+                        }
+                        
+                        // Stop if we hit a new requisite line
+                        if (nextLine.startsWith("Prerequisite") ||
+                            nextLine.startsWith("Corequisite") ||
+                            nextLine.startsWith("Antirequisite") ||
+                            nextLine.startsWith("Advisory") ||
+                            nextLine.startsWith("Note:")) {
+                            break;
+                        }
+                        
+                        // If line is not empty and doesn't match stop conditions, it's a continuation
+                        if (!nextLine.isEmpty()) {
                             fullText.append(" ").append(nextLine);
                             i++; // Skip this line in the main loop
                         } else {
+                            // Empty line might indicate end of continuation
                             break;
                         }
                     }
                     
                     String fullLine = fullText.toString();
                     
-                    // Split by semicolon if multiple requisites in one line
-                    String[] parts = fullLine.split(";");
+                    // Parse requisites from the full text
+                    // Handle cases where multiple requisites are in the same line
+                    // e.g., "Prerequisites: ... Antirequisite: ..."
                     
-                    for (String part : parts) {
-                        part = part.trim();
-                        
-                        if (part.startsWith("Advisory Prerequisite:")) {
-                            currentPrerequisites = part.substring("Advisory Prerequisite:".length()).trim();
-                        } else if (part.startsWith("Prerequisite:")) {
-                            currentPrerequisites = part.substring("Prerequisite:".length()).trim();
-                        } else if (part.startsWith("Advisory Corequisite:")) {
-                            currentCorequisites = part.substring("Advisory Corequisite:".length()).trim();
-                        } else if (part.startsWith("Corequisite:")) {
-                            currentCorequisites = part.substring("Corequisite:".length()).trim();
-                        } else if (part.startsWith("Antirequisite:") || part.startsWith("Anti-requisite:")) {
-                            // Handle both "Antirequisite:" and "Anti-requisite:"
-                            if (part.startsWith("Anti-requisite:")) {
-                                currentAntirequisites = part.substring("Anti-requisite:".length()).trim();
-                            } else {
-                                currentAntirequisites = part.substring("Antirequisite:".length()).trim();
-                            }
-                        }
+                    // Extract Prerequisites
+                    if (fullLine.contains("Advisory Prerequisites:")) {
+                        int start = fullLine.indexOf("Advisory Prerequisites:") + "Advisory Prerequisites:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentPrerequisites = fullLine.substring(start, end).trim();
+                    } else if (fullLine.contains("Advisory Prerequisite:")) {
+                        int start = fullLine.indexOf("Advisory Prerequisite:") + "Advisory Prerequisite:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentPrerequisites = fullLine.substring(start, end).trim();
+                    } else if (fullLine.contains("Prerequisites:")) {
+                        int start = fullLine.indexOf("Prerequisites:") + "Prerequisites:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentPrerequisites = fullLine.substring(start, end).trim();
+                    } else if (fullLine.contains("Prerequisite:")) {
+                        int start = fullLine.indexOf("Prerequisite:") + "Prerequisite:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentPrerequisites = fullLine.substring(start, end).trim();
+                    }
+                    
+                    // Extract Corequisites
+                    if (fullLine.contains("Advisory Corequisites:")) {
+                        int start = fullLine.indexOf("Advisory Corequisites:") + "Advisory Corequisites:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentCorequisites = fullLine.substring(start, end).trim();
+                    } else if (fullLine.contains("Advisory Corequisite:")) {
+                        int start = fullLine.indexOf("Advisory Corequisite:") + "Advisory Corequisite:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentCorequisites = fullLine.substring(start, end).trim();
+                    } else if (fullLine.contains("Corequisites:")) {
+                        int start = fullLine.indexOf("Corequisites:") + "Corequisites:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentCorequisites = fullLine.substring(start, end).trim();
+                    } else if (fullLine.contains("Corequisite:")) {
+                        int start = fullLine.indexOf("Corequisite:") + "Corequisite:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentCorequisites = fullLine.substring(start, end).trim();
+                    }
+                    
+                    // Extract Antirequisites
+                    if (fullLine.contains("Anti-requisites:")) {
+                        int start = fullLine.indexOf("Anti-requisites:") + "Anti-requisites:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentAntirequisites = fullLine.substring(start, end).trim();
+                    } else if (fullLine.contains("Anti-requisite:")) {
+                        int start = fullLine.indexOf("Anti-requisite:") + "Anti-requisite:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentAntirequisites = fullLine.substring(start, end).trim();
+                    } else if (fullLine.contains("Antirequisites:")) {
+                        int start = fullLine.indexOf("Antirequisites:") + "Antirequisites:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentAntirequisites = fullLine.substring(start, end).trim();
+                    } else if (fullLine.contains("Antirequisite:")) {
+                        int start = fullLine.indexOf("Antirequisite:") + "Antirequisite:".length();
+                        int end = findNextRequisiteStart(fullLine, start);
+                        currentAntirequisites = fullLine.substring(start, end).trim();
                     }
                 }
                 continue;
@@ -256,6 +344,13 @@ public class PdfParserService {
                 try {
                     // Extract class information
                     Long classId = Long.parseLong(classDetailWithIdMatcher.group(1).trim());
+                    
+                    // Skip if this class ID has already been processed (avoid duplicates)
+                    if (processedClassIds.contains(classId)) {
+                        continue;
+                    }
+                    processedClassIds.add(classId);
+                    
                     String sectionType = classDetailWithIdMatcher.group(2).trim(); // LEC, LAB, REC, etc.
                     String section = classDetailWithIdMatcher.group(3).trim();
                     String days = classDetailWithIdMatcher.group(4).trim();
@@ -339,7 +434,8 @@ public class PdfParserService {
                     
                     classEntity.setSemester(semester);
                     classEntity.setYear(year);
-                    classEntity.setCredits(currentCredits);
+                    classEntity.setMinCredits(currentMinCredits);
+                    classEntity.setMaxCredits(currentMaxCredits);
                     classEntity.setSbc(currentSbc); // Set SBC
                     classEntity.setPrerequisites(currentPrerequisites);
                     classEntity.setCorequisites(currentCorequisites);
@@ -355,6 +451,37 @@ public class PdfParserService {
         }
         
         return classes;
+    }
+    
+    /**
+     * Helper method to find the start position of the next requisite keyword in a string.
+     * Used to extract the text between two requisite keywords.
+     * 
+     * @param text The full text to search
+     * @param startPos The position to start searching from
+     * @return The position of the next requisite keyword, or end of string if not found
+     */
+    private int findNextRequisiteStart(String text, int startPos) {
+        int minPos = text.length();
+        
+        // Check for all possible requisite keywords
+        String[] keywords = {
+            "Prerequisite:", "Prerequisites:",
+            "Advisory Prerequisite:", "Advisory Prerequisites:",
+            "Corequisite:", "Corequisites:",
+            "Advisory Corequisite:", "Advisory Corequisites:",
+            "Antirequisite:", "Antirequisites:",
+            "Anti-requisite:", "Anti-requisites:"
+        };
+        
+        for (String keyword : keywords) {
+            int pos = text.indexOf(keyword, startPos);
+            if (pos != -1 && pos < minPos) {
+                minPos = pos;
+            }
+        }
+        
+        return minPos;
     }
     
 }
