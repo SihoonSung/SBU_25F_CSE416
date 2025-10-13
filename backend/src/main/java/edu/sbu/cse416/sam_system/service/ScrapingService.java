@@ -9,7 +9,8 @@ package edu.sbu.cse416.sam_system.service;
  * - Enforces one-time scraping per term (throws exception if term already scraped)
  * - Handles placement exam simplification with warnings
  * - Supports multiple subjects (BIO, PSY, CSE, ECO, AMS, POL)
- * - Fallback mechanism: uses nearest term's data if requested term not available
+ * - Enhanced fallback mechanism: uses nearest available term's data if requested term not scraped
+ * - No data deletion on re-scraping: maintains data integrity by preventing re-scraping
  */
 
 import edu.sbu.cse416.sam_system.entity.Course;
@@ -46,6 +47,7 @@ public class ScrapingService {
 
     /**
      * Scrapes courses for specified subjects and term from Stony Brook course catalog
+     * Each term can only be scraped once to prevent data inconsistency
      */
     @Transactional
     public void scrapeCourses(String termName, List<String> subjects) {
@@ -58,17 +60,15 @@ public class ScrapingService {
         // Get or create term
         Term term = getOrCreateTerm(termName);
         
-        // Drop old data if term was previously scraped
-        if (term.getIsScraped()) {
-            long oldCourseCount = courseRepository.countByTerm(term);
-            System.out.println("\nNOTICE: Term '" + termName + "' was previously scraped.");
-            System.out.println("Dropping old data before importing new data...");
-            System.out.println("Deleting " + oldCourseCount + " existing courses for this term.");
-            
-            courseRepository.deleteByTerm(term);
-            
-            System.out.println("✓ Old data dropped successfully.");
-            System.out.println("Proceeding with new import...\n");
+        // Prevent re-scraping: each term can only be scraped once (regardless of subjects)
+        if (term.getIsScraped() != null && term.getIsScraped()) {
+            throw new IllegalStateException("Term '" + termName + "' has already been scraped. Each term can only be scraped once.");
+        }
+        
+        // Additional safety check: if there are already courses for this term, prevent scraping
+        long existingCourseCount = courseRepository.countByTerm(term);
+        if (existingCourseCount > 0) {
+            throw new IllegalStateException("Term '" + termName + "' already has " + existingCourseCount + " courses. Cannot re-scrape. Use reset-term endpoint if needed.");
         }
 
         int totalScraped = 0;
@@ -491,24 +491,43 @@ public class ScrapingService {
     }
 
     /**
-     * Gets courses for a term with fallback
+     * Gets courses for a term with fallback to nearest available term
+     * If the requested term hasn't been scraped, uses the nearest term with course data
      */
     public List<Course> getCoursesForTerm(String termName, String subject) {
+        // First, try to get courses for the exact term
         List<Course> courses = courseRepository.findBySubjectAndTermName(subject, termName);
 
         if (!courses.isEmpty()) {
+            System.out.println("Found " + courses.size() + " courses for term: " + termName + ", subject: " + subject);
             return courses;
         }
 
-        // Fallback to nearest term
+        // Check if the term exists but hasn't been scraped
+        Optional<Term> termOpt = termRepository.findByName(termName);
+        if (termOpt.isPresent() && !termOpt.get().getIsScraped()) {
+            System.out.println("Term '" + termName + "' exists but hasn't been scraped yet. Using fallback to nearest available term.");
+        }
+
+        // Fallback to nearest term with course data for this subject
         List<Term> availableTerms = termRepository.findTermsWithCoursesForSubject(subject);
 
         if (!availableTerms.isEmpty()) {
+            // Sort by start date to get the most recent term
+            availableTerms.sort((t1, t2) -> {
+                if (t1.getStartDate() == null && t2.getStartDate() == null) return 0;
+                if (t1.getStartDate() == null) return 1;
+                if (t2.getStartDate() == null) return -1;
+                return t2.getStartDate().compareTo(t1.getStartDate()); // Most recent first
+            });
+            
             Term nearestTerm = availableTerms.get(0);
-            System.out.println("Using fallback term: " + nearestTerm.getName() + " for subject: " + subject);
-            return courseRepository.findBySubjectAndTerm(subject, nearestTerm);
+            List<Course> fallbackCourses = courseRepository.findBySubjectAndTerm(subject, nearestTerm);
+            System.out.println("Using fallback term: " + nearestTerm.getName() + " for subject: " + subject + " (found " + fallbackCourses.size() + " courses)");
+            return fallbackCourses;
         }
 
+        System.out.println("No courses found for subject: " + subject + " in any term");
         return new ArrayList<>();
     }
 }
