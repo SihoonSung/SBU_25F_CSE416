@@ -35,6 +35,14 @@ public class UserService {
         String firstName = oauth2User.getAttribute("given_name");
         String lastName = oauth2User.getAttribute("family_name");
         String profilePictureUrl = oauth2User.getAttribute("picture");
+        
+        // Handle null values from Google OAuth
+        if (firstName == null || firstName.trim().isEmpty()) {
+            firstName = "Unknown";
+        }
+        if (lastName == null || lastName.trim().isEmpty()) {
+            lastName = "User";
+        }
 
         // Check if user exists by Google ID
         Optional<User> existingUser = userRepository.findByGoogleId(googleId);

@@ -1,8 +1,60 @@
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import './Login.css'
+import { signIn } from '../utils/auth'
 
 function Login() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const [isLoading, setIsLoading] = useState(false)
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const googleUrl = `${backendBase}/oauth2/authorization/google`
+
+  // OAuth 콜백 처리
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const success = searchParams.get('success')
+      const error = searchParams.get('error')
+      
+      if (error) {
+        console.error('OAuth error:', error)
+        return
+      }
+      
+      if (success === 'true') {
+        setIsLoading(true)
+        try {
+          // OAuth 인증 완료 후 사용자 정보 가져오기
+          const response = await fetch(`${backendBase}/api/auth/success`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            if (data.success && data.user) {
+              // 사용자 정보를 localStorage에 저장
+              signIn('oauth-token', data.user.email)
+              
+              // 홈화면으로 리디렉션
+              navigate('/home', { replace: true })
+            }
+          } else {
+            console.error('Failed to get user info')
+          }
+        } catch (error) {
+          console.error('Error during OAuth callback:', error)
+        } finally {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    handleOAuthCallback()
+  }, [searchParams, navigate, backendBase])
 
   return (
     <div className="login-page">
@@ -13,15 +65,22 @@ function Login() {
         </div>
         
         <div className="login-form">
-          <a className="google-button" href={googleUrl}>
-            <svg className="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-              <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12 s5.373-12,12-12c3.059,0,5.842,1.156,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24 s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
-              <path fill="#FF3D00" d="M6.306,14.691l6.571,4.818C14.655,16.108,18.961,14,24,14c3.059,0,5.842,1.156,7.961,3.039l5.657-5.657 C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
-              <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.191-5.238C29.211,35.091,26.715,36,24,36 c-5.202,0-9.619-3.317-11.277-7.951l-6.54,5.036C9.5,39.556,16.227,44,24,44z"/>
-              <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.793,2.24-2.231,4.166-4.086,5.571 c0.001-0.001,0.002-0.001,0.003-0.002l6.191,5.238C36.767,40.19,44,36,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
-            </svg>
-            Login with SBU Google Account
-          </a>
+          {isLoading ? (
+            <div className="loading-container">
+              <div className="loading-spinner"></div>
+              <p>로그인 중...</p>
+            </div>
+          ) : (
+            <a className="google-button" href={googleUrl}>
+              <svg className="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12 s5.373-12,12-12c3.059,0,5.842,1.156,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24 s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                <path fill="#FF3D00" d="M6.306,14.691l6.571,4.818C14.655,16.108,18.961,14,24,14c3.059,0,5.842,1.156,7.961,3.039l5.657-5.657 C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.191-5.238C29.211,35.091,26.715,36,24,36 c-5.202,0-9.619-3.317-11.277-7.951l-6.54,5.036C9.5,39.556,16.227,44,24,44z"/>
+                <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.793,2.24-2.231,4.166-4.086,5.571 c0.001-0.001,0.002-0.001,0.003-0.002l6.191,5.238C36.767,40.19,44,36,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+              </svg>
+              Login with SBU Google Account
+            </a>
+          )}
         </div>
         
         <div className="login-footer">

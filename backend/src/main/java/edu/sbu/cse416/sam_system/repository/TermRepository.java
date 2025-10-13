@@ -42,7 +42,7 @@ public interface TermRepository extends JpaRepository<Term, Long> {
     List<Term> findMostRecentScrapedTerms();
     
     // Find the nearest scraped term (for fallback when specific term not found)
-    @Query("SELECT t FROM Term t WHERE t.isScraped = true ORDER BY ABS(DATEDIFF(t.startDate, :targetDate)) ASC")
+    @Query("SELECT t FROM Term t WHERE t.isScraped = true ORDER BY t.startDate DESC")
     List<Term> findNearestScrapedTerm(@Param("targetDate") LocalDate targetDate);
     
     // Check if term exists by name

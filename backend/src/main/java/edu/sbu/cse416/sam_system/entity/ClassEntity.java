@@ -42,7 +42,7 @@ public class ClassEntity {
     private String semester;
     
     // Year (e.g., 2025)
-    @Column(name = "year")
+    @Column(name = "academic_year")
     private Integer year;
     
     // Minimum number of credits (for variable credit courses)
