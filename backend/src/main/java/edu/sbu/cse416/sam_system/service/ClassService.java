@@ -20,6 +20,9 @@ public class ClassService {
     @Autowired
     private ClassRepository classRepository;
     
+    @Autowired
+    private RoomService roomService;
+    
     // Get all classes
     public List<ClassEntity> getAllClasses() {
         return classRepository.findAll();
@@ -69,6 +72,50 @@ public class ClassService {
     // Create or update class
     public ClassEntity saveClass(ClassEntity classEntity) {
         return classRepository.save(classEntity);
+    }
+    
+    /**
+     * Calculate and set capacity for a class based on location
+     * If location is in room database → use room capacity
+     * Otherwise → use default capacity (20)
+     */
+    public void setCapacityBasedOnLocation(ClassEntity classEntity) {
+        if (classEntity.getLocation() != null) {
+            int capacity = roomService.getCapacityForLocation(classEntity.getLocation());
+            classEntity.setCapacity(capacity);
+        } else {
+            classEntity.setCapacity(20); // Default capacity
+        }
+    }
+    
+    /**
+     * Update capacity for a specific class (manual edit by registrar)
+     */
+    public ClassEntity updateCapacity(Long classId, Integer newCapacity) {
+        Optional<ClassEntity> classOpt = classRepository.findById(classId);
+        if (classOpt.isPresent()) {
+            ClassEntity classEntity = classOpt.get();
+            classEntity.setCapacity(newCapacity);
+            return classRepository.save(classEntity);
+        }
+        return null;
+    }
+    
+    /**
+     * Recalculate capacities for all classes based on room database
+     * Useful after updating room capacities
+     */
+    public int recalculateAllCapacities() {
+        List<ClassEntity> allClasses = classRepository.findAll();
+        int count = 0;
+        
+        for (ClassEntity classEntity : allClasses) {
+            setCapacityBasedOnLocation(classEntity);
+            classRepository.save(classEntity);
+            count++;
+        }
+        
+        return count;
     }
     
     // Delete class

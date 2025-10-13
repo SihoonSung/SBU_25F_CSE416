@@ -35,6 +35,8 @@ function PdfUpload() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [searchTerm, setSearchTerm] = useState('')
+  const [loadingCapacity, setLoadingCapacity] = useState(false)
+  const [capacityMessage, setCapacityMessage] = useState('')
 
   /**
    * Fetch all classes on component mount
@@ -116,6 +118,34 @@ function PdfUpload() {
     const numValue = parseInt(value)
     if (!isNaN(numValue) && numValue >= 0) {
       setEditingCapacity({...editingCapacity, [classId]: numValue})
+    }
+  }
+
+  /**
+   * Load room capacities from server and calculate all class capacities
+   */
+  const handleLoadCapacity = async () => {
+    setLoadingCapacity(true)
+    setCapacityMessage('')
+
+    try {
+      const response = await fetch('http://localhost:8080/api/rooms/load-and-calculate', {
+        method: 'POST'
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setCapacityMessage('✅ ' + data.message)
+        // Refresh class list to show updated capacities
+        fetchClasses()
+      } else {
+        setCapacityMessage('❌ ' + data.message)
+      }
+    } catch (error) {
+      setCapacityMessage('❌ Error loading capacities: ' + error)
+    } finally {
+      setLoadingCapacity(false)
     }
   }
 
@@ -279,6 +309,28 @@ function PdfUpload() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Room Capacity Section */}
+      <div className="capacity-section">
+        <h2>🏢 Load Room Capacities</h2>
+        <p className="section-description">
+          Load room capacities from server and automatically calculate class capacities based on room locations.
+        </p>
+        
+        <button 
+          className="load-capacity-btn"
+          onClick={handleLoadCapacity}
+          disabled={loadingCapacity}
+        >
+          {loadingCapacity ? '⏳ Loading...' : '🏢 Load Capacity from Server'}
+        </button>
+
+        {capacityMessage && (
+          <div className={`capacity-message ${capacityMessage.includes('✅') ? 'success' : 'error'}`}>
+            {capacityMessage}
+          </div>
+        )}
       </div>
 
       {/* Class Management Section */}
