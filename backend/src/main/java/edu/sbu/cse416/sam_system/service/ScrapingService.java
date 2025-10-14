@@ -8,7 +8,7 @@ package edu.sbu.cse416.sam_system.service;
  * - Prevents duplicate entries (updates existing courses if found)
  * - Allows scraping additional subjects for the same term (extension), but prevents re-scraping the same subject
  * - Handles placement exam simplification with warnings
- * - Supports multiple subjects (BIO, PSY, CSE, ECO, AMS, POL)
+ * - Supports several subjects (BIO, PSY, CSE, ECO, AMS, POL)
  * - Enhanced fallback mechanism: uses nearest available term's data if requested term not scraped
  * - No data deletion on re-scraping: maintains data integrity by preventing subject-level re-scraping
  * - Credit range support: handles "0-6 credits" format with separate min/max fields

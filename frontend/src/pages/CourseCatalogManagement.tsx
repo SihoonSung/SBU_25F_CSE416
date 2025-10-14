@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import './CourseCatalogManagement.css';
 
+
+//TP : Used cursor to display course catalog data in temrs of design
+
+
 interface ScrapedCourse {
   id: number;
   subject: string;
@@ -8,6 +12,7 @@ interface ScrapedCourse {
   courseName: string;
   description: string;
   credits: number;
+  maxCredits?: number; // Maximum credits for credit ranges
   prerequisites: string;
   corequisites: string;
   antirequisites: string;
@@ -40,7 +45,6 @@ interface Term {
 const CourseCatalogManagement: React.FC = () => {
   const [selectedTerm, setSelectedTerm] = useState<string>('');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-  const [customSubject, setCustomSubject] = useState<string>('');
   const [availableSubjects] = useState<string[]>(['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']);
   const [supportedSubjects] = useState<string[]>(['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']);
   const [scrapedCourses, setScrapedCourses] = useState<ScrapedCourse[]>([]);
@@ -77,29 +81,6 @@ const CourseCatalogManagement: React.FC = () => {
     checkForUnsupportedSubjects(newSelectedSubjects);
   };
 
-  const handleCustomSubjectAdd = () => {
-    if (!customSubject.trim()) return;
-    
-    const subject = customSubject.trim().toUpperCase();
-    
-    // If it's a supported subject, check the checkbox
-    if (availableSubjects.includes(subject)) {
-      if (!selectedSubjects.includes(subject)) {
-        const newSelectedSubjects = [...selectedSubjects, subject];
-        setSelectedSubjects(newSelectedSubjects);
-        checkForUnsupportedSubjects(newSelectedSubjects);
-      }
-      setCustomSubject('');
-      return;
-    }
-    
-    // If it's an unsupported subject, show warning and don't add
-    setMessage({
-      type: 'warning',
-      text: `Subject "${subject}" is not supported and cannot be selected. Only supported subjects (BIO, PSY, CSE, ECO, AMS, POL) can be scraped.`
-    });
-    setCustomSubject('');
-  };
 
   const checkForUnsupportedSubjects = (subjects: string[]) => {
     const unsupportedSelected = subjects.filter(s => !supportedSubjects.includes(s));
@@ -211,7 +192,7 @@ const CourseCatalogManagement: React.FC = () => {
     await fetchScrapedCourses();
   };
 
-  // Reset Term functionality - commented out as it may not be needed
+  // Reset Term functionality
   /*
   const handleResetTerm = async () => {
     if (!selectedTerm) {
@@ -311,7 +292,7 @@ const CourseCatalogManagement: React.FC = () => {
 
         <div className="form-group">
           <label>Select Subjects:</label>
-          
+         
           {/* Supported Subjects Only */}
           <div className="subjects-section">
             <h4>Supported Subjects</h4>
@@ -328,30 +309,14 @@ const CourseCatalogManagement: React.FC = () => {
                 </label>
               ))}
             </div>
+            <div className="subject-help">
+              <span style={{ fontSize: '1rem' }}>
+                <strong>Supported Subjects :</strong> BIO, PSY, CSE, ECO, AMS, POL - Only those subjects are be available. Please check the green box
+              </span>
+          </div>
+          
           </div>
 
-          {/* Custom Subject Input */}
-          <div className="subjects-section">
-            <h4>Add Custom Subject</h4>
-            <div className="custom-subject-input">
-              <input
-                type="text"
-                value={customSubject}
-                onChange={(e) => setCustomSubject(e.target.value)}
-                placeholder="Enter subject"
-                className="custom-input"
-                maxLength={3}
-              />
-              <button
-                type="button"
-                onClick={handleCustomSubjectAdd}
-                disabled={!customSubject.trim()}
-                className="add-subject-button"
-              >
-                Add
-              </button>
-            </div>
-          </div>
 
           {/* Selected Subjects Display */}
           {selectedSubjects.length > 0 && (
@@ -375,12 +340,7 @@ const CourseCatalogManagement: React.FC = () => {
             </div>
           )}
 
-          <div className="subject-help">
-            <small>
-              <strong>Supported Subjects:</strong> BIO, PSY, CSE, ECO, AMS, POL - Course information will be parsed accurately.<br/>
-              <strong>Custom Input:</strong> Enter supported subjects to check them automatically, or try unsupported subjects to see a warning message.
-            </small>
-          </div>
+        
         </div>
 
         <div className="action-buttons">
@@ -429,6 +389,7 @@ const CourseCatalogManagement: React.FC = () => {
                   <th>Number</th>
                   <th>Course Name</th>
                   <th>Credits</th>
+                  <th>Max Credits</th>
                   <th>Prerequisites</th>
                   <th>SBCs</th>
                   <th>Warning</th>
@@ -440,7 +401,8 @@ const CourseCatalogManagement: React.FC = () => {
                     <td className="subject-cell">{course.subject}</td>
                     <td className="number-cell">{course.courseNumber}</td>
                     <td className="name-cell">{course.courseName}</td>
-                    <td className="credits-cell">{course.credits || 'N/A'}</td>
+                    <td className="credits-cell">{course.credits !== null ? course.credits : 'N/A'}</td>
+                    <td className="credits-cell">{course.maxCredits !== null ? course.maxCredits : 'N/A'}</td>
                     <td className="prereq-cell">
                       {course.prerequisites ? (
                         <span title={course.prerequisites}>
