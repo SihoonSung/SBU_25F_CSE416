@@ -13,7 +13,7 @@ import jakarta.persistence.*;
  */
 @Entity
 @Table(name = "classes", 
-       indexes = @Index(name = "idx_semester_year", columnList = "semester, year"))
+       indexes = @Index(name = "idx_semester_year", columnList = "semester, academic_year"))
 public class ClassEntity {
     
     // Primary key - class ID from course catalog (5-digit number)

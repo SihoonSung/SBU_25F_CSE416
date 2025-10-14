@@ -73,13 +73,39 @@ public class ScrapingController {
             System.out.println("  Term: " + term);
             System.out.println("  Subjects: " + subjects);
 
-            scrapingService.scrapeCourses(term, subjects);
+            Map<String, Object> scrapingResults = scrapingService.scrapeCourses(term, subjects);
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("message", "Successfully scraped courses");
             response.put("term", term);
             response.put("subjects", subjects);
+            response.putAll(scrapingResults);
+
+            // Generate appropriate message based on results
+            @SuppressWarnings("unchecked")
+            List<String> scrapedSubjects = (List<String>) scrapingResults.get("scrapedSubjects");
+            @SuppressWarnings("unchecked")
+            List<String> skippedSubjects = (List<String>) scrapingResults.get("skippedSubjects");
+            @SuppressWarnings("unchecked")
+            List<String> failedSubjects = (List<String>) scrapingResults.get("failedSubjects");
+
+            StringBuilder message = new StringBuilder();
+            
+            if (!scrapedSubjects.isEmpty()) {
+                message.append("Successfully scraped ").append(scrapedSubjects).append(" courses for ").append(term);
+            }
+            
+            if (!skippedSubjects.isEmpty()) {
+                if (message.length() > 0) message.append(". ");
+                message.append("Cannot scrape: ").append(skippedSubjects).append(" (already scraped)");
+            }
+            
+            if (!failedSubjects.isEmpty()) {
+                if (message.length() > 0) message.append(". ");
+                message.append("Failed to scrape ").append(failedSubjects);
+            }
+
+            response.put("message", message.toString());
 
             return ResponseEntity.ok(response);
 

@@ -3,10 +3,11 @@ package edu.sbu.cse416.sam_system.entity;
 /*
  * TP: Used Cursor to implement Course entity for storing scraped course information
  * Features:
- * - Stores course details: subject, number, name, description, credits
+ * - Stores course details: subject, number, name, description, credits (with range support)
  * - Handles prerequisites, corequisites, antirequisites, advisory prerequisites
  * - Tracks SBCs satisfied
  * - Links to Term entity for catalog version tracking
+ * - Supports credit ranges (e.g., 0-6 credits) with min/max credit fields
  */
 
 import jakarta.persistence.*;
@@ -47,8 +48,14 @@ public class Course {
     @Column(name = "credits")
     private Integer credits;
     
+    @Column(name = "max_credits")
+    private Integer maxCredits; // For credit ranges (e.g., 0-6 credits)
+    
     @Column(name = "sbcs_satisfied", columnDefinition = "TEXT")
     private String sbcsSatisfied; // Stony Brook Curriculum requirements
+    
+    @Column(name = "warning")
+    private Boolean warning = false; // True if placement exam simplification was applied
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "term_id", nullable = false)
@@ -146,12 +153,28 @@ public class Course {
         this.credits = credits;
     }
     
+    public Integer getMaxCredits() {
+        return maxCredits;
+    }
+    
+    public void setMaxCredits(Integer maxCredits) {
+        this.maxCredits = maxCredits;
+    }
+    
     public String getSbcsSatisfied() {
         return sbcsSatisfied;
     }
     
     public void setSbcsSatisfied(String sbcsSatisfied) {
         this.sbcsSatisfied = sbcsSatisfied;
+    }
+    
+    public Boolean getWarning() {
+        return warning;
+    }
+    
+    public void setWarning(Boolean warning) {
+        this.warning = warning;
     }
     
     public Term getTerm() {
@@ -175,6 +198,8 @@ public class Course {
                 ", courseNumber='" + courseNumber + '\'' +
                 ", courseName='" + courseName + '\'' +
                 ", credits=" + credits +
+                ", maxCredits=" + maxCredits +
+                ", warning=" + warning +
                 ", term=" + (term != null ? term.getName() : "null") +
                 '}';
     }

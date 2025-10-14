@@ -4,13 +4,14 @@ package edu.sbu.cse416.sam_system.service;
  * TP: Used Cursor to implement web scraping service for SBU course catalog
  * Features:
  * - Two-step scraping: course list page → individual course detail pages
- * - Extracts all required fields: description, credits, prerequisites, corequisites, antirequisites, advisory prereqs, SBCs
+ * - Extracts all required fields: description, credits (including ranges), prerequisites, corequisites, antirequisites, advisory prereqs, SBCs
  * - Prevents duplicate entries (updates existing courses if found)
- * - Enforces one-time scraping per term (throws exception if term already scraped)
+ * - Allows scraping additional subjects for the same term (extension), but prevents re-scraping the same subject
  * - Handles placement exam simplification with warnings
  * - Supports multiple subjects (BIO, PSY, CSE, ECO, AMS, POL)
  * - Enhanced fallback mechanism: uses nearest available term's data if requested term not scraped
- * - No data deletion on re-scraping: maintains data integrity by preventing re-scraping
+ * - No data deletion on re-scraping: maintains data integrity by preventing subject-level re-scraping
+ * - Credit range support: handles "0-6 credits" format with separate min/max fields
  */
 
 import edu.sbu.cse416.sam_system.entity.Course;
@@ -29,10 +30,25 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+/**
+ * Helper class to represent credit range information
+ */
+class CreditRange {
+    final Integer minCredits;
+    final Integer maxCredits;
+    
+    CreditRange(Integer minCredits, Integer maxCredits) {
+        this.minCredits = minCredits;
+        this.maxCredits = maxCredits;
+    }
+}
 
 @Service
 public class ScrapingService {
@@ -48,10 +64,11 @@ public class ScrapingService {
 
     /**
      * Scrapes courses for specified subjects and term from Stony Brook course catalog
-     * Each term can only be scraped once to prevent data inconsistency
+     * Allows scraping additional subjects for the same term (extension), but prevents re-scraping the same subject
+     * Returns a map with scraping results for each subject
      */
     @Transactional
-    public void scrapeCourses(String termName, List<String> subjects) {
+    public Map<String, Object> scrapeCourses(String termName, List<String> subjects) {
         System.out.println("\n" + "=".repeat(80));
         System.out.println("COURSE SCRAPING START");
         System.out.println("Term: " + termName);
@@ -60,27 +77,31 @@ public class ScrapingService {
 
         // Get or create term
         Term term = getOrCreateTerm(termName);
-        
-        // Prevent re-scraping: each term can only be scraped once (regardless of subjects)
-        if (term.getIsScraped() != null && term.getIsScraped()) {
-            throw new IllegalStateException("Term '" + termName + "' has already been scraped. Each term can only be scraped once.");
-        }
-        
-        // Additional safety check: if there are already courses for this term, prevent scraping
-        long existingCourseCount = courseRepository.countByTerm(term);
-        if (existingCourseCount > 0) {
-            throw new IllegalStateException("Term '" + termName + "' already has " + existingCourseCount + " courses. Cannot re-scrape. Use reset-term endpoint if needed.");
-        }
 
         // Define supported subjects
         List<String> supportedSubjects = Arrays.asList("BIO", "PSY", "CSE", "ECO", "AMS", "POL");
 
+        // Initialize result tracking
+        Map<String, Object> results = new HashMap<>();
+        List<String> scrapedSubjects = new ArrayList<>();
+        List<String> skippedSubjects = new ArrayList<>();
+        List<String> failedSubjects = new ArrayList<>();
         int totalScraped = 0;
+
         for (String subject : subjects) {
             try {
                 System.out.println("\n" + "-".repeat(80));
                 System.out.println("Scraping subject: " + subject);
                 System.out.println("-".repeat(80));
+
+                // Check if this subject has already been scraped for this term
+                List<Course> existingCourses = courseRepository.findBySubjectAndTerm(subject, term);
+                if (!existingCourses.isEmpty()) {
+                    System.out.println("⚠ WARNING: Subject '" + subject + "' has already been scraped for term '" + termName + "' (" + existingCourses.size() + " courses found).");
+                    System.out.println("   Skipping to prevent duplicate scraping of the same subject and term combination.");
+                    skippedSubjects.add(subject);
+                    continue;
+                }
 
                 // Check if subject is supported
                 if (!supportedSubjects.contains(subject)) {
@@ -92,21 +113,37 @@ public class ScrapingService {
                 totalScraped += coursesScraped;
 
                 System.out.println("✓ Scraped " + coursesScraped + " courses for " + subject);
+                scrapedSubjects.add(subject);
 
             } catch (Exception e) {
                 System.err.println("✗ Error scraping " + subject + ": " + e.getMessage());
                 e.printStackTrace();
+                failedSubjects.add(subject);
             }
         }
 
-        // Mark term as scraped
-        term.setIsScraped(true);
-        termRepository.save(term);
+        // Mark term as scraped if we scraped any new courses
+        if (totalScraped > 0) {
+            term.setIsScraped(true);
+            termRepository.save(term);
+        }
+
+        // Prepare results
+        results.put("totalScraped", totalScraped);
+        results.put("scrapedSubjects", scrapedSubjects);
+        results.put("skippedSubjects", skippedSubjects);
+        results.put("failedSubjects", failedSubjects);
+        results.put("term", termName);
 
         System.out.println("\n" + "=".repeat(80));
         System.out.println("COURSE SCRAPING COMPLETED");
         System.out.println("Total courses scraped: " + totalScraped);
+        System.out.println("Subjects scraped: " + scrapedSubjects);
+        System.out.println("Subjects skipped (already scraped): " + skippedSubjects);
+        System.out.println("Subjects failed: " + failedSubjects);
         System.out.println("=".repeat(80) + "\n");
+
+        return results;
     }
 
     /**
@@ -177,11 +214,13 @@ public class ScrapingService {
                             existing.setCourseName(course.getCourseName());
                             existing.setDescription(course.getDescription());
                             existing.setCredits(course.getCredits());
+                            existing.setMaxCredits(course.getMaxCredits());
                             existing.setPrerequisites(course.getPrerequisites());
                             existing.setCorequisites(course.getCorequisites());
                             existing.setAntirequisites(course.getAntirequisites());
                             existing.setAdvisoryPrerequisites(course.getAdvisoryPrerequisites());
                             existing.setSbcsSatisfied(course.getSbcsSatisfied());
+                            existing.setWarning(course.getWarning());
                             courseRepository.save(existing);
                             System.out.println(String.format("\n[%d] UPDATED: %s %s - %s", 
                                 count + 1, course.getSubject(), course.getCourseNumber(), course.getCourseName()));
@@ -233,17 +272,25 @@ public class ScrapingService {
         String description = extractDescriptionFromHtml(fullHtml);
         course.setDescription(description);
 
-        // Extract credits
-        Integer credits = extractCredits(fullText);
-        course.setCredits(credits);
+        // Extract credits (including ranges)
+        CreditRange creditRange = extractCredits(fullText);
+        course.setCredits(creditRange.minCredits);
+        course.setMaxCredits(creditRange.maxCredits);
 
         // Extract prerequisites
-        String prerequisites = isSubjectSupported ? extractPrerequisites(fullText) : "unknown";
+        Map<String, Object> prereqResult = isSubjectSupported ? extractPrerequisites(fullText) : null;
+        String prerequisites = prereqResult != null ? (String) prereqResult.get("text") : "unknown";
+        boolean hasWarning = prereqResult != null && (Boolean) prereqResult.get("hasWarning");
         course.setPrerequisites(prerequisites);
 
         // Extract corequisites
-        String corequisites = isSubjectSupported ? extractCorequisites(fullText) : "unknown";
+        Map<String, Object> coreqResult = isSubjectSupported ? extractCorequisites(fullText) : null;
+        String corequisites = coreqResult != null ? (String) coreqResult.get("text") : "unknown";
+        boolean coreqHasWarning = coreqResult != null && (Boolean) coreqResult.get("hasWarning");
         course.setCorequisites(corequisites);
+        
+        // Set warning flag if any placement exam simplification was applied
+        course.setWarning(hasWarning || coreqHasWarning);
 
         // Extract antirequisites
         String antirequisites = isSubjectSupported ? extractAntirequisites(fullText) : "unknown";
@@ -262,7 +309,8 @@ public class ScrapingService {
         System.out.println("📚 " + subject + " " + courseNumber + " - " + courseName);
         System.out.println("=".repeat(80));
         System.out.println("📖 Description: " + (description != null && description.length() > 100 ? description.substring(0, 100) + "..." : description));
-        System.out.println("🎓 Credits: " + (credits != null ? credits : "Unknown"));
+        
+        
         System.out.println("🔗 URL: " + url);
         
         // Field status with icons
@@ -315,41 +363,60 @@ public class ScrapingService {
 
 
     /**
-     * Extracts credits
+     * Extracts credits, handling both single values and ranges (e.g., "3 credits" or "0-6 credits")
      */
-    private Integer extractCredits(String text) {
-        Pattern pattern = Pattern.compile("(\\d+)(?:-\\d+)?\\s+credits?", Pattern.CASE_INSENSITIVE);
-        Matcher matcher = pattern.matcher(text);
+    private CreditRange extractCredits(String text) {
+        // Pattern to match credit ranges like "0-6 credits" or single credits like "3 credits"
+        Pattern rangePattern = Pattern.compile("(\\d+)-(\\d+)\\s+credits?", Pattern.CASE_INSENSITIVE);
+        Matcher rangeMatcher = rangePattern.matcher(text);
         
-        if (matcher.find()) {
+        if (rangeMatcher.find()) {
             try {
-                return Integer.parseInt(matcher.group(1));
+                Integer minCredits = Integer.parseInt(rangeMatcher.group(1));
+                Integer maxCredits = Integer.parseInt(rangeMatcher.group(2));
+                System.out.println("    📊 Found credit range: " + minCredits + "-" + maxCredits + " credits");
+                return new CreditRange(minCredits, maxCredits);
+            } catch (NumberFormatException e) {
+                // Fall through to single credit pattern
+            }
+        }
+        
+        // Pattern to match single credits like "3 credits"
+        Pattern singlePattern = Pattern.compile("(\\d+)\\s+credits?", Pattern.CASE_INSENSITIVE);
+        Matcher singleMatcher = singlePattern.matcher(text);
+        
+        if (singleMatcher.find()) {
+            try {
+                Integer credits = Integer.parseInt(singleMatcher.group(1));
+                System.out.println("    📊 Found single credit: " + credits + " credits");
+                return new CreditRange(credits, null); // maxCredits is null for single values
             } catch (NumberFormatException e) {
                 // Ignore
             }
         }
         
-        return null;
+        System.out.println("    📊 No credits found");
+        return new CreditRange(null, null);
     }
 
     /**
      * Extracts prerequisites with placement exam simplification
+     * Returns a map with the prerequisites text and whether warning should be set
      */
-    private String extractPrerequisites(String text) {
+    private Map<String, Object> extractPrerequisites(String text) {
         StringBuilder allPrereqs = new StringBuilder();
+        boolean hasWarning = false;
         
         // First try "Prerequisite(s):" pattern (with parentheses)
         String prereqs = extractField(text, "Prerequisite(s)");
         if (prereqs != null && !prereqs.isEmpty()) {
             // Clean up any "Pre- or" text that might be in the prerequisite field
             prereqs = prereqs.replaceAll("Pre-\\s*or\\s*", "").trim();
-            prereqs = prereqs.replaceAll("Pre-\\s+or\\s*", "").trim();
-            prereqs = prereqs.replaceAll("Pre-\\s*or\\s+", "").trim();
-            prereqs = prereqs.replaceAll("Pre-\\s*or", "").trim();
             
             if (prereqs.toLowerCase().contains("placement") && prereqs.toLowerCase().contains("exam")) {
                 System.out.println("    ⚠ WARNING: Simplifying prerequisites with placement exam");
                 prereqs = simplifyPlacementExamPrerequisite(prereqs);
+                hasWarning = true;
             }
             allPrereqs.append(prereqs);
         }
@@ -361,6 +428,7 @@ public class ScrapingService {
                 if (prereqs.toLowerCase().contains("placement") && prereqs.toLowerCase().contains("exam")) {
                     System.out.println("    ⚠ WARNING: Simplifying prerequisites with placement exam");
                     prereqs = simplifyPlacementExamPrerequisite(prereqs);
+                    hasWarning = true;
                 }
                 allPrereqs.append(prereqs);
             }
@@ -372,25 +440,33 @@ public class ScrapingService {
         
         if (preOrCoMatcher.find()) {
             String preOrCo = preOrCoMatcher.group(1).trim();
-            // Remove any remaining "Pre- or" text that might have been captured
-            System.out.println("DEBUG: Before cleanup: '" + preOrCo + "'");
-            preOrCo = preOrCo.replaceAll("Pre-\\s*or\\s*", "").trim();
-            preOrCo = preOrCo.replaceAll("Pre-\\s+or\\s*", "").trim();
-            preOrCo = preOrCo.replaceAll("Pre-\\s*or\\s+", "").trim();
-            preOrCo = preOrCo.replaceAll("Pre-\\s*or", "").trim();
-            System.out.println("DEBUG: After cleanup: '" + preOrCo + "'");
-            if (preOrCo.toLowerCase().contains("placement") && preOrCo.toLowerCase().contains("exam")) {
-                System.out.println("    ⚠ WARNING: Simplifying prerequisites with placement exam");
-                preOrCo = simplifyPlacementExamPrerequisite(preOrCo);
-            }
+            System.out.println("    🔍 Found Pre- or corequisite: " + preOrCo);
             
-            // Check if this content is already in the prerequisites to avoid duplication
-            String currentPrereqs = allPrereqs.toString();
-            if (currentPrereqs.isEmpty() || !currentPrereqs.contains(preOrCo)) {
-                if (allPrereqs.length() > 0) {
-                    allPrereqs.append("; ");
+            // Remove any remaining "Pre- or" text that might have been captured
+            preOrCo = preOrCo.replaceAll("Pre-\\s*or\\s*", "").trim();
+            
+            if (preOrCo.toLowerCase().contains("placement") && preOrCo.toLowerCase().contains("exam")) {
+                System.out.println("    ⚠ WARNING: Simplifying Pre- or corequisite with placement exam");
+                preOrCo = simplifyPlacementExamPrerequisite(preOrCo);
+                hasWarning = true;
+                
+                // For Pre- or corequisite with placement exam, add to both prerequisites and corequisites
+                String currentPrereqs = allPrereqs.toString();
+                if (currentPrereqs.isEmpty() || !currentPrereqs.contains(preOrCo)) {
+                    if (allPrereqs.length() > 0) {
+                        allPrereqs.append("; ");
+                    }
+                    allPrereqs.append(preOrCo);
                 }
-                allPrereqs.append(preOrCo);
+            } else {
+                // Regular Pre- or corequisite without placement exam
+                String currentPrereqs = allPrereqs.toString();
+                if (currentPrereqs.isEmpty() || !currentPrereqs.contains(preOrCo)) {
+                    if (allPrereqs.length() > 0) {
+                        allPrereqs.append("; ");
+                    }
+                    allPrereqs.append(preOrCo);
+                }
             }
         }
         
@@ -398,44 +474,66 @@ public class ScrapingService {
         if (result != null) {
             // Final cleanup of any "Pre- or" text that might have leaked through
             result = result.replaceAll("Pre-\\s*or\\s*", "").trim();
-            result = result.replaceAll("Pre-\\s+or\\s*", "").trim();
-            result = result.replaceAll("Pre-\\s*or\\s+", "").trim();
-            result = result.replaceAll("Pre-\\s*or", "").trim();
         }
-        return result;
+        
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("text", result);
+        resultMap.put("hasWarning", hasWarning);
+        return resultMap;
     }
 
     /**
      * Simplifies prerequisites involving placement exams
+     * Handles various patterns:
+     * - "MAT 123 or higher, or level 4 or higher on the mathematics placement examination" → "MAT 123 or higher"
+     * - "B or higher in MAT 123 or level 5 on the mathematics placement examination" → "B or higher in MAT 123"
+     * - "C or higher in AMS 151 or MAT 131, or level 7 on the mathematics placement examination" → "C or higher in AMS 151 or MAT 131"
      */
     private String simplifyPlacementExamPrerequisite(String prereqs) {
-        // Look for course codes (3 letters + 3 digits) in the text
-        Pattern coursePattern = Pattern.compile("([A-Z]{3}\\s+\\d{3}[^.;]*?)(?:[.;]|$)");
-        Matcher matcher = coursePattern.matcher(prereqs);
+        System.out.println("    🔍 Simplifying placement exam prerequisite: " + prereqs);
         
-        if (matcher.find()) {
-            // Found course code, return the course part
-            return matcher.group(1).trim();
+        // Remove placement exam parts (everything after "or level X on the mathematics placement examination")
+        // Use case-insensitive pattern to match various capitalizations (with or without comma)
+        String simplified = prereqs.replaceAll("(?i)(,\\s*)?or\\s+level\\s+\\d+.*placement.*examination.*$", "");
+        
+        // Clean up any trailing commas or "or" words
+        simplified = simplified.replaceAll(",\\s*$", "").trim();
+        simplified = simplified.replaceAll("\\s+or\\s*$", "").trim();
+        
+        // If the result is empty or too short, try to extract course codes
+        if (simplified.length() < 5) {
+            // Look for course codes (3 letters + 3 digits) in the original text
+            Pattern coursePattern = Pattern.compile("([A-Z]{3}\\s+\\d{3}[^.;]*?)(?:[.;]|$)");
+            Matcher matcher = coursePattern.matcher(prereqs);
+            
+            if (matcher.find()) {
+                simplified = matcher.group(1).trim();
+            }
         }
         
-        // No course code found - keep original text with warning
-        return prereqs + " [WARNING: Contains placement exam requirement]";
+        System.out.println("    ✅ Simplified to: " + simplified);
+        return simplified;
     }
 
     /**
      * Extracts corequisites
+     * Returns a map with the corequisites text and whether warning should be set
      */
-    private String extractCorequisites(String text) {
+    private Map<String, Object> extractCorequisites(String text) {
         StringBuilder allCoreqs = new StringBuilder();
+        boolean hasWarning = false;
         
         // First try "Corequisite(s):" pattern (with parentheses)
         String coreqs = extractField(text, "Corequisite(s)");
         if (coreqs != null && !coreqs.isEmpty()) {
             // Clean up any "Pre- or" text that might be in the corequisite field
             coreqs = coreqs.replaceAll("Pre-\\s*or\\s*", "").trim();
-            coreqs = coreqs.replaceAll("Pre-\\s+or\\s*", "").trim();
-            coreqs = coreqs.replaceAll("Pre-\\s*or\\s+", "").trim();
-            coreqs = coreqs.replaceAll("Pre-\\s*or", "").trim();
+            
+            if (coreqs.toLowerCase().contains("placement") && coreqs.toLowerCase().contains("exam")) {
+                System.out.println("    ⚠ WARNING: Simplifying corequisites with placement exam");
+                coreqs = simplifyPlacementExamPrerequisite(coreqs);
+                hasWarning = true;
+            }
             allCoreqs.append(coreqs);
         }
         
@@ -448,6 +546,12 @@ public class ScrapingService {
                 coreqs = coreqs.replaceAll("Pre-\\s+or\\s*", "").trim();
                 coreqs = coreqs.replaceAll("Pre-\\s*or\\s+", "").trim();
                 coreqs = coreqs.replaceAll("Pre-\\s*or", "").trim();
+                
+                if (coreqs.toLowerCase().contains("placement") && coreqs.toLowerCase().contains("exam")) {
+                    System.out.println("    ⚠ WARNING: Simplifying corequisites with placement exam");
+                    coreqs = simplifyPlacementExamPrerequisite(coreqs);
+                    hasWarning = true;
+                }
                 allCoreqs.append(coreqs);
             }
         }
@@ -458,13 +562,16 @@ public class ScrapingService {
         
         if (preOrCoMatcher.find()) {
             String preOrCo = preOrCoMatcher.group(1).trim();
+            System.out.println("    🔍 Found Pre- or corequisite (coreq section): " + preOrCo);
+            
             // Remove any remaining "Pre- or" text that might have been captured
-            System.out.println("DEBUG: Before cleanup: '" + preOrCo + "'");
             preOrCo = preOrCo.replaceAll("Pre-\\s*or\\s*", "").trim();
-            preOrCo = preOrCo.replaceAll("Pre-\\s+or\\s*", "").trim();
-            preOrCo = preOrCo.replaceAll("Pre-\\s*or\\s+", "").trim();
-            preOrCo = preOrCo.replaceAll("Pre-\\s*or", "").trim();
-            System.out.println("DEBUG: After cleanup: '" + preOrCo + "'");
+            
+            if (preOrCo.toLowerCase().contains("placement") && preOrCo.toLowerCase().contains("exam")) {
+                System.out.println("    ⚠ WARNING: Simplifying Pre- or corequisite with placement exam (coreq section)");
+                preOrCo = simplifyPlacementExamPrerequisite(preOrCo);
+                hasWarning = true;
+            }
             
             // Check if this content is already in the corequisites to avoid duplication
             String currentCoreqs = allCoreqs.toString();
@@ -476,7 +583,12 @@ public class ScrapingService {
             }
         }
         
-        return allCoreqs.length() > 0 ? allCoreqs.toString() : null;
+        String result = allCoreqs.length() > 0 ? allCoreqs.toString() : null;
+        
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("text", result);
+        resultMap.put("hasWarning", hasWarning);
+        return resultMap;
     }
 
     /**
@@ -681,6 +793,8 @@ public class ScrapingService {
         result = result.replaceAll("\\s*\\[WARNING:.*$", "");
         result = result.replaceAll("\\s*SBC\\s*:.*$", "");
         result = result.replaceAll("\\s*Advisory Preq\\s*:.*$", "");
+        result = result.replaceAll("\\s*Fees.*$", "");
+        result = result.replaceAll("\\s*Note:.*$", "");
         result = result.trim();
         
         return result.isEmpty() ? null : result;

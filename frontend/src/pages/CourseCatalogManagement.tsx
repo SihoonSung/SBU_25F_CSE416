@@ -13,6 +13,7 @@ interface ScrapedCourse {
   antirequisites: string;
   advisoryPrerequisites: string;
   sbcsSatisfied: string;
+  warning?: boolean; // True if placement exam simplification was applied
   term?: string; // Optional term name for display
 }
 
@@ -21,6 +22,10 @@ interface ScrapingResponse {
   message: string;
   term?: string;
   subjects?: string[];
+  totalScraped?: number;
+  scrapedSubjects?: string[];
+  skippedSubjects?: string[];
+  failedSubjects?: string[];
 }
 
 interface Term {
@@ -151,7 +156,14 @@ const CourseCatalogManagement: React.FC = () => {
       const result: ScrapingResponse = await response.json();
 
       if (result.success) {
-        setMessage({ type: 'success', text: `Successfully scraped ${selectedSubjects.join(', ')} courses for ${selectedTerm}` });
+        // Determine message type based on results
+        let messageType: 'success' | 'warning' = 'success';
+        
+        if (result.skippedSubjects && result.skippedSubjects.length > 0) {
+          messageType = 'warning'; // Show warning if some subjects were skipped
+        }
+        
+        setMessage({ type: messageType, text: result.message });
         await fetchScrapedCourses();
         await fetchTerms(); // Refresh terms to update isScraped status
       } else {
@@ -199,6 +211,8 @@ const CourseCatalogManagement: React.FC = () => {
     await fetchScrapedCourses();
   };
 
+  // Reset Term functionality - commented out as it may not be needed
+  /*
   const handleResetTerm = async () => {
     if (!selectedTerm) {
       setMessage({ type: 'warning', text: 'Please select a term to reset.' });
@@ -228,6 +242,7 @@ const CourseCatalogManagement: React.FC = () => {
       console.error('Reset error:', error);
     }
   };
+  */
 
   const getTermStatusDisplay = (termName: string) => {
     if (!isValidTermFormat(termName)) {
@@ -385,6 +400,7 @@ const CourseCatalogManagement: React.FC = () => {
             View Scraped Courses
           </button>
 
+          {/* Reset Term button - commented out as it may not be needed
           <button
             onClick={handleResetTerm}
             disabled={!selectedTerm || !isValidTermFormat(selectedTerm) || checkTermStatus(selectedTerm) !== 'scraped'}
@@ -392,6 +408,7 @@ const CourseCatalogManagement: React.FC = () => {
           >
             Reset Term
           </button>
+          */}
         </div>
       </div>
 
@@ -414,6 +431,7 @@ const CourseCatalogManagement: React.FC = () => {
                   <th>Credits</th>
                   <th>Prerequisites</th>
                   <th>SBCs</th>
+                  <th>Warning</th>
                 </tr>
               </thead>
               <tbody>
@@ -434,6 +452,13 @@ const CourseCatalogManagement: React.FC = () => {
                       ) : 'None'}
                     </td>
                     <td className="sbc-cell">{course.sbcsSatisfied || 'N/A'}</td>
+                    <td className="warning-cell">
+                      {course.warning ? (
+                        <span className="warning-icon" title="Placement exam simplification applied">⚠️</span>
+                      ) : (
+                        <span className="no-warning">✓</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
