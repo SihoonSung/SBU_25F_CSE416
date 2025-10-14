@@ -10,6 +10,7 @@ package edu.sbu.cse416.sam_system.entity;
  */
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "courses")
@@ -51,6 +52,7 @@ public class Course {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "term_id", nullable = false)
+    @JsonIgnore
     private Term term;
     
     // Constructors

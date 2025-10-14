@@ -10,6 +10,7 @@ package edu.sbu.cse416.sam_system.entity;
  */
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +39,7 @@ public class Term {
     private Boolean isScraped = false;
     
     @OneToMany(mappedBy = "term", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Course> courses = new ArrayList<>();
     
     // Constructors

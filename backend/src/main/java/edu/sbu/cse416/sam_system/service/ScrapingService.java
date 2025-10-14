@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -71,12 +72,21 @@ public class ScrapingService {
             throw new IllegalStateException("Term '" + termName + "' already has " + existingCourseCount + " courses. Cannot re-scrape. Use reset-term endpoint if needed.");
         }
 
+        // Define supported subjects
+        List<String> supportedSubjects = Arrays.asList("BIO", "PSY", "CSE", "ECO", "AMS", "POL");
+        
         int totalScraped = 0;
         for (String subject : subjects) {
             try {
                 System.out.println("\n" + "-".repeat(80));
                 System.out.println("Scraping subject: " + subject);
                 System.out.println("-".repeat(80));
+
+                // Check if subject is supported
+                if (!supportedSubjects.contains(subject)) {
+                    System.out.println("⚠ WARNING: Subject '" + subject + "' is not in the supported list (BIO, PSY, CSE, ECO, AMS, POL).");
+                    System.out.println("   Course information may not be parsed correctly and marked as 'unknown'.");
+                }
 
                 int coursesScraped = scrapeSubject(subject, term);
                 totalScraped += coursesScraped;
@@ -180,21 +190,6 @@ public class ScrapingService {
                         // Save new course
                         courseRepository.save(course);
                         count++;
-                        System.out.println(String.format("\n[%d] NEW: %s %s - %s", 
-                            count, course.getSubject(), course.getCourseNumber(), course.getCourseName()));
-                    }
-
-                    // Print details
-                    System.out.println("    Credits: " + course.getCredits());
-                    if (course.getDescription() != null) {
-                        String desc = course.getDescription();
-                        System.out.println("    Description: " + desc.substring(0, Math.min(60, desc.length())) + "...");
-                    }
-                    if (course.getPrerequisites() != null) {
-                        System.out.println("    Prerequisites: " + course.getPrerequisites().substring(0, Math.min(40, course.getPrerequisites().length())) + "...");
-                    }
-                    if (course.getSbcsSatisfied() != null) {
-                        System.out.println("    SBCs: " + course.getSbcsSatisfied());
                     }
                 }
 
@@ -221,6 +216,10 @@ public class ScrapingService {
 
         Course course = new Course(subject, courseNumber, courseName, term);
 
+        // Check if subject is supported for detailed parsing
+        List<String> supportedSubjects = Arrays.asList("BIO", "PSY", "CSE", "ECO", "AMS", "POL");
+        boolean isSubjectSupported = supportedSubjects.contains(subject);
+
         // Get the main content area
         Element contentTd = doc.selectFirst("td.block_content");
         if (contentTd == null) {
@@ -239,24 +238,41 @@ public class ScrapingService {
         course.setCredits(credits);
 
         // Extract prerequisites
-        String prerequisites = extractPrerequisites(fullText);
+        String prerequisites = isSubjectSupported ? extractPrerequisites(fullText) : "unknown";
         course.setPrerequisites(prerequisites);
 
         // Extract corequisites
-        String corequisites = extractCorequisites(fullText);
+        String corequisites = isSubjectSupported ? extractCorequisites(fullText) : "unknown";
         course.setCorequisites(corequisites);
 
         // Extract antirequisites
-        String antirequisites = extractAntirequisites(fullText);
+        String antirequisites = isSubjectSupported ? extractAntirequisites(fullText) : "unknown";
         course.setAntirequisites(antirequisites);
 
         // Extract advisory prerequisites
-        String advisoryPrereqs = extractAdvisoryPrerequisites(fullText);
+        String advisoryPrereqs = isSubjectSupported ? extractAdvisoryPrerequisites(fullText) : "unknown";
         course.setAdvisoryPrerequisites(advisoryPrereqs);
 
         // Extract SBCs
-        String sbcs = extractSBCs(fullText);
+        String sbcs = isSubjectSupported ? extractSBCs(fullText) : "unknown";
         course.setSbcsSatisfied(sbcs);
+
+        // Print comprehensive course summary
+        System.out.println("\n" + "=".repeat(80));
+        System.out.println("📚 " + subject + " " + courseNumber + " - " + courseName);
+        System.out.println("=".repeat(80));
+        System.out.println("📖 Description: " + (description != null && description.length() > 100 ? description.substring(0, 100) + "..." : description));
+        System.out.println("🎓 Credits: " + (credits != null ? credits : "Unknown"));
+        System.out.println("🔗 URL: " + url);
+        
+        // Field status with icons
+        System.out.println("\n📋 Course Attributes:");
+        System.out.println("  📝 Prerequisites: " + (prerequisites != null && !prerequisites.isEmpty() && !prerequisites.equals("unknown") ? "✅ " + prerequisites : "❌ None"));
+        System.out.println("  🔗 Corequisites: " + (corequisites != null && !corequisites.isEmpty() && !corequisites.equals("unknown") ? "✅ " + corequisites : "❌ None"));
+        System.out.println("  🚫 Antirequisites: " + (antirequisites != null && !antirequisites.isEmpty() && !antirequisites.equals("unknown") ? "✅ " + antirequisites : "❌ None"));
+        System.out.println("  💡 Advisory Prerequisites: " + (advisoryPrereqs != null && !advisoryPrereqs.isEmpty() && !advisoryPrereqs.equals("unknown") ? "✅ " + advisoryPrereqs : "❌ None"));
+        System.out.println("  🏷️  SBCs: " + (sbcs != null && !sbcs.isEmpty() && !sbcs.equals("unknown") ? "✅ " + sbcs : "❌ None"));
+        System.out.println("=".repeat(80));
 
         return course;
     }
@@ -320,30 +336,67 @@ public class ScrapingService {
      * Extracts prerequisites with placement exam simplification
      */
     private String extractPrerequisites(String text) {
-        String prereqs = extractField(text, "Prerequisite");
+        StringBuilder allPrereqs = new StringBuilder();
         
+        // First try "Prerequisite(s):" pattern (with parentheses)
+        String prereqs = extractField(text, "Prerequisite(s)");
         if (prereqs != null && !prereqs.isEmpty()) {
             if (prereqs.toLowerCase().contains("placement") && prereqs.toLowerCase().contains("exam")) {
                 System.out.println("    ⚠ WARNING: Simplifying prerequisites with placement exam");
                 prereqs = simplifyPlacementExamPrerequisite(prereqs);
             }
+            allPrereqs.append(prereqs);
         }
         
-        return prereqs;
+        // Then try regular prerequisite pattern
+        if (prereqs == null || prereqs.isEmpty()) {
+            prereqs = extractField(text, "Prerequisite");
+            if (prereqs != null && !prereqs.isEmpty()) {
+                if (prereqs.toLowerCase().contains("placement") && prereqs.toLowerCase().contains("exam")) {
+                    System.out.println("    ⚠ WARNING: Simplifying prerequisites with placement exam");
+                    prereqs = simplifyPlacementExamPrerequisite(prereqs);
+                }
+                allPrereqs.append(prereqs);
+            }
+        }
+        
+        // Also check for "Pre- or corequisite" pattern (but not "Advisory Preq")
+        Pattern preOrCoPattern = Pattern.compile("(?<!Advisory\\s)Pre- or corequisite\\s*:\\s*([A-Z0-9\\s,;]+?)(?=\\s*(?:Back to Top|Print|Repeatable|Offered|DEC|SBC:|$))", Pattern.CASE_INSENSITIVE);
+        Matcher preOrCoMatcher = preOrCoPattern.matcher(text);
+        
+        if (preOrCoMatcher.find()) {
+            String preOrCo = preOrCoMatcher.group(1).trim();
+            // Remove any remaining "Pre- or" text that might have been captured
+            preOrCo = preOrCo.replaceAll("Pre-\\s*or\\s*", "").trim();
+            preOrCo = preOrCo.replaceAll("Pre-\\s+or\\s*", "").trim();
+            preOrCo = preOrCo.replaceAll("Pre-\\s*or\\s+", "").trim();
+            if (preOrCo.toLowerCase().contains("placement") && preOrCo.toLowerCase().contains("exam")) {
+                System.out.println("    ⚠ WARNING: Simplifying prerequisites with placement exam");
+                preOrCo = simplifyPlacementExamPrerequisite(preOrCo);
+            }
+            if (allPrereqs.length() > 0) {
+                allPrereqs.append("; ");
+            }
+            allPrereqs.append(preOrCo);
+        }
+        
+        return allPrereqs.length() > 0 ? allPrereqs.toString() : null;
     }
 
     /**
      * Simplifies prerequisites involving placement exams
      */
     private String simplifyPlacementExamPrerequisite(String prereqs) {
-        // Look for course codes (3 letters + 3 digits)
+        // Look for course codes (3 letters + 3 digits) in the text
         Pattern coursePattern = Pattern.compile("([A-Z]{3}\\s+\\d{3}[^.;]*?)(?:[.;]|$)");
         Matcher matcher = coursePattern.matcher(prereqs);
         
         if (matcher.find()) {
+            // Found course code, return the course part
             return matcher.group(1).trim();
         }
         
+        // No course code found - keep original text with warning
         return prereqs + " [WARNING: Contains placement exam requirement]";
     }
 
@@ -351,33 +404,84 @@ public class ScrapingService {
      * Extracts corequisites
      */
     private String extractCorequisites(String text) {
-        return extractField(text, "Corequisite");
+        StringBuilder allCoreqs = new StringBuilder();
+        
+        // First try "Corequisite(s):" pattern (with parentheses)
+        String coreqs = extractField(text, "Corequisite(s)");
+        if (coreqs != null && !coreqs.isEmpty()) {
+            allCoreqs.append(coreqs);
+        }
+        
+        // Then try regular corequisite pattern
+        if (coreqs == null || coreqs.isEmpty()) {
+            coreqs = extractField(text, "Corequisite");
+            if (coreqs != null && !coreqs.isEmpty()) {
+                allCoreqs.append(coreqs);
+            }
+        }
+        
+        // Also check for "Pre- or corequisite" pattern (but not "Advisory Preq")
+        Pattern preOrCoPattern = Pattern.compile("(?<!Advisory\\s)Pre- or corequisite\\s*:\\s*([A-Z0-9\\s,;]+?)(?=\\s*(?:Back to Top|Print|Repeatable|Offered|DEC|SBC:|$))", Pattern.CASE_INSENSITIVE);
+        Matcher preOrCoMatcher = preOrCoPattern.matcher(text);
+        
+        if (preOrCoMatcher.find()) {
+            String preOrCo = preOrCoMatcher.group(1).trim();
+            // Remove any remaining "Pre- or" text that might have been captured
+            preOrCo = preOrCo.replaceAll("Pre-\\s*or\\s*", "").trim();
+            preOrCo = preOrCo.replaceAll("Pre-\\s+or\\s*", "").trim();
+            preOrCo = preOrCo.replaceAll("Pre-\\s*or\\s+", "").trim();
+            if (allCoreqs.length() > 0) {
+                allCoreqs.append("; ");
+            }
+            allCoreqs.append(preOrCo);
+        }
+        
+        return allCoreqs.length() > 0 ? allCoreqs.toString() : null;
     }
 
     /**
      * Extracts antirequisites
      */
     private String extractAntirequisites(String text) {
-        String antireqs = extractField(text, "Antirequisite");
-        
-        if (antireqs != null && !antireqs.isEmpty()) {
-            return antireqs;
+        // Try "Antirequisite(s):" pattern (with parentheses)
+        Pattern antireqPattern = Pattern.compile("Antirequisite\\(s\\)\\s*:\\s*([^\\r\\n]*?)(?=\\s*(?:Back to Top|Print|Repeatable|SBC:|Offered|DEC|$|\\r\\n))", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = antireqPattern.matcher(text);
+        if (matcher.find()) {
+            String result = matcher.group(1).trim();
+            return result.isEmpty() ? null : result;
         }
         
-        // Try "Not for credit" format
-        Pattern pattern = Pattern.compile("Not for credit in addition to ([^.]+)", Pattern.CASE_INSENSITIVE);
-        Matcher matcher = pattern.matcher(text);
-        
+        // Try "Anti-requisite:" pattern (with hyphen)
+        antireqPattern = Pattern.compile("Anti-requisite\\s*:\\s*([^\\r\\n]*?)(?=\\s*(?:Back to Top|Print|Repeatable|SBC:|Offered|DEC|$|\\r\\n))", Pattern.CASE_INSENSITIVE);
+        matcher = antireqPattern.matcher(text);
         if (matcher.find()) {
-            return matcher.group(1).trim();
+            String result = matcher.group(1).trim();
+            return result.isEmpty() ? null : result;
         }
         
-        // Try "May not be taken" format
-        pattern = Pattern.compile("May not be taken (?:by students )?with credit for ([^.]+)", Pattern.CASE_INSENSITIVE);
-        matcher = pattern.matcher(text);
-        
+        // Try regular "Antirequisite:" pattern (without hyphen)
+        antireqPattern = Pattern.compile("Antirequisite\\s*:\\s*([^\\r\\n]*?)(?=\\s*(?:Back to Top|Print|Repeatable|SBC:|Offered|DEC|$|\\r\\n))", Pattern.CASE_INSENSITIVE);
+        matcher = antireqPattern.matcher(text);
         if (matcher.find()) {
-            return matcher.group(1).trim();
+            String result = matcher.group(1).trim();
+            return result.isEmpty() ? null : result;
+        }
+        
+        // Only look for "Not for credit" format if it appears as a standalone field (not in description)
+        // Must be on its own line or after credits line
+        Pattern pattern = Pattern.compile("(?:\\d+\\s+credits?\\s*\\n\\s*|^\\s*)Not for credit in addition to ([^.]+)(?:\\s*\\n|$)", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
+        Matcher matcher1 = pattern.matcher(text);
+        
+        if (matcher1.find()) {
+            return matcher1.group(1).trim();
+        }
+        
+        // Try "May not be taken" format - must be on its own line or after credits
+        pattern = Pattern.compile("(?:\\d+\\s+credits?\\s*\\n\\s*|^\\s*)May not be taken (?:by students )?with credit for ([^.]+)(?:\\s*\\n|$)", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
+        Matcher matcher2 = pattern.matcher(text);
+        
+        if (matcher2.find()) {
+            return matcher2.group(1).trim();
         }
         
         return null;
@@ -387,23 +491,104 @@ public class ScrapingService {
      * Extracts advisory prerequisites
      */
     private String extractAdvisoryPrerequisites(String text) {
-        return extractField(text, "Advisory Prerequisite");
-    }
-
-    /**
-     * Extracts SBCs
-     */
-    private String extractSBCs(String text) {
-        Pattern pattern = Pattern.compile("SBC\\s*:\\s*([A-Z, ]+)", Pattern.CASE_INSENSITIVE);
+        // Try "Advisory Preq:" format first (this is the actual format in HTML)
+        Pattern pattern = Pattern.compile("Advisory Preq\\s*:\\s*([^\\n\\r]+?)(?=\\s*(?:Back to Top|Print|Repeatable|Offered|DEC|SBC:|$))", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(text);
         
         if (matcher.find()) {
-            String sbcs = matcher.group(1).trim();
-            sbcs = sbcs.replaceAll("[.,;]+$", "").trim();
-            return sbcs;
+            String result = matcher.group(1).trim();
+            return result.isEmpty() ? null : result;
+        }
+        
+        // Try "Advisory Prerequisite(s):" pattern (with parentheses)
+        pattern = Pattern.compile("Advisory Prerequisite\\(s\\)\\s*:\\s*([^\\n\\r]*?)(?=\\s*(?:Back to Top|Print|Repeatable|Offered|DEC|SBC:|$))", Pattern.CASE_INSENSITIVE);
+        matcher = pattern.matcher(text);
+        
+        if (matcher.find()) {
+            String result = matcher.group(1).trim();
+            return result.isEmpty() ? null : result;
+        }
+        
+        // Fallback to full "Advisory Prerequisite" format
+        pattern = Pattern.compile("Advisory Prerequisite\\s*:\\s*([^\\n\\r]*?)(?=\\s*(?:Back to Top|Print|Repeatable|Offered|DEC|SBC:|$))", Pattern.CASE_INSENSITIVE);
+        matcher = pattern.matcher(text);
+        
+        if (matcher.find()) {
+            String result = matcher.group(1).trim();
+            return result.isEmpty() ? null : result;
         }
         
         return null;
+    }
+
+    /**
+     * Extracts SBCs with improved parsing for all SBC patterns
+     */
+    private String extractSBCs(String text) {
+        // First try "SBC: Partially fulfills: ..." pattern - remove "SBC:" prefix
+        Pattern sbcPartialPattern = Pattern.compile("SBC\\s*:\\s*(Partially fulfills\\s*:?\\s*[^\\r\\n]*?)(?=\\s*(?:Back to Top|Print|Repeatable|$|\\r\\n))", Pattern.CASE_INSENSITIVE);
+        Matcher sbcPartialMatcher = sbcPartialPattern.matcher(text);
+        
+        if (sbcPartialMatcher.find()) {
+            String sbcs = sbcPartialMatcher.group(1).trim();
+            // Ensure it has a colon after "Partially fulfills"
+            if (!sbcs.contains(":")) {
+                sbcs = sbcs.replaceFirst("Partially fulfills", "Partially fulfills:");
+            }
+            return cleanSBCString(sbcs);
+        }
+        
+        // Then try standalone "Partially fulfills" pattern (without SBC: prefix)
+        Pattern partialPattern = Pattern.compile("(Partially fulfills\\s*:?\\s*[^\\r\\n]*?)(?=\\s*(?:Back to Top|Print|Repeatable|$|\\r\\n))", Pattern.CASE_INSENSITIVE);
+        Matcher partialMatcher = partialPattern.matcher(text);
+        
+        if (partialMatcher.find()) {
+            String sbcs = partialMatcher.group(1).trim();
+            // Ensure it has a colon after "Partially fulfills"
+            if (!sbcs.contains(":")) {
+                sbcs = sbcs.replaceFirst("Partially fulfills", "Partially fulfills:");
+            }
+            return cleanSBCString(sbcs);
+        }
+        
+        // Try simple SBC pattern - remove "SBC:" prefix for simple SBCs
+        Pattern simpleSbcPattern = Pattern.compile("SBC\\s*:\\s*([A-Z+,\\s]+?)(?=\\s*(?:Back to Top|Print|Repeatable|$|\\r\\n))", Pattern.CASE_INSENSITIVE);
+        Matcher simpleMatcher = simpleSbcPattern.matcher(text);
+        
+        if (simpleMatcher.find()) {
+            String sbcs = simpleMatcher.group(1).trim();
+            // Skip if it contains "Partially fulfills" (already handled above)
+            if (!sbcs.toLowerCase().contains("partially fulfills")) {
+                return cleanSBCString(sbcs);
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Cleans SBC string by removing unwanted suffixes and formatting
+     */
+    private String cleanSBCString(String sbcString) {
+        if (sbcString == null || sbcString.isEmpty()) {
+            return null;
+        }
+        
+        // Clean up extra spaces and punctuation first
+        sbcString = sbcString.replaceAll("[.,;]+$", "").trim();
+        sbcString = sbcString.replaceAll("\\s+", " ").trim();
+        
+        // Remove unwanted suffixes from the entire string
+        sbcString = sbcString.replaceAll("\\s+Back to Top.*$", "");
+        sbcString = sbcString.replaceAll("\\s+Repeatable.*$", "");
+        sbcString = sbcString.replaceAll("\\s*Print.*$", "");
+        sbcString = sbcString.replaceAll("\\s*\\|.*$", "");
+        sbcString = sbcString.replaceAll("\\s*\\(opens a new window\\).*$", "");
+        
+        // Clean up any remaining extra spaces
+        sbcString = sbcString.trim();
+        
+        return sbcString.isEmpty() ? null : sbcString;
     }
 
     /**
@@ -423,9 +608,9 @@ public class ScrapingService {
         
         // Find the end
         String[] stopKeywords = {
-            "Prerequisite", "Corequisite", "Advisory Prerequisite", 
-            "Antirequisite", "SBC:", "Not for credit", "May not be taken",
-            "\\d+\\s+credits?"
+            "Prerequisite", "Corequisite", "Advisory Prerequisite", "Advisory Preq",
+            "Antirequisite", "Anti-requisite", "SBC:", "Not for credit", "May not be taken",
+            "Repeatable", "Offered", "\\d+\\s+credits?"
         };
         
         String stopPattern = String.join("|", stopKeywords);
@@ -446,6 +631,17 @@ public class ScrapingService {
         
         result = result.replaceAll("\\s+", " ").trim();
         result = result.replaceAll("[.,;]+$", "").trim();
+        
+        // Remove unwanted text patterns
+        result = result.replaceAll("\\s*Back to Top.*$", "");
+        result = result.replaceAll("\\s*Print-Friendly Page.*$", "");
+        result = result.replaceAll("\\s*Print.*$", "");
+        result = result.replaceAll("\\s*\\|.*$", "");
+        result = result.replaceAll("\\s*\\(opens a new window\\).*$", "");
+        result = result.replaceAll("\\s*\\[WARNING:.*$", "");
+        result = result.replaceAll("\\s*SBC\\s*:.*$", "");
+        result = result.replaceAll("\\s*Advisory Preq\\s*:.*$", "");
+        result = result.trim();
         
         return result.isEmpty() ? null : result;
     }

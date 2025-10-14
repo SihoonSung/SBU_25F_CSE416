@@ -3,14 +3,16 @@ package edu.sbu.cse416.sam_system.controller;
 /*
  * TP: Used Cursor to implement REST API endpoints for course catalog scraping
  * Features:
- * - POST /api/scraping/scrape: Trigger scraping for specific term and subjects
+ * - POST /api/scraping/scrape: Trigger scraping for specific term and subjects (one-time only per term)
  * - GET /api/scraping/available-subjects: Get list of supported subjects
  * - GET /api/scraping/terms: Get all scraped terms
- * - GET /api/scraping/courses: Get courses with fallback to nearest term
+ * - GET /api/scraping/courses: Get courses with fallback to nearest available term
  * - GET /api/scraping/courses/byTerm: Get all courses for a specific term
  * - GET /api/scraping/course: Get specific course by subject and number
  * - GET /api/scraping/stats: Get scraping statistics (total courses, by subject)
- * - Handles re-scraping prevention (returns 400 Bad Request with error message)
+ * - POST /api/scraping/reset-term: Reset term's scraped status (allows re-scraping)
+ * - DELETE /api/scraping/clear-all: Clear all data (for testing/reset)
+ * - Enforces one-time scraping per term to prevent data inconsistency
  */
 
 import edu.sbu.cse416.sam_system.entity.Course;
@@ -44,6 +46,8 @@ public class ScrapingController {
 
     /**
      * Scrape courses for a given term and list of subjects
+     * Each term can only be scraped once to maintain data consistency.
+     * If a term has already been scraped, returns 400 Bad Request.
      * 
      * Example: POST /api/scraping/scrape
      * Body: {
@@ -122,7 +126,12 @@ public class ScrapingController {
             @RequestParam String term,
             @RequestParam String subject) {
         
+        System.out.println("Getting courses for term: " + term + ", subject: " + subject);
+        
         List<Course> courses = scrapingService.getCoursesForTerm(term, subject);
+        
+        System.out.println("Found " + courses.size() + " courses for " + subject + " in " + term);
+        
         return ResponseEntity.ok(courses);
     }
 
