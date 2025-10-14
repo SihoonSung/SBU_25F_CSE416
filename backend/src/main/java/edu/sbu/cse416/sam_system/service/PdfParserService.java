@@ -173,6 +173,7 @@ public class PdfParserService {
             // Handles multi-line requisites (e.g., text wrapped across multiple lines)
             // Support both singular and plural forms (Prerequisite/Prerequisites)
             if (line.startsWith("Prerequisite") || line.startsWith("Advisory Prerequisite") || 
+                line.startsWith("Pre- or Corequisite") ||
                 line.startsWith("Corequisite") || line.startsWith("Advisory Corequisite") ||
                 line.startsWith("Antirequisite") || line.contains("Anti-requisite")) {
                 
@@ -190,8 +191,14 @@ public class PdfParserService {
                             break;
                         }
                         
-                        // Stop if we hit a class detail line (5-digit ID followed by section type)
+                        // Stop if we hit a class detail line (with ID: 5-digit followed by section type)
                         if (nextLine.matches("^\\d{5}\\s+(LEC|LAB|REC|TUT|SEM|STU|IND|PRA|CLN|FLD|INT|THE|WKS).*")) {
+                            break;
+                        }
+                        
+                        // Stop if we hit a class detail line (without ID: section type at start)
+                        // e.g., "REC R02 M 08:25-09:20AM ..."
+                        if (nextLine.matches("^(LEC|LAB|REC|TUT|SEM|STU|IND|PRA|CLN|FLD|INT|THE|WKS)\\s+[A-Z]?\\d{2}\\s+.*")) {
                             break;
                         }
                         
@@ -209,6 +216,7 @@ public class PdfParserService {
                         
                         // Stop if we hit a new requisite line
                         if (nextLine.startsWith("Prerequisite") ||
+                            nextLine.startsWith("Pre- or Corequisite") ||
                             nextLine.startsWith("Corequisite") ||
                             nextLine.startsWith("Antirequisite") ||
                             nextLine.startsWith("Advisory") ||
@@ -228,77 +236,77 @@ public class PdfParserService {
                     
                     String fullLine = fullText.toString();
                     
-                    // Parse requisites from the full text
-                    // Handle cases where multiple requisites are in the same line
-                    // e.g., "Prerequisites: ... Antirequisite: ..."
+                    // Simple approach: split by semicolon and process each part
+                    String[] parts = fullLine.split(";");
+                    StringBuilder prereqBuilder = new StringBuilder();
+                    StringBuilder coreqBuilder = new StringBuilder();
+                    StringBuilder antireqBuilder = new StringBuilder();
                     
-                    // Extract Prerequisites
-                    if (fullLine.contains("Advisory Prerequisites:")) {
-                        int start = fullLine.indexOf("Advisory Prerequisites:") + "Advisory Prerequisites:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentPrerequisites = fullLine.substring(start, end).trim();
-                    } else if (fullLine.contains("Advisory Prerequisite:")) {
-                        int start = fullLine.indexOf("Advisory Prerequisite:") + "Advisory Prerequisite:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentPrerequisites = fullLine.substring(start, end).trim();
-                    } else if (fullLine.contains("Prerequisites:")) {
-                        int start = fullLine.indexOf("Prerequisites:") + "Prerequisites:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentPrerequisites = fullLine.substring(start, end).trim();
-                    } else if (fullLine.contains("Prerequisite:")) {
-                        int start = fullLine.indexOf("Prerequisite:") + "Prerequisite:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentPrerequisites = fullLine.substring(start, end).trim();
+                    for (String part : parts) {
+                        part = part.trim();
+                        
+                        // Handle "Pre- or Corequisite: ..."
+                        if (part.startsWith("Pre- or Corequisite:")) {
+                            String content = part.substring("Pre- or Corequisite:".length()).trim();
+                            
+                            // Add to prerequisites
+                            if (prereqBuilder.length() > 0) prereqBuilder.append(", or ");
+                            prereqBuilder.append(content);
+                            
+                            // Add to corequisites
+                            coreqBuilder.append(content);
+                        }
+                        // Handle regular "Prerequisite: ..." (may contain "or Corequisite:")
+                        else if (part.startsWith("Prerequisite:") || part.startsWith("Prerequisites:")) {
+                            String content = part.startsWith("Prerequisite:") 
+                                ? part.substring("Prerequisite:".length()).trim()
+                                : part.substring("Prerequisites:".length()).trim();
+                            
+                            // Just add the whole content to prerequisites (including "or Corequisite: X")
+                            if (prereqBuilder.length() > 0) prereqBuilder.append("; ");
+                            prereqBuilder.append(content);
+                        }
+                        // Handle regular "Corequisite: ..."
+                        else if (part.startsWith("Corequisite:") || part.startsWith("Corequisites:")) {
+                            String content = part.startsWith("Corequisite:") 
+                                ? part.substring("Corequisite:".length()).trim()
+                                : part.substring("Corequisites:".length()).trim();
+                            
+                            if (coreqBuilder.length() > 0) coreqBuilder.append("; ");
+                            coreqBuilder.append(content);
+                        }
+                        // Handle "Antirequisite: ..."
+                        else if (part.startsWith("Antirequisite:") || part.startsWith("Anti-requisite:")) {
+                            String content = part.startsWith("Antirequisite:") 
+                                ? part.substring("Antirequisite:".length()).trim()
+                                : part.substring("Anti-requisite:".length()).trim();
+                            
+                            if (antireqBuilder.length() > 0) antireqBuilder.append("; ");
+                            antireqBuilder.append(content);
+                        }
                     }
                     
-                    // Extract Corequisites
-                    if (fullLine.contains("Advisory Corequisites:")) {
-                        int start = fullLine.indexOf("Advisory Corequisites:") + "Advisory Corequisites:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentCorequisites = fullLine.substring(start, end).trim();
-                    } else if (fullLine.contains("Advisory Corequisite:")) {
-                        int start = fullLine.indexOf("Advisory Corequisite:") + "Advisory Corequisite:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentCorequisites = fullLine.substring(start, end).trim();
-                    } else if (fullLine.contains("Corequisites:")) {
-                        int start = fullLine.indexOf("Corequisites:") + "Corequisites:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentCorequisites = fullLine.substring(start, end).trim();
-                    } else if (fullLine.contains("Corequisite:")) {
-                        int start = fullLine.indexOf("Corequisite:") + "Corequisite:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentCorequisites = fullLine.substring(start, end).trim();
+                    // Update current values
+                    if (prereqBuilder.length() > 0) {
+                        currentPrerequisites = prereqBuilder.toString();
                     }
-                    
-                    // Extract Antirequisites
-                    if (fullLine.contains("Anti-requisites:")) {
-                        int start = fullLine.indexOf("Anti-requisites:") + "Anti-requisites:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentAntirequisites = fullLine.substring(start, end).trim();
-                    } else if (fullLine.contains("Anti-requisite:")) {
-                        int start = fullLine.indexOf("Anti-requisite:") + "Anti-requisite:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentAntirequisites = fullLine.substring(start, end).trim();
-                    } else if (fullLine.contains("Antirequisites:")) {
-                        int start = fullLine.indexOf("Antirequisites:") + "Antirequisites:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentAntirequisites = fullLine.substring(start, end).trim();
-                    } else if (fullLine.contains("Antirequisite:")) {
-                        int start = fullLine.indexOf("Antirequisite:") + "Antirequisite:".length();
-                        int end = findNextRequisiteStart(fullLine, start);
-                        currentAntirequisites = fullLine.substring(start, end).trim();
+                    if (coreqBuilder.length() > 0) {
+                        currentCorequisites = coreqBuilder.toString();
+                    }
+                    if (antireqBuilder.length() > 0) {
+                        currentAntirequisites = antireqBuilder.toString();
                     }
                 }
                 continue;
             }
             
-            // Check if this is a LEC line (without ID)
-            // LEC sections don't have class IDs, but their info is needed for LAB sections
+            // Check if this is a LEC/REC line (without ID)
+            // LEC/REC sections without IDs are informational only, but store for reference
             Matcher classDetailNoIdMatcher = classDetailNoIdPattern.matcher(line);
             if (classDetailNoIdMatcher.find() && currentDept != null) {
                 String type = classDetailNoIdMatcher.group(1).trim();
-                if (type.equals("LEC")) {
-                    // Store LEC information for later use with LAB sections
+                if (type.equals("LEC") || type.equals("REC")) {
+                    // Store LEC/REC information for later use with LAB sections
                     String days = classDetailNoIdMatcher.group(3).trim();
                     String timeSchedule = classDetailNoIdMatcher.group(4).trim();
                     String restOfLine = classDetailNoIdMatcher.group(5).trim();
@@ -468,6 +476,7 @@ public class PdfParserService {
         String[] keywords = {
             "Prerequisite:", "Prerequisites:",
             "Advisory Prerequisite:", "Advisory Prerequisites:",
+            "Pre- or Corequisite:", "Pre- or Corequisites:",
             "Corequisite:", "Corequisites:",
             "Advisory Corequisite:", "Advisory Corequisites:",
             "Antirequisite:", "Antirequisites:",
