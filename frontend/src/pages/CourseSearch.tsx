@@ -1,170 +1,273 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import './CourseSearch.css'
 
 /*
  * Course Search Page Component
- * Displays course catalog with filtering options.
+ * Displays course catalog from courses table (scraped data).
+ * Shows detailed course information including descriptions, prerequisites, SBCs, etc.
  * 
- * TP: Used Cursor to implement backend integration and filtering logic.
+ * TP: Used Cursor to implement backend integration with courses table.
  */
 
 interface Course {
-  code: string
-  title: string
-  credits: number
+  id: number
+  subject: string
+  courseNumber: string
+  courseName: string
+  description: string
+  credits: number | string
   prerequisites: string
-  instructor: string
-  time: string
-  seatsOpen: number
-  capacity?: number
-  sbc?: string
-  classId?: number
-  department?: string
-  courseNum?: number
-  section?: string
-  schedule?: string
-  location?: string
+  corequisites: string
+  antirequisites: string
+  advisoryPrerequisites: string
+  sbcsSatisfied: string
+  warning: boolean
+  termName?: string
 }
 
 function CourseSearch() {
-  const [filters, setFilters] = useState({
-    classId: '',
-    subject: '',
-    courseNumber: '',
-    sbc: 'Any',
-    instructor: '',
-    daysTime: 'Any'
-  })
-
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
-  const [availableTerms, setAvailableTerms] = useState([])
-  const [selectedSemester, setSelectedSemester] = useState('')
-  const [selectedYear, setSelectedYear] = useState('')
+  const [filters, setFilters] = useState({
+    subject: '',
+    courseNumber: '',
+    sbc: 'Any'
+  })
+  const [availableTerms, setAvailableTerms] = useState<any[]>([])
+  const [selectedTerm, setSelectedTerm] = useState<string>('')
+  const [warningMessage, setWarningMessage] = useState<string>('')
+  const supportedSubjects = ['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']
 
   /**
    * Fetch available terms on component mount
    */
   useEffect(() => {
-    fetchAvailableTerms()
+    fetchTerms()
   }, [])
-  
-  /**
-   * Fetch classes when term selection changes
-   */
-  useEffect(() => {
-    if (selectedSemester && selectedYear) {
-      fetchClassesByTerm(selectedSemester, selectedYear)
-    }
-  }, [selectedSemester, selectedYear])
 
   /**
-   * Fetch available semester/year combinations from backend
+   * Fetch courses when term changes
    */
-  const fetchAvailableTerms = async () => {
+  useEffect(() => {
+    if (selectedTerm) {
+      fetchCourses()
+    }
+  }, [selectedTerm])
+
+  /**
+   * Fetch available terms from backend
+   */
+  const fetchTerms = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/classes/terms')
+      const response = await fetch('http://localhost:8080/api/scraping/terms')
+      
+      if (!response.ok) {
+        console.error('Failed to fetch terms:', response.status)
+        setAvailableTerms([])
+        return
+      }
+      
       const data = await response.json()
+      
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        console.error('Terms data is not an array:', data)
+        setAvailableTerms([])
+        return
+      }
+      
       setAvailableTerms(data)
       
       // Auto-select the first term if available
       if (data.length > 0) {
-        setSelectedSemester(data[0].semester)
-        setSelectedYear(data[0].year)
+        setSelectedTerm(data[0].name)
       }
+      
+      console.log('Fetched terms:', data.length)
     } catch (error) {
       console.error('Error fetching terms:', error)
-    }
-  }
-  
-  /**
-   * Fetch classes by semester and year
-   */
-  const fetchClassesByTerm = async (semester: string, year: number) => {
-    try {
-      const response = await fetch(`http://localhost:8080/api/classes/by-term?semester=${semester}&year=${year}`)
-      const data = await response.json()
-      
-      // Transform backend data to frontend format
-      const transformedData = data.map((cls: any) => ({
-        code: `${cls.department}${cls.courseNum}.${cls.section}`,
-        title: cls.title,
-        credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
-        prerequisites: cls.prerequisites || 'None',
-        instructor: cls.instructor,
-        time: cls.schedule || 'View details',
-        seatsOpen: cls.capacity || 0,
-        capacity: cls.capacity,
-        sbc: cls.sbc,
-        classId: cls.classId,
-        department: cls.department,
-        courseNum: cls.courseNum,
-        section: cls.section,
-        schedule: cls.schedule,
-        location: cls.location
-      }))
-      
-      setCourses(transformedData)
-    } catch (error) {
-      console.error('Error fetching classes:', error)
-    }
-  }
-  
-  /**
-   * Fetch all classes from the backend API (deprecated)
-   */
-  const fetchAllClasses = async () => {
-    try {
-      const response = await fetch('http://localhost:8080/api/classes')
-      const data = await response.json()
-      
-      // Transform backend data to frontend format
-      const transformedData = data.map((cls: any) => ({
-        code: `${cls.department}${cls.courseNum}.${cls.section}`,
-        title: cls.title,
-        credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
-        prerequisites: cls.prerequisites || 'None',
-        instructor: cls.instructor,
-        time: cls.schedule || 'View details',
-        seatsOpen: cls.capacity || 0, // Use capacity from backend
-        capacity: cls.capacity,
-        sbc: cls.sbc,
-        classId: cls.classId,
-        department: cls.department,
-        courseNum: cls.courseNum,
-        section: cls.section,
-        schedule: cls.schedule,
-        location: cls.location
-      }))
-      
-      setCourses(transformedData)
-    } catch (error) {
-      console.error('Error fetching classes:', error)
+      setAvailableTerms([])
     }
   }
 
+  /**
+   * Fetch courses for selected term (all subjects: BIO, PSY, CSE, ECO, AMS, POL)
+   */
+  const fetchCourses = async () => {
+    if (!selectedTerm) {
+      setCourses([])
+      return
+    }
+
+    try {
+      const allCourses: any[] = []
+      const subjects = ['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']
+      
+      // Fetch courses for all subjects
+      for (const subject of subjects) {
+        try {
+          const response = await fetch(
+            `http://localhost:8080/api/scraping/courses?term=${encodeURIComponent(selectedTerm)}&subject=${subject}`
+          )
+          
+          if (response.ok) {
+            const courses = await response.json()
+            allCourses.push(...courses)
+          }
+        } catch (error) {
+          console.error(`Error fetching ${subject} for ${selectedTerm}:`, error)
+        }
+      }
+      
+      console.log('Total courses fetched:', allCourses.length)
+      
+      if (allCourses.length === 0) {
+        console.warn('No courses found for selected term and subjects.')
+        setCourses([])
+        return
+      }
+      
+      // Transform backend data to frontend format
+      const transformedData = allCourses
+        .map((course: any) => ({
+          id: course.id,
+          subject: course.subject,
+          courseNumber: course.courseNumber,
+          courseName: course.courseName,
+          description: course.description || 'No description available',
+          credits: course.credits === course.maxCredits || course.maxCredits === null 
+            ? course.credits 
+            : `${course.credits}-${course.maxCredits}`,
+          prerequisites: course.prerequisites || 'None',
+          corequisites: course.corequisites || 'None',
+          antirequisites: course.antirequisites || 'None',
+          advisoryPrerequisites: course.advisoryPrerequisites || 'None',
+          sbcsSatisfied: course.sbcsSatisfied || 'None',
+          warning: course.warning || false,
+          termName: selectedTerm
+        }))
+        .sort((a: Course, b: Course) => {
+          // Sort by Subject → Course Number
+          if (a.subject !== b.subject) {
+            return a.subject.localeCompare(b.subject)
+          }
+          return parseInt(a.courseNumber) - parseInt(b.courseNumber)
+        })
+      
+      console.log('Transformed courses:', transformedData.length)
+      setCourses(transformedData)
+    } catch (error) {
+      console.error('Error fetching courses:', error)
+    }
+  }
+
+  /**
+   * Handle search functionality
+   */
+  const handleSearch = (term: string) => {
+    setSearchTerm(term)
+    setCurrentPage(1)
+  }
+
+  /**
+   * Handle filter change
+   */
   const handleFilterChange = (field: string, value: string) => {
     setFilters(prev => ({
       ...prev,
       [field]: value
     }))
-  }
-
-  const handleAddToCart = (courseCode: string) => {
-    console.log(`Added ${courseCode} to cart`)
-    // TODO: Implement add to cart functionality
-  }
-
-  const handleViewDetails = (courseCode: string) => {
-    console.log(`View details for ${courseCode}`)
-    // TODO: Implement view details functionality
+    setCurrentPage(1)
+    
+    // Check if subject filter is for unsupported subject
+    if (field === 'subject' && value.trim() !== '') {
+      const upperValue = value.trim().toUpperCase()
+      const isSupported = supportedSubjects.some(s => s === upperValue || upperValue.includes(s))
+      
+      if (!isSupported && upperValue.length >= 2) {
+        setWarningMessage(
+          `⚠️ Warning: "${value}" may not be a supported subject. ` +
+          `Supported subjects are: BIO, PSY, CSE, ECO, AMS, POL. ` +
+          `Course information for unsupported subjects may be marked as "unknown".`
+        )
+      } else {
+        setWarningMessage('')
+      }
+    } else if (field !== 'subject') {
+      // Clear warning when changing other filters
+      if (warningMessage && !warningMessage.includes('subject')) {
+        setWarningMessage('')
+      }
+    }
   }
 
   /**
+   * Handle course selection to show details
+   */
+  const handleCourseSelect = (course: Course) => {
+    setSelectedCourse(course)
+  }
+
+  /**
+   * Go back to search results from course details
+   */
+  const handleBackToSearch = () => {
+    setSelectedCourse(null)
+  }
+
+
+  /**
+   * Apply filters and search to courses
+   */
+  useEffect(() => {
+    let filtered = courses.filter(course => {
+      // Search term filter (searches in code, title, description)
+      if (searchTerm.trim() !== '') {
+        const search = searchTerm.toLowerCase()
+        const courseCode = `${course.subject}${course.courseNumber}`.toLowerCase()
+        const title = course.courseName.toLowerCase()
+        const description = course.description.toLowerCase()
+        
+        if (!courseCode.includes(search) && 
+            !title.includes(search) && 
+            !description.includes(search)) {
+          return false
+        }
+      }
+      
+      // Subject filter
+      if (filters.subject && filters.subject.trim() !== '') {
+        if (!course.subject.toLowerCase().includes(filters.subject.toLowerCase())) {
+        return false
+        }
+      }
+      
+      // Course number filter
+      if (filters.courseNumber && filters.courseNumber.trim() !== '') {
+        if (!course.courseNumber.includes(filters.courseNumber)) {
+          return false
+        }
+      }
+      
+      // SBC filter
+      if (filters.sbc && filters.sbc !== 'Any') {
+        if (!course.sbcsSatisfied || !course.sbcsSatisfied.includes(filters.sbc)) {
+        return false
+        }
+      }
+      
+      return true
+    })
+    
+    setFilteredCourses(filtered)
+  }, [filters, courses, searchTerm])
+
+  /**
    * Calculate pagination for search results
-   * Shows 10 courses per page
    */
   const indexOfLastItem = currentPage * itemsPerPage
   const indexOfFirstItem = indexOfLastItem - itemsPerPage
@@ -189,115 +292,51 @@ function CourseSearch() {
     }
   }
 
-  /**
-   * Apply filters to courses whenever filters or courses change
-   * Also sorts results by Department → Course Number → Section
-   */
-  useEffect(() => {
-    let filtered = courses.filter(course => {
-      // Class ID filter
-      if (filters.classId && filters.classId.trim() !== '' && course.classId) {
-        if (!course.classId.toString().includes(filters.classId)) {
-          return false
-        }
-      }
-      
-      // Subject/Department filter (case insensitive)
-      if (filters.subject && filters.subject.trim() !== '' && course.department) {
-        if (!course.department.toLowerCase().includes(filters.subject.toLowerCase())) {
-          return false
-        }
-      }
-      
-      // Course number filter
-      if (filters.courseNumber && course.courseNum) {
-        if (!course.courseNum.toString().includes(filters.courseNumber)) {
-          return false
-        }
-      }
-      
-      // Instructor filter (case insensitive)
-      if (filters.instructor && filters.instructor.trim() !== '') {
-        if (!course.instructor.toLowerCase().includes(filters.instructor.toLowerCase())) {
-          return false
-        }
-      }
-      
-      return true
-    })
-    
-    // Sort by Department → Course Number → Section
-    filtered.sort((a, b) => {
-      // Sort by Department first
-      if (a.department !== b.department) {
-        return a.department.localeCompare(b.department)
-      }
-      // Then by Course Number
-      if (a.courseNum !== b.courseNum) {
-        return a.courseNum - b.courseNum
-      }
-      // Finally by Section
-      return a.section.localeCompare(b.section)
-    })
-    
-    setFilteredCourses(filtered)
-    setCurrentPage(1) // Reset to first page when filters change
-  }, [filters, courses])
-
   return (
     <div className="course-search">
-      {/* Term Selection */}
-      <div className="term-selection-bar">
-        <label htmlFor="semester-select">Semester:</label>
-        <select
-          id="semester-select"
-          value={selectedSemester}
-          onChange={(e) => setSelectedSemester(e.target.value)}
-        >
-          {availableTerms.map((term: any) => (
-            <option key={`${term.semester}-${term.year}`} value={term.semester}>
-              {term.semester}
-            </option>
-          ))}
-        </select>
-        
-        <label htmlFor="year-select">Year:</label>
-        <select
-          id="year-select"
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(Number(e.target.value))}
-        >
-          {availableTerms.map((term: any) => (
-            <option key={`${term.semester}-${term.year}`} value={term.year}>
-              {term.year}
-            </option>
-          ))}
-        </select>
-      </div>
-      
+      {/* Warning Message */}
+      {warningMessage && (
+        <div className="warning-banner">
+          {warningMessage}
+        </div>
+      )}
+
       <div className="course-search-content">
         {/* Filters Sidebar */}
         <div className="filters-sidebar">
           <h2>Filters</h2>
+          
+          {/* Term Selection */}
           <div className="filter-group">
-            <label htmlFor="classId">Class ID:</label>
-            <input
-              type="text"
-              id="classId"
-              value={filters.classId}
-              onChange={(e) => handleFilterChange('classId', e.target.value)}
-              placeholder="e.g. 85429"
-            />
+            <label htmlFor="term-select">Term:</label>
+            <select
+              id="term-select"
+              value={selectedTerm}
+              onChange={(e) => setSelectedTerm(e.target.value)}
+            >
+              <option value="">Select Term...</option>
+              {availableTerms.map((term: any) => (
+                <option key={term.id} value={term.name}>
+                  {term.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Info Text */}
+          <div className="filter-info">
+            <p>📚 Showing all subjects: BIO, PSY, CSE, ECO, AMS, POL</p>
           </div>
           
+          {/* Search Bar */}
           <div className="filter-group">
-            <label htmlFor="subject">Subject:</label>
+            <label htmlFor="search">Search:</label>
             <input
               type="text"
-              id="subject"
-              value={filters.subject}
-              onChange={(e) => handleFilterChange('subject', e.target.value)}
-              placeholder="CSE"
+              id="search"
+              placeholder="Course code, title, description..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
             />
           </div>
           
@@ -308,7 +347,7 @@ function CourseSearch() {
               id="courseNumber"
               value={filters.courseNumber}
               onChange={(e) => handleFilterChange('courseNumber', e.target.value)}
-              placeholder="e.g. 101"
+              placeholder="e.g., 416"
             />
           </div>
           
@@ -321,7 +360,11 @@ function CourseSearch() {
             >
               <option value="Any">Any</option>
               <option value="ARTS">ARTS</option>
+              <option value="CER">CER</option>
+              <option value="ESI">ESI</option>
+              <option value="EXP+">EXP+</option>
               <option value="GLO">GLO</option>
+              <option value="HFA">HFA</option>
               <option value="HUM">HUM</option>
               <option value="LANG">LANG</option>
               <option value="QPS">QPS</option>
@@ -334,105 +377,203 @@ function CourseSearch() {
             </select>
           </div>
           
-          <div className="filter-group">
-            <label htmlFor="instructor">Instructor:</label>
-            <input
-              type="text"
-              id="instructor"
-              value={filters.instructor}
-              onChange={(e) => handleFilterChange('instructor', e.target.value)}
-              placeholder="e.g. alex"
-            />
+          <div className="filter-stats">
+            <div className="stat-item">
+              <span className="stat-label">Total Courses:</span>
+              <span className="stat-value">{courses.length}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">Filtered Results:</span>
+              <span className="stat-value">{filteredCourses.length}</span>
+            </div>
           </div>
           
-          <div className="filter-group">
-            <label htmlFor="daysTime">Days/Time:</label>
-            <select
-              id="daysTime"
-              value={filters.daysTime}
-              onChange={(e) => handleFilterChange('daysTime', e.target.value)}
-            >
-              <option value="Any">Any</option>
-              <option value="MWF">MWF</option>
-              <option value="TTH">TTH</option>
-              <option value="M-F">M-F</option>
-              <option value="Weekend">Weekend</option>
-            </select>
-          </div>
+          {/* Clear Filters Button */}
+          <button 
+            className="clear-filters-btn"
+            onClick={() => {
+              setFilters({ subject: '', courseNumber: '', sbc: 'Any' })
+              setSearchTerm('')
+              setCurrentPage(1)
+            }}
+          >
+            🔄 Clear Filters
+          </button>
         </div>
 
-        {/* Results Table */}
+        {/* Results */}
         <div className="results-main">
-          <h1>Course Search Results</h1>
-          <div className="results-container">
-            <div className="results-table">
-            <div className="table-header">
-              <div className="header-cell">COURSE CODE</div>
-              <div className="header-cell">TITLE</div>
-              <div className="header-cell">CREDITS</div>
-              <div className="header-cell">SBC</div>
-              <div className="header-cell">PREREQUISITES</div>
-              <div className="header-cell">INSTRUCTOR</div>
-              <div className="header-cell">SEATS OPEN</div>
-              <div className="header-cell">ACTION</div>
-            </div>
-            
-            {currentItems.map((course, index) => (
-              <div key={course.classId || course.code} className="table-row">
-                <div className="table-cell course-code">{course.code}</div>
-                <div className="table-cell course-title">{course.title}</div>
-                <div className="table-cell course-credits">{course.credits}</div>
-                <div className="table-cell course-sbc">{course.sbc || 'N/A'}</div>
-                <div className="table-cell course-prerequisites">{course.prerequisites}</div>
-                <div className="table-cell course-instructor">{course.instructor}</div>
-                <div className="table-cell course-seats">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="9" cy="21" r="1"></circle>
-                    <circle cx="20" cy="21" r="1"></circle>
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                  </svg>
-                  {course.seatsOpen}
-                </div>
-                <div className="table-cell course-action">
-                  <button 
-                    className="add-to-cart-btn"
-                    onClick={() => handleAddToCart(course.code)}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="9" cy="21" r="1"></circle>
-                      <circle cx="20" cy="21" r="1"></circle>
-                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                    </svg>
-                    Add to Cart
-                  </button>
-                </div>
+          <h1>Course Catalog</h1>
+          <div className="catalog-results-cards">
+            {courses.length === 0 ? (
+              <div className="catalog-no-data">
+                <div className="catalog-no-data-icon">📚</div>
+                <h3>No Course Data Available</h3>
+                <p>The course catalog is empty. Please run web scraping to import course information.</p>
+                <p className="catalog-hint">💡 Go to Course Catalog Management page to scrape courses</p>
               </div>
-            ))}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="pagination">
-                <button 
-                  className="pagination-btn"
-                  onClick={handlePrevPage}
-                  disabled={currentPage === 1}
-                >
-                  ← Previous
-                </button>
-                <span className="pagination-info">
-                  Page {currentPage} of {totalPages} ({filteredCourses.length} results)
-                </span>
-                <button 
-                  className="pagination-btn"
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                >
-                  Next →
-                </button>
+            ) : currentItems.length === 0 ? (
+              <div className="catalog-no-results">
+                <div className="catalog-no-results-icon">🔍</div>
+                <h3>No Results Found</h3>
+                <p>Try adjusting your filters or search term</p>
               </div>
+            ) : (
+              currentItems.map((course) => (
+                <div key={course.id} className="catalog-course-item">
+                  {selectedCourse && selectedCourse.id === course.id ? (
+                    <div 
+                      className="catalog-detail-card catalog-clickable"
+                      onClick={handleBackToSearch}
+                    >
+                      <div className="catalog-detail-header">
+                        <div className="catalog-detail-info">
+                          <div className="catalog-code-large">{course.subject} {course.courseNumber}</div>
+                          {course.warning && (
+                            <div className="catalog-warning-text">⚠️ Simplified placement exam info</div>
+                          )}
+            </div>
+                      </div>
+                      <div className="catalog-detail-content">
+                        {!supportedSubjects.includes(course.subject) && (
+                          <div className="catalog-unsupported-warning">
+                            ⚠️ This subject ({course.subject}) is not fully supported. Some information may be marked as "unknown".
+                          </div>
+                        )}
+                        
+                        <div className="catalog-detail-row">
+                          <span className="catalog-detail-label">Title:</span>
+                          <span className="catalog-detail-value">{course.courseName}</span>
+                        </div>
+                        
+                        <div className="catalog-detail-row">
+                          <span className="catalog-detail-label">Credits:</span>
+                          <span className="catalog-detail-value">
+                            {typeof course.credits === 'string' && course.credits.includes('-') 
+                              ? `${course.credits} credits` 
+                              : `${course.credits} credit${course.credits !== 1 ? 's' : ''}`
+                            }
+                          </span>
+                        </div>
+                        
+                        {course.sbcsSatisfied && course.sbcsSatisfied !== 'None' && (
+                          <div className="catalog-detail-row">
+                            <span className="catalog-detail-label">SBC:</span>
+                            <span className={`catalog-detail-value ${course.sbcsSatisfied === 'unknown' ? 'catalog-unknown-info' : 'catalog-sbc-badges'}`}>
+                              {course.sbcsSatisfied}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {course.description && course.description !== 'No description available' && (
+                          <div className="catalog-detail-row">
+                            <span className="catalog-detail-label">Description:</span>
+                            <span className="catalog-detail-value catalog-description-text">{course.description}</span>
+                          </div>
+                        )}
+                        
+                        {/* Requisites Section */}
+                        <div className="catalog-requisites-section">
+                          {course.prerequisites && course.prerequisites !== 'None' && (
+                            <div className="catalog-detail-row">
+                              <span className="catalog-detail-label">Prerequisites:</span>
+                              <span className={`catalog-detail-value ${course.prerequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>
+                                {course.prerequisites}
+                              </span>
+                            </div>
+                          )}
+                          {course.corequisites && course.corequisites !== 'None' && (
+                            <div className="catalog-detail-row">
+                              <span className="catalog-detail-label">Corequisites:</span>
+                              <span className={`catalog-detail-value ${course.corequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>
+                                {course.corequisites}
+                              </span>
+                            </div>
+                          )}
+                          {course.antirequisites && course.antirequisites !== 'None' && (
+                            <div className="catalog-detail-row">
+                              <span className="catalog-detail-label">Antirequisites:</span>
+                              <span className={`catalog-detail-value ${course.antirequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>
+                                {course.antirequisites}
+                              </span>
+                            </div>
+                          )}
+                          {course.advisoryPrerequisites && course.advisoryPrerequisites !== 'None' && (
+                            <div className="catalog-detail-row">
+                              <span className="catalog-detail-label">Advisory Prerequisites:</span>
+                              <span className={`catalog-detail-value ${course.advisoryPrerequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>
+                                {course.advisoryPrerequisites}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* External link to Classie-Evals */}
+                        <div className="catalog-detail-row">
+                          <a 
+                            href={`https://classie-evals.stonybrook.edu/?SearchKeyword=${course.subject}${course.courseNumber}&SearchTerm=ALL`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="catalog-detail-link"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            📊 View Course Evaluations
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div 
+                      className="catalog-result-card catalog-clickable"
+                      onClick={() => handleCourseSelect(course)}
+                    >
+                      <div className="catalog-course-code">
+                        {course.subject} {course.courseNumber}
+                        {!supportedSubjects.includes(course.subject) && (
+                          <span className="catalog-unsupported-badge">⚠️</span>
+                        )}
+                      </div>
+                        <div className="catalog-course-title">{course.courseName}</div>
+                        <div className="catalog-course-schedule">
+                          {typeof course.credits === 'string' && course.credits.includes('-') 
+                            ? `${course.credits} credits` 
+                            : `${course.credits} credit${course.credits !== 1 ? 's' : ''}`
+                          }
+                        </div>
+                      {course.sbcsSatisfied && course.sbcsSatisfied !== 'None' && course.sbcsSatisfied !== 'unknown' ? (
+                        <div className="catalog-course-instructor">SBC: {course.sbcsSatisfied}</div>
+                      ) : course.sbcsSatisfied === 'unknown' && (
+                        <div className="catalog-course-instructor catalog-unknown-info">SBC: Unknown</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
             )}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="catalog-pagination">
+              <button 
+                className="catalog-pagination-btn"
+                onClick={handlePrevPage}
+                disabled={currentPage === 1}
+              >
+                ← Previous
+              </button>
+              <span className="catalog-pagination-info">
+                Page {currentPage} of {totalPages} ({filteredCourses.length} results)
+              </span>
+              <button 
+                className="catalog-pagination-btn"
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -149,47 +149,5 @@ public class ClassUploadController {
         }
     }
     
-    /**
-     * Debug endpoint to preview PDF content without importing
-     * 
-     * @param file The PDF file
-     * @return First 50 lines of extracted text for debugging
-     */
-    @PostMapping("/preview-pdf")
-    public ResponseEntity<?> previewPdf(@RequestParam("file") MultipartFile file) {
-        try {
-            if (file.isEmpty()) {
-                return ResponseEntity.badRequest().body("File is empty");
-            }
-            
-            if (!file.getOriginalFilename().toLowerCase().endsWith(".pdf")) {
-                return ResponseEntity.badRequest().body("File must be a PDF");
-            }
-            
-            // Extract text from PDF
-            String text = pdfParserService.extractTextFromPdf(file);
-            
-            // Get first 50 lines for preview
-            String[] lines = text.split("\\n");
-            int previewLines = Math.min(50, lines.length);
-            StringBuilder preview = new StringBuilder();
-            for (int i = 0; i < previewLines; i++) {
-                preview.append("Line ").append(i + 1).append(": ").append(lines[i]).append("\n");
-            }
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("totalLines", lines.length);
-            response.put("preview", preview.toString());
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "Error previewing PDF: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
 }
 

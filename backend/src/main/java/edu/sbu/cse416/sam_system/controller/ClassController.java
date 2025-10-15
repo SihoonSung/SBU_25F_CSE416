@@ -1,5 +1,16 @@
 package edu.sbu.cse416.sam_system.controller;
 
+/*
+ * TP: Used Cursor to implement REST API endpoints for class management
+ * Features:
+ * - GET /api/classes: Get all classes
+ * - GET /api/classes/search: Search classes by keyword
+ * - GET /api/classes/by-term: Get classes by semester and year
+ * - GET /api/classes/terms: Get available semester/year combinations
+ * - PUT /api/classes/{id}: Update class information (e.g., capacity)
+ * - DELETE /api/classes/{id}: Delete a class
+ */
+
 import edu.sbu.cse416.sam_system.entity.ClassEntity;
 import edu.sbu.cse416.sam_system.service.ClassService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,8 +28,6 @@ import java.util.Optional;
  * REST API Controller for class/course operations.
  * Provides endpoints for searching, filtering, and managing classes.
  * Base URL: /api/classes
- * 
- * TP: Used Cursor to create REST API endpoints with search functionality.
  */
 @RestController
 @RequestMapping("/api/classes")

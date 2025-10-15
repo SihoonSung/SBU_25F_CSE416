@@ -137,11 +137,32 @@ public class ScrapingController {
 
     /**
      * Get all terms that have been scraped
+     * Returns simplified term data to avoid lazy loading issues
      */
     @GetMapping("/terms")
-    public ResponseEntity<List<Term>> getScrapedTerms() {
-        List<Term> terms = termRepository.findAll();
-        return ResponseEntity.ok(terms);
+    public ResponseEntity<List<Map<String, Object>>> getScrapedTerms() {
+        try {
+            List<Term> terms = termRepository.findAll();
+            
+            // Transform to Map to avoid lazy loading issues
+            List<Map<String, Object>> termList = new ArrayList<>();
+            for (Term term : terms) {
+                Map<String, Object> termData = new HashMap<>();
+                termData.put("id", term.getId());
+                termData.put("name", term.getName());
+                termData.put("isScraped", term.getIsScraped());
+                termData.put("isActive", term.getIsActive());
+                termData.put("startDate", term.getStartDate());
+                termData.put("endDate", term.getEndDate());
+                termList.add(termData);
+            }
+            
+            return ResponseEntity.ok(termList);
+        } catch (Exception e) {
+            System.err.println("Error fetching terms: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(new ArrayList<>());
+        }
     }
 
     /**

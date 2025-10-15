@@ -1,5 +1,17 @@
 package edu.sbu.cse416.sam_system.service;
 
+/*
+ * TP: Used Cursor to implement PDF parsing functionality
+ * Features:
+ * - Parse SBU Course Schedule PDFs using Apache PDFBox
+ * - Extract course information (dept, number, section, title, credits, etc.)
+ * - Extract requisites (prerequisites, corequisites, antirequisites)
+ * - Handle multi-line text and complex patterns
+ * - Support credit ranges (min-max credits)
+ * - Prevent duplicate class entries
+ * - Bulk delete and replace for re-uploading same term
+ */
+
 import edu.sbu.cse416.sam_system.entity.ClassEntity;
 import edu.sbu.cse416.sam_system.repository.ClassRepository;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -18,8 +30,6 @@ import java.util.regex.Pattern;
 /**
  * Service for parsing PDF files containing class schedules from SBU's Course Offerings.
  * Extracts class information and imports them into the database.
- * 
- * TP: Used Cursor to implement PDF parsing and data extraction logic.
  */
 @Service
 public class PdfParserService {
@@ -112,7 +122,6 @@ public class PdfParserService {
         // Store LEC information for courses with LAB sections
         String lecSchedule = null;
         String lecLocation = null;
-        String lecInstructor = null;
         
         // Track processed class IDs to avoid duplicates
         java.util.Set<Long> processedClassIds = new java.util.HashSet<>();
@@ -152,7 +161,6 @@ public class PdfParserService {
                 currentAntirequisites = "None";
                 lecSchedule = null; // Reset LEC info
                 lecLocation = null;
-                lecInstructor = null;
                 
                 // Filter by subjects if specified
                 if (subjects != null && !subjects.isEmpty() && !subjects.contains(currentDept)) {
@@ -339,7 +347,6 @@ public class PdfParserService {
                     
                     lecSchedule = days + " " + timeSchedule;
                     lecLocation = locBuilder.length() > 0 ? locBuilder.toString().trim() : "TBA";
-                    lecInstructor = instrBuilder.length() > 0 ? instrBuilder.toString().trim() : "TBA";
                 }
                 continue;
             }
@@ -459,38 +466,6 @@ public class PdfParserService {
         }
         
         return classes;
-    }
-    
-    /**
-     * Helper method to find the start position of the next requisite keyword in a string.
-     * Used to extract the text between two requisite keywords.
-     * 
-     * @param text The full text to search
-     * @param startPos The position to start searching from
-     * @return The position of the next requisite keyword, or end of string if not found
-     */
-    private int findNextRequisiteStart(String text, int startPos) {
-        int minPos = text.length();
-        
-        // Check for all possible requisite keywords
-        String[] keywords = {
-            "Prerequisite:", "Prerequisites:",
-            "Advisory Prerequisite:", "Advisory Prerequisites:",
-            "Pre- or Corequisite:", "Pre- or Corequisites:",
-            "Corequisite:", "Corequisites:",
-            "Advisory Corequisite:", "Advisory Corequisites:",
-            "Antirequisite:", "Antirequisites:",
-            "Anti-requisite:", "Anti-requisites:"
-        };
-        
-        for (String keyword : keywords) {
-            int pos = text.indexOf(keyword, startPos);
-            if (pos != -1 && pos < minPos) {
-                minPos = pos;
-            }
-        }
-        
-        return minPos;
     }
     
 }
