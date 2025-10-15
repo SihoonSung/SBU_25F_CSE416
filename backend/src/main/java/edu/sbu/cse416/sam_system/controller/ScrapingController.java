@@ -183,6 +183,20 @@ public class ScrapingController {
     }
 
     /**
+     * Get ALL courses for a specific term (all subjects)
+     */
+    @GetMapping("/courses/byTerm")
+    public ResponseEntity<List<Course>> getCoursesByTerm(@RequestParam String term) {
+        System.out.println("Getting ALL courses for term: " + term);
+        
+        List<Course> courses = courseRepository.findByTermName(term);
+        
+        System.out.println("Found " + courses.size() + " total courses in " + term);
+        
+        return ResponseEntity.ok(courses);
+    }
+
+    /**
      * Get scraping statistics
      */
     @GetMapping("/stats")

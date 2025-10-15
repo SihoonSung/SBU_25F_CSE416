@@ -5,23 +5,6 @@ import './CourseCatalogManagement.css';
 //TP : Used cursor to display course catalog data in temrs of design
 
 
-interface ScrapedCourse {
-  id: number;
-  subject: string;
-  courseNumber: string;
-  courseName: string;
-  description: string;
-  credits: number;
-  maxCredits?: number; // Maximum credits for credit ranges
-  prerequisites: string;
-  corequisites: string;
-  antirequisites: string;
-  advisoryPrerequisites: string;
-  sbcsSatisfied: string;
-  warning?: boolean; // True if placement exam simplification was applied
-  term?: string; // Optional term name for display
-}
-
 interface ScrapingResponse {
   success: boolean;
   message: string;
@@ -45,16 +28,11 @@ interface Term {
 const CourseCatalogManagement: React.FC = () => {
   const [selectedTerm, setSelectedTerm] = useState<string>('');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-  const [availableSubjects] = useState<string[]>(['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']);
-  const [supportedSubjects] = useState<string[]>(['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']);
-  const [scrapedCourses, setScrapedCourses] = useState<ScrapedCourse[]>([]);
+  const supportedSubjects = ['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL'];
+  const [customSubject, setCustomSubject] = useState<string>('');
   const [terms, setTerms] = useState<Term[]>([]);
-  const [currentPage, setCurrentPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'warning', text: string } | null>(null);
-  const [totalCourses, setTotalCourses] = useState<number>(0);
-
-  const coursesPerPage = 10;
 
   useEffect(() => {
     fetchTerms();
@@ -77,6 +55,29 @@ const CourseCatalogManagement: React.FC = () => {
       ? selectedSubjects.filter(s => s !== subject)
       : [...selectedSubjects, subject];
     
+    setSelectedSubjects(newSelectedSubjects);
+    checkForUnsupportedSubjects(newSelectedSubjects);
+  };
+
+  const handleAddCustomSubject = () => {
+    const trimmed = customSubject.trim().toUpperCase();
+    if (!trimmed) {
+      return;
+    }
+    
+    if (selectedSubjects.includes(trimmed)) {
+      setMessage({ type: 'warning', text: `Subject "${trimmed}" is already selected.` });
+      return;
+    }
+    
+    const newSelectedSubjects = [...selectedSubjects, trimmed];
+    setSelectedSubjects(newSelectedSubjects);
+    setCustomSubject('');
+    checkForUnsupportedSubjects(newSelectedSubjects);
+  };
+
+  const handleRemoveSubject = (subject: string) => {
+    const newSelectedSubjects = selectedSubjects.filter(s => s !== subject);
     setSelectedSubjects(newSelectedSubjects);
     checkForUnsupportedSubjects(newSelectedSubjects);
   };
@@ -145,7 +146,6 @@ const CourseCatalogManagement: React.FC = () => {
         }
         
         setMessage({ type: messageType, text: result.message });
-        await fetchScrapedCourses();
         await fetchTerms(); // Refresh terms to update isScraped status
       } else {
         setMessage({ type: 'error', text: result.message });
@@ -158,39 +158,6 @@ const CourseCatalogManagement: React.FC = () => {
     }
   };
 
-  const fetchScrapedCourses = async () => {
-    if (!selectedTerm || selectedSubjects.length === 0) return;
-
-    try {
-      // Fetch courses for each subject individually and combine results
-      const allCourses: ScrapedCourse[] = [];
-      
-      for (const subject of selectedSubjects) {
-        const response = await fetch(
-          `http://localhost:8080/api/scraping/courses?term=${encodeURIComponent(selectedTerm)}&subject=${subject}`
-        );
-        
-        if (response.ok) {
-          const courses = await response.json();
-          allCourses.push(...courses);
-        }
-      }
-      
-      setScrapedCourses(allCourses);
-      setTotalCourses(allCourses.length);
-      setCurrentPage(1);
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-    }
-  };
-
-  const handleViewCourses = async () => {
-    if (!selectedTerm || selectedSubjects.length === 0) {
-      setMessage({ type: 'warning', text: 'Please select both term and at least one subject to view courses.' });
-      return;
-    }
-    await fetchScrapedCourses();
-  };
 
   // Reset Term functionality
   /*
@@ -243,13 +210,6 @@ const CourseCatalogManagement: React.FC = () => {
     }
   };
 
-  const getPaginatedCourses = () => {
-    const startIndex = (currentPage - 1) * coursesPerPage;
-    const endIndex = startIndex + coursesPerPage;
-    return scrapedCourses.slice(startIndex, endIndex);
-  };
-
-  const totalPages = Math.ceil(totalCourses / coursesPerPage);
 
   return (
     <div className="course-catalog-management">
@@ -293,11 +253,11 @@ const CourseCatalogManagement: React.FC = () => {
         <div className="form-group">
           <label>Select Subjects:</label>
          
-          {/* Supported Subjects Only */}
+          {/* Supported Subjects (Quick Select) */}
           <div className="subjects-section">
-            <h4>Supported Subjects</h4>
+            <h4>✅ Fully Supported Subjects (All Info Extracted)</h4>
             <div className="subjects-grid">
-              {availableSubjects.map(subject => (
+              {supportedSubjects.map(subject => (
                 <label key={subject} className="subject-checkbox supported">
                   <input
                     type="checkbox"
@@ -305,32 +265,61 @@ const CourseCatalogManagement: React.FC = () => {
                     onChange={() => handleSubjectChange(subject)}
                   />
                   <span className="subject-label">{subject}</span>
-                  <div className="subject-status">Supported</div>
+                  <div className="subject-status">✓ Full Support</div>
                 </label>
               ))}
             </div>
             <div className="subject-help">
-              <span style={{ fontSize: '1rem' }}>
-                <strong>Supported Subjects :</strong> BIO, PSY, CSE, ECO, AMS, POL - Only those subjects are be available. Please check the green box
-              </span>
-          </div>
-          
+              <strong>Full Support:</strong> BIO, PSY, CSE, ECO, AMS, POL - All course details will be extracted
+            </div>
           </div>
 
+          {/* Add Custom Subject */}
+          <div className="custom-subject-section">
+            <h4>⚠️ Add Other Subjects (Limited Info)</h4>
+            <div className="custom-subject-input">
+              <input
+                type="text"
+                value={customSubject}
+                onChange={(e) => setCustomSubject(e.target.value.toUpperCase())}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddCustomSubject();
+                  }
+                }}
+                placeholder="e.g., MAT, PHY, CHE..."
+                className="custom-subject-textbox"
+                maxLength={10}
+              />
+              <button 
+                type="button"
+                onClick={handleAddCustomSubject}
+                className="add-custom-btn"
+                disabled={!customSubject.trim()}
+              >
+                + Add Subject
+              </button>
+            </div>
+            <div className="custom-subject-help">
+              <strong>⚠️ Warning:</strong> Other subjects will extract <strong>Description, Credits, and SBCs</strong>.
+              Requisite fields (prerequisites, corequisites, antirequisites, advisory prerequisites) will be marked as "unknown".
+            </div>
+          </div>
 
           {/* Selected Subjects Display */}
           {selectedSubjects.length > 0 && (
             <div className="selected-subjects">
-              <h4>Selected Subjects:</h4>
+              <h4>Selected Subjects ({selectedSubjects.length}):</h4>
               <div className="selected-subjects-list">
                 {selectedSubjects.map(subject => (
                   <span key={subject} className={`selected-subject ${supportedSubjects.includes(subject) ? 'supported' : 'unsupported'}`}>
                     {subject}
-                    {!supportedSubjects.includes(subject) && <span className="warning-icon">⚠</span>}
+                    {!supportedSubjects.includes(subject) && <span className="warning-icon" title="Limited support">⚠️</span>}
                     <button
                       type="button"
-                      onClick={() => handleSubjectChange(subject)}
+                      onClick={() => handleRemoveSubject(subject)}
                       className="remove-subject"
+                      title="Remove subject"
                     >
                       ×
                     </button>
@@ -351,107 +340,8 @@ const CourseCatalogManagement: React.FC = () => {
           >
             {isLoading ? 'Scraping...' : 'Scrape Course Catalog'}
           </button>
-
-          <button
-            onClick={handleViewCourses}
-            disabled={!selectedTerm || selectedSubjects.length === 0}
-            className="view-button"
-          >
-            View Scraped Courses
-          </button>
-
-          {/* Reset Term button - commented out as it may not be needed
-          <button
-            onClick={handleResetTerm}
-            disabled={!selectedTerm || !isValidTermFormat(selectedTerm) || checkTermStatus(selectedTerm) !== 'scraped'}
-            className="reset-button"
-          >
-            Reset Term
-          </button>
-          */}
         </div>
       </div>
-
-      {scrapedCourses.length > 0 && (
-        <div className="results-section">
-          <div className="results-header">
-            <h3>Scraped Courses ({totalCourses} total)</h3>
-            <div className="pagination-info">
-              Showing {((currentPage - 1) * coursesPerPage) + 1}-{Math.min(currentPage * coursesPerPage, totalCourses)} of {totalCourses}
-            </div>
-          </div>
-
-          <div className="courses-table-container">
-            <table className="courses-table">
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>Number</th>
-                  <th>Course Name</th>
-                  <th>Credits</th>
-                  <th>Max Credits</th>
-                  <th>Prerequisites</th>
-                  <th>SBCs</th>
-                  <th>Warning</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getPaginatedCourses().map(course => (
-                  <tr key={course.id}>
-                    <td className="subject-cell">{course.subject}</td>
-                    <td className="number-cell">{course.courseNumber}</td>
-                    <td className="name-cell">{course.courseName}</td>
-                    <td className="credits-cell">{course.credits !== null ? course.credits : 'N/A'}</td>
-                    <td className="credits-cell">{course.maxCredits !== null ? course.maxCredits : 'N/A'}</td>
-                    <td className="prereq-cell">
-                      {course.prerequisites ? (
-                        <span title={course.prerequisites}>
-                          {course.prerequisites.length > 50 
-                            ? course.prerequisites.substring(0, 50) + '...'
-                            : course.prerequisites
-                          }
-                        </span>
-                      ) : 'None'}
-                    </td>
-                    <td className="sbc-cell">{course.sbcsSatisfied || 'N/A'}</td>
-                    <td className="warning-cell">
-                      {course.warning ? (
-                        <span className="warning-icon" title="Placement exam simplification applied">⚠️</span>
-                      ) : (
-                        <span className="no-warning">✓</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {totalPages > 1 && (
-            <div className="pagination">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="page-button"
-              >
-                Previous
-              </button>
-              
-              <span className="page-info">
-                Page {currentPage} of {totalPages}
-              </span>
-              
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="page-button"
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };

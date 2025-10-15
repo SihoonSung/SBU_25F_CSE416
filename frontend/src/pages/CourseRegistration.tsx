@@ -62,6 +62,34 @@ function CourseRegistration() {
   }, [selectedSemester, selectedYear])
 
   /**
+   * Transform backend class data to frontend format
+   */
+  const transformClassData = (cls: any) => ({
+    id: cls.classId,
+    code: `${cls.department}${cls.courseNum}.${cls.section}`,
+    courseId: cls.classId.toString(),
+    department: cls.department,
+    courseNum: cls.courseNum,
+    section: cls.section,
+    sectionType: cls.sectionType, // LEC, LAB, REC
+    title: cls.title,
+    schedule: cls.schedule,
+    instructor: cls.instructor,
+    location: cls.location,
+    lecSchedule: cls.lecSchedule, // LEC schedule
+    lecLocation: cls.lecLocation, // LEC location
+    prerequisites: cls.prerequisites,
+    corequisites: cls.corequisites,
+    antirequisites: cls.antirequisites,
+    sbc: cls.sbc, // SBC codes
+    minCredits: cls.minCredits,
+    maxCredits: cls.maxCredits,
+    credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
+    semester: cls.semester,
+    year: cls.year
+  })
+
+  /**
    * Sort classes by Department → Course Number → Section
    */
   const sortClasses = (classes: any[]) => {
@@ -107,32 +135,8 @@ function CourseRegistration() {
       const response = await fetch(`http://localhost:8080/api/classes/by-term?semester=${semester}&year=${year}`)
       const data = await response.json()
       
-      // Transform backend data to frontend format
-      const transformedData = data.map((cls: any) => ({
-        id: cls.classId,
-        code: `${cls.department}${cls.courseNum}.${cls.section}`,
-        courseId: cls.classId.toString(),
-        department: cls.department,
-        courseNum: cls.courseNum,
-        section: cls.section,
-        sectionType: cls.sectionType, // LEC, LAB, REC
-        title: cls.title,
-        schedule: cls.schedule,
-        instructor: cls.instructor,
-        location: cls.location,
-        lecSchedule: cls.lecSchedule, // LEC schedule
-        lecLocation: cls.lecLocation, // LEC location
-        prerequisites: cls.prerequisites,
-        corequisites: cls.corequisites,
-        antirequisites: cls.antirequisites,
-        sbc: cls.sbc, // SBC codes
-        minCredits: cls.minCredits,
-        maxCredits: cls.maxCredits,
-        credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
-        semester: cls.semester,
-        year: cls.year
-      }))
-      
+      // Transform and sort data
+      const transformedData = data.map(transformClassData)
       setSearchResults(sortClasses(transformedData))
     } catch (error) {
       console.error('Error fetching classes:', error)
@@ -157,35 +161,10 @@ function CourseRegistration() {
       const response = await fetch(`http://localhost:8080/api/classes/search?q=${encodeURIComponent(term)}`)
       const data = await response.json()
       
-      // Transform backend data to frontend format
-      const transformedData = data.map((cls: any) => ({
-        id: cls.classId,
-        code: `${cls.department}${cls.courseNum}.${cls.section}`,
-        courseId: cls.classId.toString(),
-        department: cls.department,
-        courseNum: cls.courseNum,
-        section: cls.section,
-        sectionType: cls.sectionType, // LEC, LAB, REC
-        title: cls.title,
-        schedule: cls.schedule,
-        instructor: cls.instructor,
-        location: cls.location,
-        lecSchedule: cls.lecSchedule, // LEC schedule
-        lecLocation: cls.lecLocation, // LEC location
-        prerequisites: cls.prerequisites,
-        corequisites: cls.corequisites,
-        antirequisites: cls.antirequisites,
-        sbc: cls.sbc, // SBC codes
-        minCredits: cls.minCredits,
-        maxCredits: cls.maxCredits,
-        credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
-        semester: cls.semester,
-        year: cls.year
-      }))
-      .filter((cls: any) => {
-        // Filter by selected semester and year
-        return cls.semester === selectedSemester && cls.year === selectedYear
-      })
+      // Transform, filter, and sort data
+      const transformedData = data
+        .map(transformClassData)
+        .filter((cls: any) => cls.semester === selectedSemester && cls.year === selectedYear)
       
       setSearchResults(sortClasses(transformedData))
       setCurrentPage(1) // Reset to first page on new search

@@ -4,11 +4,11 @@ package edu.sbu.cse416.sam_system.service;
  * TP: Used Cursor to implement web scraping service for SBU course catalog
  * Features:
  * - Two-step scraping: course list page → individual course detail pages
- * - Extracts all required fields: description, credits (including ranges), prerequisites, corequisites, antirequisites, advisory prereqs, SBCs
+ * - Extracts for ALL subjects: description, credits (including ranges), SBCs
+ * - Extracts for FULLY SUPPORTED subjects (BIO, PSY, CSE, ECO, AMS, POL): prerequisites, corequisites, antirequisites, advisory prereqs
  * - Prevents duplicate entries (updates existing courses if found)
  * - Allows scraping additional subjects for the same term (extension), but prevents re-scraping the same subject
  * - Handles placement exam simplification with warnings
- * - Supports several subjects (BIO, PSY, CSE, ECO, AMS, POL)
  * - Enhanced fallback mechanism: uses nearest available term's data if requested term not scraped
  * - No data deletion on re-scraping: maintains data integrity by preventing subject-level re-scraping
  * - Credit range support: handles "0-6 credits" format with separate min/max fields
@@ -61,6 +61,9 @@ public class ScrapingService {
 
     private static final String CATALOG_BASE_URL = "https://catalog.stonybrook.edu/content.php?catoid=7&navoid=225";
     private static final String COURSE_DETAIL_BASE_URL = "https://catalog.stonybrook.edu/preview_course_nopop.php";
+    
+    // Supported subjects with full information extraction
+    private static final List<String> FULLY_SUPPORTED_SUBJECTS = Arrays.asList("BIO", "PSY", "CSE", "ECO", "AMS", "POL");
 
     /**
      * Scrapes courses for specified subjects and term from Stony Brook course catalog
@@ -77,9 +80,6 @@ public class ScrapingService {
 
         // Get or create term
         Term term = getOrCreateTerm(termName);
-
-        // Define supported subjects
-        List<String> supportedSubjects = Arrays.asList("BIO", "PSY", "CSE", "ECO", "AMS", "POL");
 
         // Initialize result tracking
         Map<String, Object> results = new HashMap<>();
@@ -104,9 +104,9 @@ public class ScrapingService {
                 }
 
                 // Check if subject is supported
-                if (!supportedSubjects.contains(subject)) {
-                    System.out.println("⚠ WARNING: Subject '" + subject + "' is not in the supported list (BIO, PSY, CSE, ECO, AMS, POL).");
-                    System.out.println("   Course information may not be parsed correctly and marked as 'unknown'.");
+                if (!FULLY_SUPPORTED_SUBJECTS.contains(subject)) {
+                    System.out.println("⚠ WARNING: Subject '" + subject + "' is not in the fully supported list (BIO, PSY, CSE, ECO, AMS, POL).");
+                    System.out.println("   Requisite information will be marked as 'unknown'.");
                 }
 
                 int coursesScraped = scrapeSubject(subject, term);
@@ -255,9 +255,8 @@ public class ScrapingService {
 
         Course course = new Course(subject, courseNumber, courseName, term);
 
-        // Check if subject is supported for detailed parsing
-        List<String> supportedSubjects = Arrays.asList("BIO", "PSY", "CSE", "ECO", "AMS", "POL");
-        boolean isSubjectSupported = supportedSubjects.contains(subject);
+        // Check if subject is fully supported for detailed parsing
+        boolean isFullySupported = FULLY_SUPPORTED_SUBJECTS.contains(subject);
 
         // Get the main content area
         Element contentTd = doc.selectFirst("td.block_content");
@@ -268,57 +267,81 @@ public class ScrapingService {
         String fullHtml = contentTd.html();
         String fullText = contentTd.text();
 
-        // Extract description - everything between <hr> and <strong>
-        String description = extractDescriptionFromHtml(fullHtml);
-        course.setDescription(description);
-
-        // Extract credits (including ranges)
+        // Extract credits (ALL subjects) - including ranges
         CreditRange creditRange = extractCredits(fullText);
         course.setCredits(creditRange.minCredits);
         course.setMaxCredits(creditRange.maxCredits);
 
-        // Extract prerequisites
-        Map<String, Object> prereqResult = isSubjectSupported ? extractPrerequisites(fullText) : null;
-        String prerequisites = prereqResult != null ? (String) prereqResult.get("text") : "unknown";
-        boolean hasWarning = prereqResult != null && (Boolean) prereqResult.get("hasWarning");
+        // Extract SBCs (ALL subjects)
+        String sbcs = extractSBCs(fullText);
+        course.setSbcsSatisfied(sbcs != null && !sbcs.isEmpty() ? sbcs : "unknown");
+
+        // Extract description (ALL subjects) - same HTML structure for all
+        String description = extractDescriptionFromHtml(fullHtml);
+        course.setDescription(description);
+
+        // Declare variables outside if-else block
+        String prerequisites;
+        String corequisites;
+        String antirequisites;
+        String advisoryPrereqs;
+        boolean hasWarning = false;
+
+        if (isFullySupported) {
+            // FULLY SUPPORTED: Extract all information
+            System.out.println("  ✅ Fully supported subject - extracting all information");
+
+            // Extract prerequisites
+            Map<String, Object> prereqResult = extractPrerequisites(fullText);
+            prerequisites = prereqResult != null ? (String) prereqResult.get("text") : null;
+            boolean prereqWarning = prereqResult != null && (Boolean) prereqResult.get("hasWarning");
+
+            // Extract corequisites
+            Map<String, Object> coreqResult = extractCorequisites(fullText);
+            corequisites = coreqResult != null ? (String) coreqResult.get("text") : null;
+            boolean coreqHasWarning = coreqResult != null && (Boolean) coreqResult.get("hasWarning");
+            
+            // Set warning flag if any placement exam simplification was applied
+            hasWarning = prereqWarning || coreqHasWarning;
+
+            // Extract antirequisites
+            antirequisites = extractAntirequisites(fullText);
+
+            // Extract advisory prerequisites
+            advisoryPrereqs = extractAdvisoryPrerequisites(fullText);
+        } else {
+            // NOT FULLY SUPPORTED: Mark requisite fields as "unknown" and set warning
+            System.out.println("  ⚠️  Subject not fully supported - marking requisite fields as 'unknown'");
+            System.out.println("  ✓  Description extracted for unsupported subject");
+            prerequisites = "unknown";
+            corequisites = "unknown";
+            antirequisites = "unknown";
+            advisoryPrereqs = "unknown";
+            hasWarning = true; // Set warning flag for unsupported subjects
+        }
+
+        // Set all fields to course object
         course.setPrerequisites(prerequisites);
-
-        // Extract corequisites
-        Map<String, Object> coreqResult = isSubjectSupported ? extractCorequisites(fullText) : null;
-        String corequisites = coreqResult != null ? (String) coreqResult.get("text") : "unknown";
-        boolean coreqHasWarning = coreqResult != null && (Boolean) coreqResult.get("hasWarning");
         course.setCorequisites(corequisites);
-        
-        // Set warning flag if any placement exam simplification was applied
-        course.setWarning(hasWarning || coreqHasWarning);
-
-        // Extract antirequisites
-        String antirequisites = isSubjectSupported ? extractAntirequisites(fullText) : "unknown";
         course.setAntirequisites(antirequisites);
-
-        // Extract advisory prerequisites
-        String advisoryPrereqs = isSubjectSupported ? extractAdvisoryPrerequisites(fullText) : "unknown";
         course.setAdvisoryPrerequisites(advisoryPrereqs);
-
-        // Extract SBCs
-        String sbcs = isSubjectSupported ? extractSBCs(fullText) : "unknown";
-        course.setSbcsSatisfied(sbcs);
+        course.setWarning(hasWarning);
 
         // Print comprehensive course summary
         System.out.println("\n" + "=".repeat(80));
         System.out.println("📚 " + subject + " " + courseNumber + " - " + courseName);
         System.out.println("=".repeat(80));
-        System.out.println("📖 Description: " + (description != null && description.length() > 100 ? description.substring(0, 100) + "..." : description));
+        System.out.println("📖 Description: " + (course.getDescription() != null && course.getDescription().length() > 100 ? course.getDescription().substring(0, 100) + "..." : course.getDescription()));
         
         
         System.out.println("🔗 URL: " + url);
         
         // Field status with icons
         System.out.println("\n📋 Course Attributes:");
-        System.out.println("  📝 Prerequisites: " + (prerequisites != null && !prerequisites.isEmpty() && !prerequisites.equals("unknown") ? "✅ " + prerequisites : "❌ None"));
-        System.out.println("  🔗 Corequisites: " + (corequisites != null && !corequisites.isEmpty() && !corequisites.equals("unknown") ? "✅ " + corequisites : "❌ None"));
-        System.out.println("  🚫 Antirequisites: " + (antirequisites != null && !antirequisites.isEmpty() && !antirequisites.equals("unknown") ? "✅ " + antirequisites : "❌ None"));
-        System.out.println("  💡 Advisory Prerequisites: " + (advisoryPrereqs != null && !advisoryPrereqs.isEmpty() && !advisoryPrereqs.equals("unknown") ? "✅ " + advisoryPrereqs : "❌ None"));
+        System.out.println("  📝 Prerequisites: " + (course.getPrerequisites() != null && !course.getPrerequisites().isEmpty() && !course.getPrerequisites().equals("unknown") ? "✅ " + course.getPrerequisites() : "❌ None"));
+        System.out.println("  🔗 Corequisites: " + (course.getCorequisites() != null && !course.getCorequisites().isEmpty() && !course.getCorequisites().equals("unknown") ? "✅ " + course.getCorequisites() : "❌ None"));
+        System.out.println("  🚫 Antirequisites: " + (course.getAntirequisites() != null && !course.getAntirequisites().isEmpty() && !course.getAntirequisites().equals("unknown") ? "✅ " + course.getAntirequisites() : "❌ None"));
+        System.out.println("  💡 Advisory Prerequisites: " + (course.getAdvisoryPrerequisites() != null && !course.getAdvisoryPrerequisites().isEmpty() && !course.getAdvisoryPrerequisites().equals("unknown") ? "✅ " + course.getAdvisoryPrerequisites() : "❌ None"));
         System.out.println("  🏷️  SBCs: " + (sbcs != null && !sbcs.isEmpty() && !sbcs.equals("unknown") ? "✅ " + sbcs : "❌ None"));
         System.out.println("=".repeat(80));
 

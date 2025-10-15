@@ -22,7 +22,6 @@ interface Course {
   advisoryPrerequisites: string
   sbcsSatisfied: string
   warning: boolean
-  termName?: string
 }
 
 function CourseSearch() {
@@ -33,7 +32,6 @@ function CourseSearch() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [filters, setFilters] = useState({
-    subject: '',
     courseNumber: '',
     sbc: 'Any'
   })
@@ -95,7 +93,7 @@ function CourseSearch() {
   }
 
   /**
-   * Fetch courses for selected term (all subjects: BIO, PSY, CSE, ECO, AMS, POL)
+   * Fetch courses for selected term (all subjects in database)
    */
   const fetchCourses = async () => {
     if (!selectedTerm) {
@@ -104,29 +102,23 @@ function CourseSearch() {
     }
 
     try {
-      const allCourses: any[] = []
-      const subjects = ['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']
+      // Fetch ALL courses for the selected term (not limited to specific subjects)
+      const response = await fetch(
+        `http://localhost:8080/api/scraping/courses/byTerm?term=${encodeURIComponent(selectedTerm)}`
+      )
       
-      // Fetch courses for all subjects
-      for (const subject of subjects) {
-        try {
-          const response = await fetch(
-            `http://localhost:8080/api/scraping/courses?term=${encodeURIComponent(selectedTerm)}&subject=${subject}`
-          )
-          
-          if (response.ok) {
-            const courses = await response.json()
-            allCourses.push(...courses)
-          }
-        } catch (error) {
-          console.error(`Error fetching ${subject} for ${selectedTerm}:`, error)
-        }
+      if (!response.ok) {
+        console.error('Failed to fetch courses:', response.status)
+        setCourses([])
+        return
       }
+      
+      const allCourses = await response.json()
       
       console.log('Total courses fetched:', allCourses.length)
       
       if (allCourses.length === 0) {
-        console.warn('No courses found for selected term and subjects.')
+        console.warn('No courses found for selected term.')
         setCourses([])
         return
       }
@@ -147,8 +139,7 @@ function CourseSearch() {
           antirequisites: course.antirequisites || 'None',
           advisoryPrerequisites: course.advisoryPrerequisites || 'None',
           sbcsSatisfied: course.sbcsSatisfied || 'None',
-          warning: course.warning || false,
-          termName: selectedTerm
+          warning: course.warning || false
         }))
         .sort((a: Course, b: Course) => {
           // Sort by Subject → Course Number
@@ -166,11 +157,29 @@ function CourseSearch() {
   }
 
   /**
-   * Handle search functionality
+   * Handle subject search (letters only - CSE, BIO, MAT, etc.)
    */
   const handleSearch = (term: string) => {
     setSearchTerm(term)
     setCurrentPage(1)
+    
+    // Check if subject is unsupported and show warning
+    if (term.trim() !== '') {
+      const upperValue = term.trim().toUpperCase()
+      const isSupported = supportedSubjects.some(s => s === upperValue || upperValue.includes(s))
+      
+      if (!isSupported && upperValue.length >= 2) {
+        setWarningMessage(
+          `⚠️ Warning: "${term}" may not be a fully supported subject. ` +
+          `Fully supported subjects are: BIO, PSY, CSE, ECO, AMS, POL. ` +
+          `Other subjects will have limited information (description, credits, SBCs only).`
+        )
+      } else {
+        setWarningMessage('')
+      }
+    } else {
+      setWarningMessage('')
+    }
   }
 
   /**
@@ -182,27 +191,6 @@ function CourseSearch() {
       [field]: value
     }))
     setCurrentPage(1)
-    
-    // Check if subject filter is for unsupported subject
-    if (field === 'subject' && value.trim() !== '') {
-      const upperValue = value.trim().toUpperCase()
-      const isSupported = supportedSubjects.some(s => s === upperValue || upperValue.includes(s))
-      
-      if (!isSupported && upperValue.length >= 2) {
-        setWarningMessage(
-          `⚠️ Warning: "${value}" may not be a supported subject. ` +
-          `Supported subjects are: BIO, PSY, CSE, ECO, AMS, POL. ` +
-          `Course information for unsupported subjects may be marked as "unknown".`
-        )
-      } else {
-        setWarningMessage('')
-      }
-    } else if (field !== 'subject') {
-      // Clear warning when changing other filters
-      if (warningMessage && !warningMessage.includes('subject')) {
-        setWarningMessage('')
-      }
-    }
   }
 
   /**
@@ -225,28 +213,15 @@ function CourseSearch() {
    */
   useEffect(() => {
     let filtered = courses.filter(course => {
-      // Search term filter (searches in code, title, description)
+      // Subject filter (Course Code - letters only, e.g., CSE, BIO)
       if (searchTerm.trim() !== '') {
-        const search = searchTerm.toLowerCase()
-        const courseCode = `${course.subject}${course.courseNumber}`.toLowerCase()
-        const title = course.courseName.toLowerCase()
-        const description = course.description.toLowerCase()
-        
-        if (!courseCode.includes(search) && 
-            !title.includes(search) && 
-            !description.includes(search)) {
+        const search = searchTerm.toUpperCase()
+        if (!course.subject.toUpperCase().includes(search)) {
           return false
         }
       }
       
-      // Subject filter
-      if (filters.subject && filters.subject.trim() !== '') {
-        if (!course.subject.toLowerCase().includes(filters.subject.toLowerCase())) {
-        return false
-        }
-      }
-      
-      // Course number filter
+      // Course number filter (numbers only, e.g., 416, 202)
       if (filters.courseNumber && filters.courseNumber.trim() !== '') {
         if (!course.courseNumber.includes(filters.courseNumber)) {
           return false
@@ -325,29 +300,32 @@ function CourseSearch() {
 
           {/* Info Text */}
           <div className="filter-info">
-            <p>📚 Showing all subjects: BIO, PSY, CSE, ECO, AMS, POL</p>
+            <p>📚 Showing all courses from the database for the selected term</p>
           </div>
           
-          {/* Search Bar */}
+          {/* Subject Search (Letters only) */}
           <div className="filter-group">
-            <label htmlFor="search">Search:</label>
+            <label htmlFor="search">Subject (Course Code):</label>
             <input
               type="text"
               id="search"
-              placeholder="Course code, title, description..."
+              placeholder="e.g., CSE, BIO, MAT..."
               value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value.toUpperCase())}
+              maxLength={10}
             />
           </div>
           
+          {/* Course Number Filter (Numbers only) */}
           <div className="filter-group">
             <label htmlFor="courseNumber">Course Number:</label>
             <input
               type="text"
               id="courseNumber"
               value={filters.courseNumber}
-              onChange={(e) => handleFilterChange('courseNumber', e.target.value)}
-              placeholder="e.g., 416"
+              onChange={(e) => handleFilterChange('courseNumber', e.target.value.replace(/\D/g, ''))}
+              placeholder="e.g., 416, 202, 125..."
+              maxLength={5}
             />
           </div>
           
@@ -392,7 +370,7 @@ function CourseSearch() {
           <button 
             className="clear-filters-btn"
             onClick={() => {
-              setFilters({ subject: '', courseNumber: '', sbc: 'Any' })
+              setFilters({ courseNumber: '', sbc: 'Any' })
               setSearchTerm('')
               setCurrentPage(1)
             }}
