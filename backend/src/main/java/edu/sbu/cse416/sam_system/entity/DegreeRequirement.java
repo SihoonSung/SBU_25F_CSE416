@@ -6,6 +6,8 @@ import java.util.List;
 
 /**
  * Entity class representing degree requirements for majors and minors.
+ * 
+ * TP: Used Cursor to implement degree requirements management system
  */
 @Entity
 @Table(name = "degree_requirements")

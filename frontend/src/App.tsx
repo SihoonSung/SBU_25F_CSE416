@@ -25,8 +25,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login/>} />
           <Route path="/" element={isAuthenticated() ? <Dashboard/> : <Navigate to="/login" replace />} />
-          {/* <Route path="/home" element={isAuthenticated() ? <Dashboard/> : <Navigate to="/login" replace />} /> */} {/* temporary removed to test */}
-          <Route path="/home" element={<Dashboard/>} />
+          <Route path="/home" element={isAuthenticated() ? <Dashboard/> : <Navigate to="/login" replace />} />
           <Route path="/course-search" element={<CourseSearch/>} />
           <Route path="/course-registration" element={<CourseRegistration/>} />
           <Route path="/registration" element={<CourseRegistration/>} />

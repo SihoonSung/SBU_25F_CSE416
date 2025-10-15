@@ -15,6 +15,8 @@ import java.util.Optional;
 
 /**
  * Service class for managing degree requirements.
+ * 
+ * TP: Used Cursor to implement degree requirements management system
  */
 @Service
 @Transactional

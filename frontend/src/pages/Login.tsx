@@ -14,51 +14,21 @@ function Login() {
   console.log('Backend Base URL:', backendBase)
   console.log('Google OAuth URL:', googleUrl)
 
-  // OAuth 콜백 처리
+  // OAuth 콜백 처리 (에러만 처리)
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      const success = searchParams.get('success')
       const error = searchParams.get('error')
       
       if (error) {
         console.error('OAuth error:', error)
+        // 에러 발생 시 로그인 페이지로 리디렉션
+        navigate('/login', { replace: true })
         return
-      }
-      
-      if (success === 'true') {
-        setIsLoading(true)
-        try {
-          // OAuth 인증 완료 후 사용자 정보 가져오기
-          const response = await fetch(`${backendBase}/api/auth/success`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          })
-          
-          if (response.ok) {
-            const data = await response.json()
-            if (data.success && data.user) {
-              // 사용자 정보를 localStorage에 저장
-              signIn('oauth-token', data.user.email)
-              
-              // 홈화면으로 리디렉션
-              navigate('/home', { replace: true })
-            }
-          } else {
-            console.error('Failed to get user info')
-          }
-        } catch (error) {
-          console.error('Error during OAuth callback:', error)
-        } finally {
-          setIsLoading(false)
-        }
       }
     }
 
     handleOAuthCallback()
-  }, [searchParams, navigate, backendBase])
+  }, [searchParams, navigate])
 
   return (
     <div className="login-page">

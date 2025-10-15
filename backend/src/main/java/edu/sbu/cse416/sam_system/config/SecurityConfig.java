@@ -35,7 +35,7 @@ public class SecurityConfig {
             )
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/oauth2/authorization/google")
-                .defaultSuccessUrl("http://localhost:5173/login?success=true", true)
+                .defaultSuccessUrl("http://localhost:5173/home?success=true", true)
                 .failureUrl("http://localhost:5173/login?error=true")
             )
             .logout(logout -> logout

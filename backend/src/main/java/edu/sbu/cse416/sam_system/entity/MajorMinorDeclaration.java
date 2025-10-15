@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 
 /**
  * Entity class representing a student's declaration of major or minor.
+ * 
+ * TP: Used Cursor to implement major/minor declaration system
  */
 @Entity
 @Table(name = "major_minor_declarations")

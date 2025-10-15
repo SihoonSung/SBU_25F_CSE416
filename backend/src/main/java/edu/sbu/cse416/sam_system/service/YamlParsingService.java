@@ -15,6 +15,8 @@ import java.util.Map;
 
 /**
  * Service for parsing YAML files containing degree requirements.
+ * 
+ * TP: Used Cursor to implement YAML parsing functionality
  */
 @Service
 public class YamlParsingService {
