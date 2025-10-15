@@ -303,7 +303,15 @@ function CourseRegistration() {
           </div>
           {/* Search Results */}
           <div className="search-results">
-            {currentItems.map((course) => (
+            {searchResults.length === 0 ? (
+              <div className="no-data-message">
+                <div className="no-data-icon">📚</div>
+                <h3>No Class Data Available</h3>
+                <p>There are no classes in the database for the selected term.</p>
+                <p className="hint-text">💡 Go to PDF Upload & Class Management page to import class schedules</p>
+              </div>
+            ) : (
+              currentItems.map((course) => (
               <div key={course.id} className="course-item-container">
                 {selectedCourse && selectedCourse.id === course.id ? (
                   <div 
@@ -448,7 +456,8 @@ function CourseRegistration() {
                   </div>
                 )}
               </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Pagination */}
