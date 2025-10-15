@@ -1,5 +1,12 @@
-# sample user data file.  version: 2025-10-03
-# CSE416, Software Engineering, Scott D. Stoller.
+# sample user data file.  version: 2025-10-14
+# CSE416, Software Engineering, Scott D. Stoller
+
+# change log:
+# 2025-10-14 added fields related to planned majors and minor for students
+# 2025-10-13 note that 'department' field in entries for classes should have been named 'subject'
+# 2025-10-13 added 'degrees' field for students
+# 2025-10-03 replaced "department" with "subject" in description of academic_unit
+# 2025-09-14 added GPNC field to entries in student class schedules
 
 registrars:
 - SBU_ID: 100765432
@@ -45,9 +52,15 @@ students:
   AOI: CSE # major for which the student is AOI if any, otherwise null
   college: # college or school that the student is in, identified by acronym, e.g., CEAS
   majors: [CSE,AMS] # list of majors, identified by 3-letter codes, e.g., CSE
+  degrees: [BS,BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
   major_requirement_versions: [{semester: Fall, year: 2020}, {semester: Fall, year: 2021}] # the degree requirements version the student is following for each major.  entry i in this list corresponds to entry i in the majors list.
   minors: [] # list of minors, identified by 3-letter codes
   minor_requirement_versions: []
+  planned_majors: [] # planned additional majors that are not yet declared.
+  planned_major_requirement_versions: [] # degree requirements version for each planned major
+  planned_degrees: [] # degree types corresponding to planned_majors
+  planned_minors: [POL] # planned additional minors that are not yet declared.
+  planned_minor_requirement_versions: [{semester: Fall, year: 2022}] # degree requirements version for each planned minor
   graduation: null # term in which the student graduated (if they did), otherwise null
   transfer_courses: # list of transfer courses and transfer credits.
     # 'class' and 'university' identify the original class.  department and course_num identify the equivalent SBU course, if any, otherwise they are null.
