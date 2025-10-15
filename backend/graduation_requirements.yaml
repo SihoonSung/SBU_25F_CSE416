@@ -1,0 +1,217 @@
+# University-level Graduation Requirements
+# This file contains the general graduation requirements for all students
+
+requirements_version: "Fall 2025"
+effective_term: "Fall 2025"
+last_updated: "2025-01-14T10:00:00Z"
+
+# General graduation requirements
+general_requirements:
+  minimum_total_credits: 120
+  minimum_gpa: 2.0
+  residency_requirement:
+    minimum_credits_at_sbu: 30
+    minimum_credits_in_major: 18
+  time_limit:
+    maximum_years: 8
+    extension_allowed: true
+    extension_approval_required: true
+
+# Stony Brook Curriculum (SBC) Requirements
+sbc_requirements:
+  total_sbc_credits_required: 30
+  categories:
+    - code: "ARTS"
+      name: "Arts"
+      description: "Creative expression and aesthetic appreciation"
+      credits_required: 3
+      examples:
+        - "ARH 101 - Introduction to Art"
+        - "MUS 101 - Introduction to Music"
+        - "THR 101 - Introduction to Theatre"
+    
+    - code: "GLO"
+      name: "Global Issues"
+      description: "Understanding global perspectives and issues"
+      credits_required: 3
+      examples:
+        - "ANT 102 - Introduction to Cultural Anthropology"
+        - "GEO 101 - World Geography"
+        - "POL 102 - Introduction to International Relations"
+    
+    - code: "HUM"
+      name: "Humanities"
+      description: "Human thought, culture, and expression"
+      credits_required: 3
+      examples:
+        - "ENG 101 - Introduction to Literature"
+        - "HIS 101 - World History I"
+        - "PHI 101 - Introduction to Philosophy"
+    
+    - code: "LANG"
+      name: "Language"
+      description: "Foreign language proficiency"
+      credits_required: 3
+      examples:
+        - "CHI 101 - Elementary Chinese I"
+        - "FRE 101 - Elementary French I"
+        - "SPA 101 - Elementary Spanish I"
+    
+    - code: "QPS"
+      name: "Quantitative Problem Solving"
+      description: "Mathematical and quantitative reasoning"
+      credits_required: 3
+      examples:
+        - "MAT 125 - Calculus A"
+        - "MAT 131 - Calculus I"
+        - "AMS 110 - Probability and Statistics"
+    
+    - code: "SBS"
+      name: "Social and Behavioral Sciences"
+      description: "Human behavior and social systems"
+      credits_required: 3
+      examples:
+        - "PSY 103 - Introduction to Psychology"
+        - "SOC 105 - Introduction to Sociology"
+        - "ECO 108 - Introduction to Economics"
+    
+    - code: "SNW"
+      name: "Science and Technology in Society"
+      description: "Impact of science and technology on society"
+      credits_required: 3
+      examples:
+        - "EST 201 - Environmental Studies"
+        - "PHI 104 - Philosophy of Science"
+        - "STS 101 - Science, Technology, and Society"
+    
+    - code: "TECH"
+      name: "Technology and Innovation"
+      description: "Understanding technology and its applications"
+      credits_required: 3
+      examples:
+        - "CSE 101 - Introduction to Computer Science"
+        - "EST 202 - Technology and Society"
+        - "ISE 101 - Introduction to Information Systems"
+    
+    - code: "USA"
+      name: "United States History and Government"
+      description: "American history, government, and civic engagement"
+      credits_required: 3
+      examples:
+        - "HIS 104 - United States History I"
+        - "POL 101 - Introduction to American Government"
+        - "SOC 104 - American Society"
+    
+    - code: "WRT"
+      name: "Writing"
+      description: "Written communication skills"
+      credits_required: 3
+      examples:
+        - "WRT 101 - Introduction to Academic Writing"
+        - "WRT 102 - Intermediate Writing Workshop"
+        - "WRT 303 - Advanced Writing Workshop"
+
+# Physical Education Requirements
+physical_education:
+  credits_required: 2
+  courses_required: 2
+  examples:
+    - "PED 101 - Physical Fitness"
+    - "PED 102 - Team Sports"
+    - "PED 103 - Individual Sports"
+
+# Academic Standing Requirements
+academic_standing:
+  good_standing:
+    minimum_gpa: 2.0
+    maximum_incomplete_grades: 2
+    maximum_failing_grades: 1
+  
+  probation:
+    gpa_range: [1.5, 2.0)
+    conditions:
+      - "Must meet with academic advisor"
+      - "Limited course load"
+      - "Academic improvement plan required"
+  
+  dismissal:
+    gpa_below: 1.5
+    conditions:
+      - "Academic dismissal"
+      - "Appeal process available"
+      - "Reinstatement requirements"
+
+# Transfer Credit Policies
+transfer_credit:
+  maximum_transfer_credits: 90
+  minimum_grade_for_transfer: "C"
+  accreditation_requirements:
+    - "Regional accreditation required"
+    - "Course-by-course evaluation"
+    - "Official transcripts required"
+  
+  credit_evaluation:
+    quarter_to_semester_conversion: 0.67
+    international_credit_evaluation: "Required"
+    military_credit: "Accepted with proper documentation"
+
+# Graduation Application Requirements
+graduation_application:
+  deadline:
+    fall_graduation: "October 1"
+    spring_graduation: "March 1"
+    summer_graduation: "June 1"
+  
+  requirements:
+    - "Completed graduation application"
+    - "All degree requirements met"
+    - "Minimum GPA achieved"
+    - "All financial obligations cleared"
+    - "Official transcripts on file"
+
+# Special Programs and Policies
+special_programs:
+  honors_programs:
+    university_honors:
+      gpa_requirement: 3.5
+      additional_requirements: "Honors thesis or project"
+    
+    departmental_honors:
+      gpa_requirement: 3.3
+      additional_requirements: "Department-specific requirements"
+  
+  double_major:
+    allowed: true
+    requirements:
+      - "Both majors must be completed"
+      - "Minimum 30 credits in each major"
+      - "All requirements for both majors met"
+  
+  minor_programs:
+    allowed: true
+    maximum_minors: 3
+    requirements:
+      - "Minimum 18 credits in minor"
+      - "Minimum 9 credits at 300+ level"
+      - "Minimum GPA of 2.0 in minor"
+
+# Academic Calendar and Deadlines
+academic_calendar:
+  add_drop_period: "First 2 weeks of semester"
+  withdrawal_deadline: "10th week of semester"
+  grade_change_deadline: "End of following semester"
+  
+  important_dates:
+    fall_semester:
+      classes_begin: "Late August"
+      classes_end: "Mid December"
+      final_exams: "Mid December"
+    
+    spring_semester:
+      classes_begin: "Late January"
+      classes_end: "Mid May"
+      final_exams: "Mid May"
+    
+    summer_sessions:
+      session_1: "May - June"
+      session_2: "July - August"

@@ -1,25 +1,31 @@
 #!/bin/bash
 
-# Google OAuth 2.0 환경 변수 설정 스크립트
-# 사용법: ./setup-oauth.sh YOUR_CLIENT_SECRET
+# Google OAuth2 Setup Script for SAM System
+# This script helps you set up the Google OAuth2 client secret
 
-if [ $# -ne 1 ]; then
-    echo "사용법: $0 <GOOGLE_CLIENT_SECRET>"
+echo "🔧 Google OAuth2 Setup for SAM System"
+echo "======================================"
+echo ""
+
+# Check if .env file exists
+if [ ! -f ".env" ]; then
+    echo "📝 Creating .env file from template..."
+    cp env.example .env
+    echo "✅ .env file created!"
     echo ""
-    echo "Google Cloud Console에서 클라이언트 시크릿을 확인한 후"
-    echo "클라이언트 시크릿을 이 스크립트에 전달하세요."
-    echo ""
-    echo "예시:"
-    echo "  $0 GOCSPX-abcdef123456"
-    exit 1
 fi
 
-export GOOGLE_CLIENT_ID="944868309517-t06evs8nf92dh9nq5ucbp6b69naq265i.apps.googleusercontent.com"
-export GOOGLE_CLIENT_SECRET="$1"
-
-echo "Google OAuth 환경 변수가 설정되었습니다:"
-echo "GOOGLE_CLIENT_ID: $GOOGLE_CLIENT_ID"
-echo "GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:0:10}..."
+echo "📋 Next steps:"
+echo "1. Go to Google Cloud Console: https://console.cloud.google.com/apis/credentials"
+echo "2. Find your OAuth 2.0 Client ID: 944868309517-t06evs8nf92dh9nq5ucbp6b69naq265i.apps.googleusercontent.com"
+echo "3. Click on it and copy the 'Client secret' value"
+echo "4. Edit the .env file and replace 'your_actual_client_secret_here' with your actual client secret"
+echo "5. Save the file"
 echo ""
-echo "이제 Spring Boot 애플리케이션을 실행하세요:"
-echo "  ./mvnw spring-boot:run"
+
+echo "🚀 After setting up the client secret, you can run the application with:"
+echo "   ./mvnw spring-boot:run"
+echo ""
+
+echo "⚠️  IMPORTANT: Never commit the .env file to version control!"
+echo "   The .env file is already in .gitignore"

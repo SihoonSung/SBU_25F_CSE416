@@ -44,22 +44,32 @@
 
 ### 1. Google OAuth2 설정
 
-1. [Google Cloud Console](https://console.cloud.google.com/)에서 프로젝트 생성
-2. OAuth2 클라이언트 ID 생성
-3. 승인된 리디렉션 URI 추가: `http://localhost:8080/login/oauth2/code/google`
+#### 자동 설정 (권장)
+```bash
+cd backend
+./setup-oauth.sh
+```
+
+#### 수동 설정
+1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials)에서 OAuth2 클라이언트 ID 확인
+2. 클라이언트 ID: `944868309517-t06evs8nf92dh9nq5ucbp6b69naq265i.apps.googleusercontent.com`
+3. 클라이언트 시크릿 복사
 4. 환경 변수 설정:
 
 ```bash
-export GOOGLE_CLIENT_ID="your-google-client-id"
-export GOOGLE_CLIENT_SECRET="your-google-client-secret"
+export GOOGLE_CLIENT_SECRET="your-actual-client-secret"
 ```
 
-또는 `application.properties`에서 직접 설정:
-
-```properties
-spring.security.oauth2.client.registration.google.client-id=your-google-client-id
-spring.security.oauth2.client.registration.google.client-secret=your-google-client-secret
+또는 `.env` 파일 생성:
+```bash
+cd backend
+cp env.example .env
+# .env 파일을 편집하여 실제 클라이언트 시크릿 입력
 ```
+
+#### 승인된 리디렉션 URI 확인
+Google Cloud Console에서 다음 URI가 등록되어 있는지 확인:
+- `http://localhost:8080/login/oauth2/code/google`
 
 ### 2. 데이터베이스 설정
 

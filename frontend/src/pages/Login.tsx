@@ -9,6 +9,10 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false)
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const googleUrl = `${backendBase}/oauth2/authorization/google`
+  
+  // 디버깅을 위한 로그
+  console.log('Backend Base URL:', backendBase)
+  console.log('Google OAuth URL:', googleUrl)
 
   // OAuth 콜백 처리
   useEffect(() => {

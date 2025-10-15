@@ -1,0 +1,282 @@
+# Sample Degree Requirements YAML File
+# This file demonstrates the structure for importing degree requirements
+
+requirements_version: "Fall 2025"
+effective_term: "Fall 2025"
+imported_by: "registrar_netid"
+imported_at: "2025-01-14T10:00:00Z"
+
+degree_requirements:
+  - subject_code: "CSE"
+    degree_type: "BS"
+    total_credits_required: 120
+    is_restricted: true
+    gpa_requirement: 3.0
+    admission_requirements:
+      required_courses:
+        - course_code: "CSE 114"
+          min_grade: "C"
+        - course_code: "CSE 214"
+          min_grade: "C"
+        - course_code: "CSE 215"
+          min_grade: "C"
+      minimum_gpa: 3.0
+      additional_requirements:
+        - "Completion of at least 30 credits"
+        - "Good academic standing"
+    course_requirements:
+      core_courses:
+        - "CSE 114"
+        - "CSE 214"
+        - "CSE 215"
+        - "CSE 216"
+        - "CSE 220"
+        - "CSE 300"
+        - "CSE 310"
+        - "CSE 316"
+        - "CSE 320"
+        - "CSE 373"
+        - "CSE 416"
+      elective_courses:
+        category: "CSE Electives"
+        credits_required: 12
+        min_300_level: 6
+      math_requirements:
+        - "MAT 131"
+        - "MAT 132"
+        - "AMS 210"
+        - "AMS 310"
+      science_requirements:
+        - "PHY 131"
+        - "PHY 132"
+        - "PHY 133"
+        - "PHY 134"
+    sbc_requirements:
+      - category: "ARTS"
+        credits_required: 3
+      - category: "GLO"
+        credits_required: 3
+      - category: "HUM"
+        credits_required: 3
+      - category: "LANG"
+        credits_required: 3
+      - category: "QPS"
+        credits_required: 3
+      - category: "SBS"
+        credits_required: 3
+      - category: "SNW"
+        credits_required: 3
+      - category: "TECH"
+        credits_required: 3
+      - category: "USA"
+        credits_required: 3
+      - category: "WRT"
+        credits_required: 3
+
+  - subject_code: "CSE"
+    degree_type: "BA"
+    total_credits_required: 120
+    is_restricted: false
+    gpa_requirement: 2.0
+    admission_requirements:
+      required_courses:
+        - course_code: "CSE 114"
+          min_grade: "C"
+      minimum_gpa: 2.0
+    course_requirements:
+      core_courses:
+        - "CSE 114"
+        - "CSE 214"
+        - "CSE 215"
+        - "CSE 216"
+        - "CSE 300"
+        - "CSE 310"
+      elective_courses:
+        category: "CSE Electives"
+        credits_required: 6
+      math_requirements:
+        - "MAT 131"
+        - "MAT 132"
+    sbc_requirements:
+      - category: "ARTS"
+        credits_required: 3
+      - category: "GLO"
+        credits_required: 3
+      - category: "HUM"
+        credits_required: 3
+      - category: "LANG"
+        credits_required: 3
+      - category: "QPS"
+        credits_required: 3
+      - category: "SBS"
+        credits_required: 3
+      - category: "SNW"
+        credits_required: 3
+      - category: "TECH"
+        credits_required: 3
+      - category: "USA"
+        credits_required: 3
+      - category: "WRT"
+        credits_required: 3
+
+  - subject_code: "BIO"
+    degree_type: "BA"
+    total_credits_required: 120
+    is_restricted: false
+    gpa_requirement: 2.0
+    admission_requirements:
+      required_courses:
+        - course_code: "BIO 201"
+          min_grade: "C"
+        - course_code: "BIO 202"
+          min_grade: "C"
+      minimum_gpa: 2.0
+    course_requirements:
+      core_courses:
+        - "BIO 201"
+        - "BIO 202"
+        - "BIO 203"
+        - "BIO 204"
+        - "BIO 205"
+        - "BIO 206"
+      elective_courses:
+        category: "BIO Electives"
+        credits_required: 12
+        min_300_level: 6
+      math_requirements:
+        - "MAT 125"
+        - "MAT 126"
+      science_requirements:
+        - "CHE 131"
+        - "CHE 132"
+        - "CHE 133"
+        - "CHE 134"
+    sbc_requirements:
+      - category: "ARTS"
+        credits_required: 3
+      - category: "GLO"
+        credits_required: 3
+      - category: "HUM"
+        credits_required: 3
+      - category: "LANG"
+        credits_required: 3
+      - category: "QPS"
+        credits_required: 3
+      - category: "SBS"
+        credits_required: 3
+      - category: "SNW"
+        credits_required: 3
+      - category: "TECH"
+        credits_required: 3
+      - category: "USA"
+        credits_required: 3
+      - category: "WRT"
+        credits_required: 3
+
+  - subject_code: "PSY"
+    degree_type: "BA"
+    total_credits_required: 120
+    is_restricted: false
+    gpa_requirement: 2.0
+    admission_requirements:
+      required_courses:
+        - course_code: "PSY 103"
+          min_grade: "C"
+      minimum_gpa: 2.0
+    course_requirements:
+      core_courses:
+        - "PSY 103"
+        - "PSY 250"
+        - "PSY 252"
+        - "PSY 310"
+        - "PSY 320"
+        - "PSY 340"
+      elective_courses:
+        category: "PSY Electives"
+        credits_required: 15
+        min_300_level: 9
+      math_requirements:
+        - "MAT 125"
+        - "MAT 126"
+    sbc_requirements:
+      - category: "ARTS"
+        credits_required: 3
+      - category: "GLO"
+        credits_required: 3
+      - category: "HUM"
+        credits_required: 3
+      - category: "LANG"
+        credits_required: 3
+      - category: "QPS"
+        credits_required: 3
+      - category: "SBS"
+        credits_required: 3
+      - category: "SNW"
+        credits_required: 3
+      - category: "TECH"
+        credits_required: 3
+      - category: "USA"
+        credits_required: 3
+      - category: "WRT"
+        credits_required: 3
+
+# Minor requirements
+minor_requirements:
+  - subject_code: "CSE"
+    degree_type: "MINOR"
+    total_credits_required: 18
+    is_restricted: false
+    gpa_requirement: 2.0
+    admission_requirements:
+      required_courses:
+        - course_code: "CSE 114"
+          min_grade: "C"
+      minimum_gpa: 2.0
+    course_requirements:
+      core_courses:
+        - "CSE 114"
+        - "CSE 214"
+        - "CSE 215"
+      elective_courses:
+        category: "CSE Electives"
+        credits_required: 9
+        min_300_level: 3
+
+  - subject_code: "BIO"
+    degree_type: "MINOR"
+    total_credits_required: 18
+    is_restricted: false
+    gpa_requirement: 2.0
+    admission_requirements:
+      required_courses:
+        - course_code: "BIO 201"
+          min_grade: "C"
+      minimum_gpa: 2.0
+    course_requirements:
+      core_courses:
+        - "BIO 201"
+        - "BIO 202"
+      elective_courses:
+        category: "BIO Electives"
+        credits_required: 12
+        min_300_level: 6
+
+  - subject_code: "PSY"
+    degree_type: "MINOR"
+    total_credits_required: 18
+    is_restricted: false
+    gpa_requirement: 2.0
+    admission_requirements:
+      required_courses:
+        - course_code: "PSY 103"
+          min_grade: "C"
+      minimum_gpa: 2.0
+    course_requirements:
+      core_courses:
+        - "PSY 103"
+        - "PSY 250"
+        - "PSY 252"
+      elective_courses:
+        category: "PSY Electives"
+        credits_required: 9
+        min_300_level: 3
