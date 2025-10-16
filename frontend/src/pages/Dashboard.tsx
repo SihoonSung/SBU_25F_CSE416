@@ -1,68 +1,11 @@
-import React, { useEffect, useState } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import React from 'react'
 import './Dashboard.css'
-import { signIn } from '../utils/auth'
 
 /*
  * TP: Used Cursor to make it consistent with the codebase.
  */
 
 function Dashboard() {
-  const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const [isLoading, setIsLoading] = useState(false)
-  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
-
-  // OAuth 성공 콜백 처리
-  useEffect(() => {
-    const handleOAuthSuccess = async () => {
-      const success = searchParams.get('success')
-      
-      if (success === 'true') {
-        setIsLoading(true)
-        try {
-          // OAuth 인증 완료 후 사용자 정보 가져오기
-          const response = await fetch(`${backendBase}/api/auth/success`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            mode: 'cors',
-          })
-          
-          if (response.ok) {
-            const data = await response.json()
-            if (data.success && data.user) {
-              // 사용자 정보를 localStorage에 저장
-              signIn('oauth-token', data.user.email)
-              
-              // URL에서 success 파라미터 제거
-              navigate('/home', { replace: true })
-            }
-          } else {
-            console.error('Failed to get user info')
-          }
-        } catch (error) {
-          console.error('Error during OAuth callback:', error)
-        } finally {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    handleOAuthSuccess()
-  }, [searchParams, navigate, backendBase])
-  if (isLoading) {
-    return (
-      <div className="dashboard">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>로그인 중...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="dashboard">

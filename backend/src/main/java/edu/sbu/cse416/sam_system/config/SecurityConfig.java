@@ -6,19 +6,16 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
+import java.util.List;
 
-/**
- * Security configuration for SAM system.
- * Configures OAuth2 Google authentication and CORS settings.
- */
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true) // enable @PreAuthorize on controllers
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     @Bean
@@ -27,19 +24,20 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/oauth2/**", "/login/**", "/error").permitAll()
-                // NOTE: leaving /api/** open at the HTTP filter, but @PreAuthorize
-                // on controllers will still enforce authentication/roles.
+                // Allow OAuth callback and login paths
+                .requestMatchers("/oauth2/**", "/login/**", "/login/oauth2/**", "/error").permitAll()
+                // Allow all API endpoints for demo (use @PreAuthorize for protection)
                 .requestMatchers("/api/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/oauth2/authorization/google")
-                .defaultSuccessUrl("http://localhost:5173/home?success=true", true)
-                .failureUrl("http://localhost:5173/login?error=true")
+                .defaultSuccessUrl("http://localhost:5175/home", true)
+                .failureUrl("http://localhost:5175/login?error=true")
             )
             .logout(logout -> logout
-                .logoutUrl("/logout")
+                // Default is POST /logout
+                .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "POST"))
                 .logoutSuccessUrl("/api/auth/logout-success")
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)
@@ -50,17 +48,18 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:3000",
-            "http://localhost:5173"
+        CorsConfiguration c = new CorsConfiguration();
+        c.setAllowedOrigins(List.of(
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://localhost:5175",
+            "http://localhost:3000"
         ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
+        c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS","PATCH"));
+        c.setAllowedHeaders(List.of("*"));
+        c.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();
+        s.registerCorsConfiguration("/**", c);
+        return s;
     }
 }
