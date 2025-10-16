@@ -1,218 +1,143 @@
 package edu.sbu.cse416.sam_system.controller;
 
+import edu.sbu.cse416.sam_system.dto.StudentProfileDto;
 import edu.sbu.cse416.sam_system.entity.User;
-import edu.sbu.cse416.sam_system.entity.UserRole;
+import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.service.UserService;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.lang.reflect.Method;
+import java.util.*;
 
-/**
- * Controller for user management operations.
- * Provides endpoints for user search, management, and YAML import.
- * 
- * TP: Used Cursor to implement user management controller
- */
+@CrossOrigin(
+    origins = {"http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"},
+    allowCredentials = "true"
+)
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"})
 public class UserController {
 
+    private final UserRepository userRepository;
+    private final UserService userService;
+
     @Autowired
-    private UserService userService;
-
-    /**
-     * Get all users (for registrar)
-     */
-    @GetMapping
-    public ResponseEntity<List<User>> getAllUsers(
-            @AuthenticationPrincipal OAuth2User principal) {
-        
-        if (!isRegistrar(principal)) {
-            return ResponseEntity.status(403).build();
-        }
-        
-        List<User> users = userService.getAllUsers();
-        return ResponseEntity.ok(users);
+    public UserController(UserRepository userRepository, UserService userService) {
+        this.userRepository = userRepository;
+        this.userService = userService;
     }
 
     /**
-     * Get user by ID
+     * Lookup by email or studentId from users table only.
+     *   /api/users/student-lookup?email=abc@xyz.com
+     *   /api/users/student-lookup?studentId=1100123456
+     * If both are provided, email wins.
      */
-    @GetMapping("/{userId}")
-    public ResponseEntity<User> getUserById(
-            @PathVariable Long userId,
-            @AuthenticationPrincipal OAuth2User principal) {
-        
-        if (!isRegistrar(principal)) {
-            return ResponseEntity.status(403).build();
-        }
-        
-        Optional<User> user = userService.getUserById(userId);
-        return user.map(ResponseEntity::ok)
-                  .orElse(ResponseEntity.notFound().build());
-    }
-
-    /**
-     * Search users by name
-     */
-    @GetMapping("/search")
-    public ResponseEntity<List<User>> searchUsers(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String role,
-            @RequestParam(required = false) String email,
-            @RequestParam(required = false) String major,
-            @RequestParam(required = false) String department,
-            @AuthenticationPrincipal OAuth2User principal) {
-        
-        if (!isRegistrar(principal)) {
-            return ResponseEntity.status(403).build();
-        }
-        
-        List<User> users;
-        
-        if (name != null && !name.trim().isEmpty()) {
-            if (role != null && !role.trim().isEmpty()) {
-                try {
-                    UserRole userRole = UserRole.valueOf(role.toUpperCase());
-                    users = userService.searchUsersByNameAndRole(name, userRole);
-                } catch (IllegalArgumentException e) {
-                    return ResponseEntity.badRequest().build();
-                }
-            } else {
-                users = userService.searchUsersByName(name);
-            }
-        } else if (email != null && !email.trim().isEmpty()) {
-            users = userService.searchUsersByEmailDomain(email);
-        } else if (major != null && !major.trim().isEmpty()) {
-            users = userService.searchStudentsByMajor(major);
-        } else if (department != null && !department.trim().isEmpty()) {
-            users = userService.searchInstructorsByDepartment(department);
+    @GetMapping("/student-lookup")
+    @PreAuthorize("permitAll()")
+    public StudentProfileDto lookupStudent(
+            @RequestParam(value = "email", required = false) String email,
+            @RequestParam(value = "studentId", required = false) String studentId
+    ) {
+        Optional<User> u;
+        if (email != null && !email.isBlank()) {
+            u = userRepository.findByEmailIgnoreCase(email.trim());
+        } else if (studentId != null && !studentId.isBlank()) {
+            u = userRepository.findByStudentId(studentId.trim());
         } else {
-            users = userService.getAllUsers();
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email or studentId is required");
         }
-        
-        return ResponseEntity.ok(users);
+
+        User user = u.orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found"));
+
+        return toStudentProfileDto(user);
     }
 
-    /**
-     * Get users by role
-     */
-    @GetMapping("/role/{role}")
-    public ResponseEntity<List<User>> getUsersByRole(
-            @PathVariable String role,
-            @AuthenticationPrincipal OAuth2User principal) {
-        
-        if (!isRegistrar(principal)) {
-            return ResponseEntity.status(403).build();
-        }
-        
+    // ---------- mapper ----------
+    private static StudentProfileDto toStudentProfileDto(User u) {
+        StudentProfileDto d = new StudentProfileDto();
+
+        // internal id: try getId() -> getUserId() -> getUid(); else 0L
+        d.id = safeInternalId(u);
+
+        d.studentId = nvl(callString(u, "getStudentId"), "-");
+
+        String first = nvl(callString(u, "getFirstName"), "");
+        String last  = nvl(callString(u, "getLastName"), "");
+        String name = (first + " " + last).trim();
+        d.name = name.isEmpty() ? "-" : name;
+
+        d.major = nvl(callString(u, "getMajor"), "-");
+        d.email = nvl(callString(u, "getEmail"), "-");
+
+        // Not present on User -> default values
+        d.status = "-";
+        d.entryYear = "-";
+
+        return d;
+    }
+
+    // ---------- helpers (no dependency on missing getters) ----------
+    private static Long safeInternalId(User u) {
+        Long v = callLong(u, "getId");
+        if (v != null) return v;
+        v = callLong(u, "getUserId");
+        if (v != null) return v;
+        v = callLong(u, "getUid");
+        if (v != null) return v;
+        return 0L;
+    }
+
+    private static String nvl(String v, String def) {
+        return (v == null || v.isBlank()) ? def : v;
+    }
+
+    private static String callString(Object target, String getter) {
         try {
-            UserRole userRole = UserRole.valueOf(role.toUpperCase());
-            List<User> users = userService.getUsersByRole(userRole);
-            return ResponseEntity.ok(users);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            Method m = target.getClass().getMethod(getter);
+            Object out = m.invoke(target);
+            return (out == null) ? null : String.valueOf(out);
+        } catch (Exception ignore) {
+            return null;
         }
     }
 
-    /**
-     * Update user information
-     */
-    @PutMapping("/{userId}")
-    public ResponseEntity<User> updateUser(
-            @PathVariable Long userId,
-            @RequestBody User userUpdate,
-            @AuthenticationPrincipal OAuth2User principal) {
-        
-        if (!isRegistrar(principal)) {
-            return ResponseEntity.status(403).build();
-        }
-        
-        Optional<User> existingUser = userService.getUserById(userId);
-        if (existingUser.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        
-        User user = existingUser.get();
-        
-        // Update allowed fields
-        if (userUpdate.getFirstName() != null) {
-            user.setFirstName(userUpdate.getFirstName());
-        }
-        if (userUpdate.getLastName() != null) {
-            user.setLastName(userUpdate.getLastName());
-        }
-        if (userUpdate.getRole() != null) {
-            user.setRole(userUpdate.getRole());
-        }
-        if (userUpdate.getStudentId() != null) {
-            user.setStudentId(userUpdate.getStudentId());
-        }
-        if (userUpdate.getMajor() != null) {
-            user.setMajor(userUpdate.getMajor());
-        }
-        if (userUpdate.getGpa() != null) {
-            user.setGpa(userUpdate.getGpa());
-        }
-        if (userUpdate.getGraduationYear() != null) {
-            user.setGraduationYear(userUpdate.getGraduationYear());
-        }
-        if (userUpdate.getDepartment() != null) {
-            user.setDepartment(userUpdate.getDepartment());
-        }
-        if (userUpdate.getOfficeLocation() != null) {
-            user.setOfficeLocation(userUpdate.getOfficeLocation());
-        }
-        if (userUpdate.getOfficeHours() != null) {
-            user.setOfficeHours(userUpdate.getOfficeHours());
-        }
-        
-        User updatedUser = userService.updateUser(user);
-        return ResponseEntity.ok(updatedUser);
-    }
-
-    /**
-     * Deactivate user
-     */
-    @PutMapping("/{userId}/deactivate")
-    public ResponseEntity<User> deactivateUser(
-            @PathVariable Long userId,
-            @AuthenticationPrincipal OAuth2User principal) {
-        
-        if (!isRegistrar(principal)) {
-            return ResponseEntity.status(403).build();
-        }
-        
+    private static Long callLong(Object target, String getter) {
         try {
-            User user = userService.deactivateUser(userId);
-            return ResponseEntity.ok(user);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
+            Method m = target.getClass().getMethod(getter);
+            Object out = m.invoke(target);
+            if (out == null) return null;
+            if (out instanceof Long) return (Long) out;
+            if (out instanceof Number) return ((Number) out).longValue();
+            String s = String.valueOf(out);
+            return s.matches("\\d+") ? Long.parseLong(s) : null;
+        } catch (Exception ignore) {
+            return null;
         }
     }
 
-    /**
-     * Activate user
-     */
+    // ================= Registrar/Admin APIs =================
+
+    /** Activate user */
     @PutMapping("/{userId}/activate")
     public ResponseEntity<User> activateUser(
             @PathVariable Long userId,
             @AuthenticationPrincipal OAuth2User principal) {
-        
+
         if (!isRegistrar(principal)) {
             return ResponseEntity.status(403).build();
         }
-        
+
         try {
             User user = userService.activateUser(userId);
             return ResponseEntity.ok(user);
@@ -221,23 +146,19 @@ public class UserController {
         }
     }
 
-    /**
-     * Import users from YAML file
-     */
+    /** Import users from YAML file */
     @PostMapping("/import")
     public ResponseEntity<Map<String, Object>> importUsers(
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal OAuth2User principal) {
-        
-        // Temporarily disable authorization check for development
-        // if (!isRegistrar(principal)) {
-        //     return ResponseEntity.status(403).build();
-        // }
-        
+
+        // 개발 중엔 잠시 열어두고 싶으면 위 권한 체크 주석 유지 가능
+        // if (!isRegistrar(principal)) return ResponseEntity.status(403).build();
+
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
         }
-        
+
         try {
             List<User> importedUsers = userService.importUsersFromYaml(file);
             Map<String, Object> response = new HashMap<>();
@@ -250,32 +171,24 @@ public class UserController {
         }
     }
 
-    /**
-     * Get user statistics
-     */
+    /** Get user statistics */
     @GetMapping("/statistics")
     public ResponseEntity<Map<String, Object>> getUserStatistics(
             @AuthenticationPrincipal OAuth2User principal) {
-        
+
         if (!isRegistrar(principal)) {
             return ResponseEntity.status(403).build();
         }
-        
+
         Map<String, Object> stats = userService.getUserStatistics();
         return ResponseEntity.ok(stats);
     }
 
-    /**
-     * Check if current user is registrar
-     */
+    /** Check if current user is registrar */
     private boolean isRegistrar(OAuth2User principal) {
-        if (principal == null) {
-            return false;
-        }
-        
+        if (principal == null) return false;
         String googleId = principal.getName();
         var userOpt = userService.getUserByGoogleId(googleId);
-        
         return userOpt.isPresent() && userOpt.get().isRegistrar();
     }
 }

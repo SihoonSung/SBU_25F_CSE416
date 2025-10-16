@@ -19,7 +19,7 @@ type PersonBasic = {
 /** Student basic + details (as before) */
 type StudentProfile = {
   id: number;
-  netId: string;
+  studentId: string;
   name: string;
   major: string;
   email: string;
@@ -141,7 +141,7 @@ export default function ProfilePage() {
   const [myCoursePlan, setMyCoursePlan] = useState<PlannedCourse[]>([]);
 
   /** ===== Target student bundle (via search) ===== */
-  const [targetNetId, setTargetNetId] = useState<string | null>(null);
+  const [targetSid, setTargetSid] = useState<string | null>(null);
   const [term, setTerm] = useState<string>("2025-Fall"); // target term
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [details, setDetails] = useState<FullStudentDetails | null>(null);
@@ -172,8 +172,13 @@ export default function ProfilePage() {
   const [searchResult, setSearchResult] = useState<StudentProfile | null>(null);
 
   /** ===== Helpers ===== */
-  const buildPrefix = (netId: string | null) =>
-    netId ? `${BASE}/api/profile/student/${encodeURIComponent(netId)}` : `${BASE}/api/profile/me`;
+  const buildPrefix = (key: string | null) => {
+  if (!key) return `${BASE}/api/profile/me`;
+  const isSid = /^[0-9]{6,10}$/.test(key);
+  return isSid
+    ? `${BASE}/api/profile/student-id/${encodeURIComponent(key)}`
+    : `${BASE}/api/profile/student/${encodeURIComponent(key)}`;
+};
 
   const fmt = {
     num(n?: number | null) {
@@ -271,18 +276,18 @@ export default function ProfilePage() {
     (async () => {
       if (!profile) return;
       try {
-        const sched = await safeFetch(`${buildPrefix(targetNetId)}/schedule?term=${encodeURIComponent(term)}`);
+        const sched = await safeFetch(`${buildPrefix(targetSid)}/schedule?term=${encodeURIComponent(term)}`);
         setSchedule(Array.isArray(sched) ? (sched as ScheduleClass[]) : []);
       } catch (e: any) {
         setMsg(e.message);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [term, targetNetId, profile]);
+  }, [term, targetSid, profile]);
 
   /** ===== Load student bundle (me or target) ===== */
   async function loadStudentBundle(
-    netId: string | null,
+    sid: string | null,
     t: string,
     sinks: {
       setProfile: (v: StudentProfile | null) => void;
@@ -300,7 +305,7 @@ export default function ProfilePage() {
       setCoursePlan: (v: PlannedCourse[]) => void;
     }
   ) {
-    const prefix = buildPrefix(netId);
+    const prefix = buildPrefix(sid);
     const [p, d, gpa, sched, planList, adm, deg, h, w, log, tr, ch, cp] = await Promise.all([
       safeFetch(`${prefix}`).catch(() => null),
       safeFetch(`${prefix}/details`).catch(() => null),
@@ -340,16 +345,23 @@ export default function ProfilePage() {
     setMsg(null);
     try {
       const q = search.trim();
-      let data: StudentProfile | null = null;
-      if (!q.includes("@")) {
-        data = await safeFetch(`${BASE}/api/profile/student?netId=${encodeURIComponent(q)}`);
-      } else {
-        data = await safeFetch(`${BASE}/api/profile/student-by-email?email=${encodeURIComponent(q)}`);
-      }
-      setSearchResult(data);
-      if (!data) setMsg("No student found.");
+      const url = q.includes("@")
+        ? `${BASE}/api/users/student-lookup?email=${encodeURIComponent(q)}`
+        : `${BASE}/api/users/student-lookup?studentId=${encodeURIComponent(q)}`;
+
+      const r = await safeFetch(url); 
+      const mapped: StudentProfile = {
+        id: r.id,
+        studentId: r.studentId ?? "-",
+        name: r.name ?? "-",
+        major: r.major ?? "-",
+        email: r.email ?? "-",
+        status: r.status ?? "-",
+        entryYear: r.entryYear ?? "-",
+      };
+      setSearchResult(mapped);
     } catch (e: any) {
-      setMsg(e.message);
+      setMsg(e.message || "No student found.");
     } finally {
       setSearching(false);
     }
@@ -357,8 +369,8 @@ export default function ProfilePage() {
 
   const useSearchedAsTarget = async () => {
     if (!searchResult) return;
-    setTargetNetId(searchResult.netId);
-    await loadStudentBundle(searchResult.netId, term, {
+    setTargetSid(searchResult.studentId);
+    await loadStudentBundle(searchResult.studentId, term, {
       setProfile,
       setDetails,
       setSummary,
@@ -487,7 +499,7 @@ export default function ProfilePage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Enter netId or email"
+            placeholder="Enter studentId or email"
             style={{ flex: 1, padding: "8px 10px", border: "1px solid #ddd", borderRadius: 6 }}
             disabled={searching || busy}
           />
@@ -501,7 +513,7 @@ export default function ProfilePage() {
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                  {searchResult.name} ({searchResult.netId})
+                  {searchResult.name} ({searchResult.studentId})
                 </div>
                 <div style={{ fontSize: 13, color: "#666" }}>
                   {searchResult.email} • {searchResult.major} • {searchResult.status} • Entry {searchResult.entryYear}
@@ -514,7 +526,7 @@ export default function ProfilePage() {
       </section>
 
       <StudentBundleView
-        title={`Target Student Profile${targetNetId ? ` (${targetNetId})` : ""}`}
+        title={`Target Student Profile${targetSid ? ` (${targetSid})` : ""}`}
         term={term}
         setTerm={setTerm}
         profile={profile}
@@ -649,8 +661,8 @@ function StudentBundleView(props: {
           <div style={{ display: "grid", gridTemplateColumns: "150px 1fr", rowGap: 8, columnGap: 12, marginTop: 8 }}>
             <div style={{ color: "#666" }}>Name</div>
             <div>{profile.name}</div>
-            <div style={{ color: "#666" }}>NetID</div>
-            <div>{profile.netId}</div>
+            <div style={{ color: "#666" }}>Student ID</div>
+            <div>{profile.studentId}</div>
             <div style={{ color: "#666" }}>Email</div>
             <div>{profile.email}</div>
             <div style={{ color: "#666" }}>Status</div>

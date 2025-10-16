@@ -1,17 +1,91 @@
-import React from 'react'
+// src/pages/Dashboard.tsx
+import React, { useEffect, useState } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import './Dashboard.css'
 
-/*
- * TP: Used Cursor to make it consistent with the codebase.
- */
+type Me = {
+  userId: number
+  email: string
+  fullName: string
+  firstName?: string
+  lastName?: string
+  role?: string
+  profilePictureUrl?: string
+  isActive?: boolean
+} | null
 
 function Dashboard() {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const [isLoading, setIsLoading] = useState(false)
+  const [me, setMe] = useState<Me>(null)
+
+  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+
+  // 1) OAuth 성공 콜백 처리 + 2) 세션으로 현재 유저 불러오기
+  useEffect(() => {
+    const run = async () => {
+      const success = searchParams.get('success')
+      try {
+        setIsLoading(true)
+
+        // OAuth 성공으로 돌아왔으면, 백엔드에 성공 처리(유저 생성/업데이트)를 요청
+        if (success === 'true') {
+          const ok = await fetch(`${backendBase}/api/auth/success`, {
+            method: 'GET',
+            credentials: 'include', // ★ 서버 세션 쿠키 포함
+            headers: { 'Content-Type': 'application/json' },
+            mode: 'cors',
+          })
+          if (!ok.ok) {
+            console.error('auth/success 호출 실패')
+          }
+          // URL에서 success 파라미터 제거
+          navigate('/home', { replace: true })
+        }
+
+        // 세션 쿠키로 현재 로그인된 유저 조회
+        const meRes = await fetch(`${backendBase}/api/auth/me`, {
+          method: 'GET',
+          credentials: 'include', // ★ 중요
+          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',
+        })
+
+        if (meRes.ok) {
+          const data = await meRes.json()
+          setMe(data.user ?? null)
+        } else {
+          setMe(null)
+        }
+      } catch (e) {
+        console.error(e)
+        setMe(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backendBase]) // success 파라미터는 처리 후 /home으로 replace하므로 의존성에서 제외
+
+  if (isLoading) {
+    return (
+      <div className="dashboard">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>로그인 중...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="dashboard">
       {/* Header */}
       <header className="dashboard-header">
-        <h1>Welcome back, Sihoon</h1>
+        <h1>Welcome back{me ? `, ${me.fullName}` : ''}</h1>
       </header>
 
       {/* Main Content */}
@@ -49,7 +123,7 @@ function Dashboard() {
               <div className="progress-text">85%</div>
             </div>
             <div className="progress-bar">
-              <div className="progress-fill" style={{width: '85%'}}></div>
+              <div className="progress-fill" style={{ width: '85%' }}></div>
             </div>
           </div>
 
@@ -71,61 +145,69 @@ function Dashboard() {
               <h2>Course Schedule</h2>
               <h3>Spring 2025</h3>
             </div>
-            <div className="schedule-table">
-              <div className="schedule-header">
-                <div className="time-header">Time</div>
-                <div className="day-header">Mon</div>
-                <div className="day-header">Tue</div>
-                <div className="day-header">Wed</div>
-                <div className="day-header">Thu</div>
-                <div className="day-header">Fri</div>
-              </div>
-              <div className="schedule-body">
-                <div className="schedule-row">
-                  <div className="time-cell">9</div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell cse373" rowSpan="2">CSE373<br/>FREY HALL 317</div>
-                  <div className="course-cell cse312" rowSpan="2">CSE312<br/>COMPUTER SCI 312B</div>
-                  <div className="course-cell cse300" rowSpan="2">CSE300<br/>FREY HALL 328</div>
-                  <div className="course-cell cse355" rowSpan="2">CSE355<br/>ONLINE</div>
-                </div>
-                <div className="schedule-row">
-                  <div className="time-cell">10</div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                </div>
-                <div className="schedule-row">
-                  <div className="time-cell">11</div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell ams310">AMS310<br/>HUMANITIES 1006</div>
-                  <div className="course-cell"></div>
-                </div>
-                <div className="schedule-row">
-                  <div className="time-cell">12</div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                </div>
-                <div className="schedule-row">
-                  <div className="time-cell">1</div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                </div>
-                <div className="schedule-row">
-                  <div className="time-cell">2</div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell cse416">CSE416<br/>FREY HALL 317</div>
-                  <div className="course-cell"></div>
-                  <div className="course-cell"></div>
-                </div>
-              </div>
-            </div>
+
+            <table className="schedule-table">
+              <thead>
+                <tr>
+                  <th className="time-header">Time</th>
+                  <th className="day-header">Mon</th>
+                  <th className="day-header">Tue</th>
+                  <th className="day-header">Wed</th>
+                  <th className="day-header">Thu</th>
+                  <th className="day-header">Fri</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="time-cell">9</td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell cse373" rowSpan={2}>CSE373<br/>FREY HALL 317</td>
+                  <td className="course-cell cse312" rowSpan={2}>CSE312<br/>COMPUTER SCI 312B</td>
+                  <td className="course-cell cse300" rowSpan={2}>CSE300<br/>FREY HALL 328</td>
+                  <td className="course-cell cse355" rowSpan={2}>CSE355<br/>ONLINE</td>
+                </tr>
+                <tr>
+                  <td className="time-cell">10</td>
+                  <td className="course-cell"></td>
+                </tr>
+
+                <tr>
+                  <td className="time-cell">11</td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell ams310">AMS310<br/>HUMANITIES 1006</td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                </tr>
+
+                <tr>
+                  <td className="time-cell">12</td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                </tr>
+
+                <tr>
+                  <td className="time-cell">1</td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                </tr>
+
+                <tr>
+                  <td className="time-cell">2</td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell cse416">CSE416<br/>FREY HALL 317</td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                  <td className="course-cell"></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           {/* Planner */}

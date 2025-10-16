@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import './Login.css'
-import { signIn } from '../utils/auth'
 
 function Login() {
   const navigate = useNavigate()

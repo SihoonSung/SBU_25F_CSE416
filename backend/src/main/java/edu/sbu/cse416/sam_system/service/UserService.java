@@ -5,7 +5,9 @@ import edu.sbu.cse416.sam_system.entity.UserRole;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.yaml.snakeyaml.Yaml;
 
@@ -13,19 +15,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
-/**
- * Service class for user management operations.
- * Handles user authentication, registration, and management.
- */
 @Service
 public class UserService {
 
     @Autowired
     private UserRepository userRepository;
 
-    /**
-     * Find or create user from Google OIDC authentication
-     */
+    /** Google OIDC 로그인 후 사용자 조회/생성 (OidcUser 버전) */
     public User findOrCreateUserFromOAuth2(OidcUser principal) {
         String googleId = principal.getSubject();
         String email = safeLower(principal.getEmail());
@@ -34,7 +30,6 @@ public class UserService {
         String fullName  = nvl(principal.getFullName(), principal.getAttribute("name"));
         String picture   = nvl(principal.getPicture(), principal.getAttribute("picture"));
 
-        // Handle null/empty values
         if (isBlank(firstName) && !isBlank(fullName)) {
             String[] parts = fullName.trim().split("\\s+", 2);
             firstName = parts[0];
@@ -43,7 +38,7 @@ public class UserService {
         if (isBlank(firstName)) firstName = "Unknown";
         if (isBlank(lastName))  lastName  = "User";
 
-        // Check existing user by Google ID
+        // 1) googleId 로 존재하면 업데이트
         Optional<User> existingByGoogleId = userRepository.findByGoogleId(googleId);
         if (existingByGoogleId.isPresent()) {
             User u = existingByGoogleId.get();
@@ -53,7 +48,7 @@ public class UserService {
             return userRepository.save(u);
         }
 
-        // Check existing user by email
+        // 2) email 로 존재하면 연결
         if (!isBlank(email)) {
             Optional<User> existingByEmail = userRepository.findByEmail(email);
             if (existingByEmail.isPresent()) {
@@ -67,7 +62,7 @@ public class UserService {
             }
         }
 
-        // Create new user
+        // 3) 신규 생성
         User nu = new User();
         nu.setGoogleId(googleId);
         nu.setEmail(email);
@@ -80,80 +75,117 @@ public class UserService {
         return userRepository.save(nu);
     }
 
-    /** Get user by ID */
-    public Optional<User> getUserById(Long userId) {
-        return userRepository.findById(userId);
+    /** Google OAuth2 로그인 후 사용자 조회/생성 (OAuth2User 버전, OIDC 아닐 때도 커버) */
+    public User findOrCreateUserFromOAuth2(OAuth2User principal) {
+        if (principal instanceof OidcUser oidc) {
+            return findOrCreateUserFromOAuth2(oidc);
+        }
+        String googleId = principal.getName();
+        String email    = safeLower(principal.getAttribute("email"));
+        String first    = principal.getAttribute("given_name");
+        String last     = principal.getAttribute("family_name");
+        String fullName = principal.getAttribute("name");
+        String picture  = principal.getAttribute("picture");
+
+        if (isBlank(first) && !isBlank(fullName)) {
+            String[] parts = fullName.trim().split("\\s+", 2);
+            first = parts[0];
+            if (isBlank(last) && parts.length > 1) last = parts[1];
+        }
+        if (isBlank(first)) first = "Unknown";
+        if (isBlank(last))  last  = "User";
+
+        Optional<User> byGoogle = userRepository.findByGoogleId(googleId);
+        if (byGoogle.isPresent()) {
+            User u = byGoogle.get();
+            if (!isBlank(picture)) u.setProfilePictureUrl(picture);
+            if (!isBlank(email) && isBlank(u.getEmail())) u.setEmail(email);
+            u.updateLastLogin();
+            return userRepository.save(u);
+        }
+
+        if (!isBlank(email)) {
+            Optional<User> byEmail = userRepository.findByEmail(email);
+            if (byEmail.isPresent()) {
+                User u = byEmail.get();
+                u.setGoogleId(googleId);
+                if (!isBlank(picture)) u.setProfilePictureUrl(picture);
+                if (isBlank(u.getFirstName())) u.setFirstName(first);
+                if (isBlank(u.getLastName()))  u.setLastName(last);
+                u.updateLastLogin();
+                return userRepository.save(u);
+            }
+        }
+
+        User nu = new User();
+        nu.setGoogleId(googleId);
+        nu.setEmail(email);
+        nu.setFirstName(first);
+        nu.setLastName(last);
+        nu.setProfilePictureUrl(picture);
+        nu.setRole(UserRole.STUDENT);
+        nu.setIsActive(true);
+        nu.updateLastLogin();
+        return userRepository.save(nu);
     }
 
-    /** Get user by email */
+    public Optional<User> getUserById(Long userId) { return userRepository.findById(userId); }
+
     public Optional<User> getUserByEmail(String email) {
         return userRepository.findByEmail(safeLower(email));
     }
 
-    /** Get user by Google ID (OIDC sub) */
+    public Optional<User> getUserByEmailIgnoreCase(String email) {
+        if (email == null) return Optional.empty();
+        return userRepository.findByEmailIgnoreCase(email);
+    }
+
     public Optional<User> getUserByGoogleId(String googleId) {
         return userRepository.findByGoogleId(googleId);
     }
 
-    /** Get all users */
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    public Optional<User> getUserByStudentId(String studentId) {
+        if (studentId == null) return Optional.empty();
+        return userRepository.findByStudentId(studentId);
     }
 
-    /** Get users by role */
-    public List<User> getUsersByRole(UserRole role) {
-        return userRepository.findByRole(role);
+    public List<User> getAllUsers() { return userRepository.findAll(); }
+
+    public List<User> getUsersByRole(UserRole role) { return userRepository.findByRole(role); }
+
+    public List<User> searchUsersByName(String term) { return userRepository.findByNameContaining(term); }
+
+    public List<User> searchUsersByNameAndRole(String term, UserRole role) {
+        return userRepository.findByNameContainingAndRole(term, role);
     }
 
-    /** Search users by name */
-    public List<User> searchUsersByName(String searchTerm) {
-        return userRepository.findByNameContaining(searchTerm);
-    }
+    public List<User> searchUsersByEmailDomain(String domain) { return userRepository.findByEmailDomain(domain); }
 
-    /** Search users by name and role */
-    public List<User> searchUsersByNameAndRole(String searchTerm, UserRole role) {
-        return userRepository.findByNameContainingAndRole(searchTerm, role);
-    }
+    public List<User> searchStudentsByMajor(String major) { return userRepository.findByMajorContaining(major); }
 
-    /** Search users by email domain */
-    public List<User> searchUsersByEmailDomain(String domain) {
-        return userRepository.findByEmailDomain(domain);
-    }
+    public List<User> searchInstructorsByDepartment(String dept) { return userRepository.findByDepartmentContaining(dept); }
 
-    /** Search students by major */
-    public List<User> searchStudentsByMajor(String major) {
-        return userRepository.findByMajorContaining(major);
-    }
-
-    /** Search instructors by department */
-    public List<User> searchInstructorsByDepartment(String department) {
-        return userRepository.findByDepartmentContaining(department);
-    }
-
-    /** Update user information */
+    @Transactional
     public User updateUser(User user) {
-        // Normalize email
-        if (!isBlank(user.getEmail())) {
-            user.setEmail(safeLower(user.getEmail()));
-        }
+        if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
         return userRepository.save(user);
     }
 
-    /** Deactivate user */
+    @Transactional
     public User deactivateUser(Long userId) {
         return userRepository.findById(userId)
-                .map(u -> { u.setIsActive(false); return userRepository.save(u); })
-                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+            .map(u -> { u.setIsActive(false); return userRepository.save(u); })
+            .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
     }
 
-    /** Activate user */
+    @Transactional
     public User activateUser(Long userId) {
         return userRepository.findById(userId)
-                .map(u -> { u.setIsActive(true); return userRepository.save(u); })
-                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+            .map(u -> { u.setIsActive(true); return userRepository.save(u); })
+            .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
     }
 
-    /** Import users from YAML file */
+    /** YAML import (일반 포맷 + SBU 포맷 모두 지원) */
     public List<User> importUsersFromYaml(MultipartFile file) throws IOException {
         List<User> importedUsers = new ArrayList<>();
         Yaml yaml = new Yaml();
@@ -161,18 +193,17 @@ public class UserService {
         try (InputStream inputStream = file.getInputStream()) {
             Map<String, Object> data = yaml.load(inputStream);
             if (data != null) {
-                // Handle different YAML structures
                 if (data.containsKey("users")) {
-                    // Standard format: users array
+                    @SuppressWarnings("unchecked")
                     List<Map<String, Object>> usersData = (List<Map<String, Object>>) data.get("users");
                     for (Map<String, Object> userData : usersData) {
                         User user = createUserFromYamlData(userData);
                         if (user != null) {
-                            importedUsers.add(processUserForImport(user));
+                            User saved = processUserForImport(user);
+                            if (saved != null) importedUsers.add(saved);
                         }
                     }
                 } else {
-                    // Handle SBU format: separate arrays for each role
                     importUsersByRole(data, "registrars", UserRole.REGISTRAR, importedUsers);
                     importUsersByRole(data, "academic_advisors", UserRole.ADVISOR, importedUsers);
                     importUsersByRole(data, "instructors", UserRole.INSTRUCTOR, importedUsers);
@@ -180,52 +211,43 @@ public class UserService {
                 }
             }
         }
-
         return importedUsers;
     }
 
-    /** Import users by role from SBU YAML format */
     private void importUsersByRole(Map<String, Object> data, String roleKey, UserRole role, List<User> importedUsers) {
         if (data.containsKey(roleKey)) {
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> usersData = (List<Map<String, Object>>) data.get(roleKey);
             for (Map<String, Object> userData : usersData) {
                 User user = createUserFromSBUYamlData(userData, role);
                 if (user != null) {
-                    importedUsers.add(processUserForImport(user));
+                    User saved = processUserForImport(user);
+                    if (saved != null) importedUsers.add(saved);
                 }
             }
         }
     }
 
-    /** Process user for import (normalize email and check duplicates) */
     private User processUserForImport(User user) {
-        if (!isBlank(user.getEmail())) {
-            user.setEmail(safeLower(user.getEmail()));
-        }
-        // Check for duplicates
+        if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
         Optional<User> existing = userRepository.findByEmail(user.getEmail());
-        if (existing.isEmpty()) {
-            return userRepository.save(user);
-        }
+        if (existing.isEmpty()) return userRepository.save(user);
         return null;
     }
 
-    /** Create user from YAML data */
     private User createUserFromYamlData(Map<String, Object> userData) {
         try {
             User user = new User();
-
             user.setEmail(safeLower((String) userData.get("email")));
             user.setFirstName((String) userData.get("firstName"));
             user.setLastName((String) userData.get("lastName"));
 
-            // Parse role
             String roleStr = (String) userData.get("role");
             user.setRole(roleStr != null ? UserRole.valueOf(roleStr.toUpperCase()) : UserRole.STUDENT);
 
-            // Student-specific
-            if (userData.containsKey("studentId"))   user.setStudentId((String) userData.get("studentId"));
-            if (userData.containsKey("major"))       user.setMajor((String) userData.get("major"));
+            if (userData.containsKey("studentId")) user.setStudentId((String) userData.get("studentId"));
+            if (userData.containsKey("major"))     user.setMajor((String) userData.get("major"));
+
             if (userData.containsKey("gpa")) {
                 Object gpaObj = userData.get("gpa");
                 if (gpaObj instanceof Number) user.setGpa(((Number) gpaObj).doubleValue());
@@ -235,7 +257,6 @@ public class UserService {
                 if (yearObj instanceof Number) user.setGraduationYear(((Number) yearObj).intValue());
             }
 
-            // Instructor-specific
             if (userData.containsKey("department"))     user.setDepartment((String) userData.get("department"));
             if (userData.containsKey("officeLocation")) user.setOfficeLocation((String) userData.get("officeLocation"));
             if (userData.containsKey("officeHours"))    user.setOfficeHours((String) userData.get("officeHours"));
@@ -248,36 +269,25 @@ public class UserService {
         }
     }
 
-    /** Create user from SBU YAML data format */
     private User createUserFromSBUYamlData(Map<String, Object> userData, UserRole role) {
         try {
             User user = new User();
-
-            // SBU format uses different field names
             user.setEmail(safeLower((String) userData.get("email")));
             user.setFirstName((String) userData.get("first_name"));
             user.setLastName((String) userData.get("last_name"));
             user.setRole(role);
 
-            // SBU_ID can be used as studentId for students
             if (userData.containsKey("SBU_ID")) {
                 String sbuId = String.valueOf(userData.get("SBU_ID"));
-                if (role == UserRole.STUDENT) {
-                    user.setStudentId(sbuId);
-                }
+                if (role == UserRole.STUDENT) user.setStudentId(sbuId);
             }
 
-            // Handle role-specific fields
             if (role == UserRole.STUDENT) {
-                // Students might have majors array - take first one
                 if (userData.containsKey("majors")) {
                     List<?> majors = (List<?>) userData.get("majors");
-                    if (majors != null && !majors.isEmpty()) {
-                        user.setMajor(String.valueOf(majors.get(0)));
-                    }
+                    if (majors != null && !majors.isEmpty()) user.setMajor(String.valueOf(majors.get(0)));
                 }
             } else if (role == UserRole.INSTRUCTOR || role == UserRole.ADVISOR) {
-                // For instructors/advisors, we could set department based on academic_unit
                 if (userData.containsKey("academic_unit")) {
                     user.setDepartment((String) userData.get("academic_unit"));
                 }
@@ -291,7 +301,6 @@ public class UserService {
         }
     }
 
-    /** Get user statistics */
     public Map<String, Object> getUserStatistics() {
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalUsers", userRepository.count());
@@ -303,14 +312,8 @@ public class UserService {
         return stats;
     }
 
-    // -------- helpers --------
-    private static boolean isBlank(String s) {
-        return s == null || s.trim().isEmpty();
-    }
-    private static String nvl(String a, String b) {
-        return !isBlank(a) ? a : b;
-    }
-    private static String safeLower(String s) {
-        return s == null ? null : s.toLowerCase(Locale.ROOT).trim();
-    }
+    // ---- helpers ----
+    private static boolean isBlank(String s) { return s == null || s.trim().isEmpty(); }
+    private static String nvl(String a, String b) { return !isBlank(a) ? a : b; }
+    private static String safeLower(String s) { return s == null ? null : s.toLowerCase(Locale.ROOT).trim(); }
 }

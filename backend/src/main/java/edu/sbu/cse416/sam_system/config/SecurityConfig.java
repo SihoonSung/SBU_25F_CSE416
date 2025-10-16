@@ -1,5 +1,6 @@
 package edu.sbu.cse416.sam_system.config;
 
+import edu.sbu.cse416.sam_system.security.OAuth2LoginSuccessHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -18,25 +19,28 @@ import java.util.List;
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
+    private final OAuth2LoginSuccessHandler successHandler;
+
+    public SecurityConfig(OAuth2LoginSuccessHandler successHandler) {
+        this.successHandler = successHandler;
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
-                // Allow OAuth callback and login paths
                 .requestMatchers("/oauth2/**", "/login/**", "/login/oauth2/**", "/error").permitAll()
-                // Allow all API endpoints for demo (use @PreAuthorize for protection)
                 .requestMatchers("/api/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/oauth2/authorization/google")
-                .defaultSuccessUrl("http://localhost:5173/home", true)
+                .successHandler(successHandler)
                 .failureUrl("http://localhost:5173/login?error=true")
             )
             .logout(logout -> logout
-                // Default is POST /logout
                 .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "POST"))
                 .logoutSuccessUrl("/api/auth/logout-success")
                 .invalidateHttpSession(true)

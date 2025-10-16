@@ -7,8 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.access.prepost.PreAuthorize;
 
-import edu.sbu.cse416.sam_system.model.Student;
-import edu.sbu.cse416.sam_system.repository.StudentRepository;
+import edu.sbu.cse416.sam_system.entity.User;
+import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.security.CurrentUser;
 
 import java.sql.ResultSet;
@@ -20,201 +20,237 @@ import java.util.*;
 @RequestMapping("/api/profile")
 public class ProfileController {
 
-    private final StudentRepository studentRepository;
+    private final UserRepository userRepository;
     private final JdbcTemplate jdbc;
     private final CurrentUser currentUser;
 
     @Autowired
-    public ProfileController(StudentRepository studentRepository, JdbcTemplate jdbc, CurrentUser currentUser) {
-        this.studentRepository = studentRepository;
+    public ProfileController(UserRepository userRepository, JdbcTemplate jdbc, CurrentUser currentUser) {
+        this.userRepository = userRepository;
         this.jdbc = jdbc;
         this.currentUser = currentUser;
     }
 
-    // --------------------------------------------------------------------------------------------
-    // 0) Student search (experiment: unrestricted)
-    // --------------------------------------------------------------------------------------------
-    @GetMapping("/student")
-    @PreAuthorize("permitAll()")
-    public Student getStudentByNetId(@RequestParam("netId") String netId) {
-        if (netId == null || netId.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "netId is required");
+    /* ======================================================================
+     * DTOs
+     * ====================================================================== */
+    public static class StudentProfileDto {
+        public Long id;
+        public String studentId;
+        public String name;
+        public String major;
+        public String email;
+        public String status;     // mapped from isActive
+        public String entryYear;  // not present on User -> "-"
+
+        public static StudentProfileDto fromUser(User u) {
+            StudentProfileDto d = new StudentProfileDto();
+            d.id = u.getUserId();
+            d.studentId = u.getStudentId();
+            d.name = buildName(u.getFirstName(), u.getLastName());
+            d.major = nvl(u.getMajor(), "-");
+            d.email = nvl(u.getEmail(), "-");
+            Boolean active = u.getIsActive();
+            d.status = (active != null && active) ? "Active" : "Inactive";
+            d.entryYear = "-";
+            return d;
         }
-        return resolveStudentByNetId(netId.trim());
     }
 
+    public static class TermRef {
+        public String semester; // "Fall" | "Spring" | "SummerI" | "SummerII"
+        public Integer year;
+    }
+
+    public static class FullStudentDetailsDto {
+        public String sbuId;
+        public String firstName;
+        public String lastName;
+        public String email;
+        public TermRef universityEntry; // not available -> null
+        public String directAdmit;      // not available -> null
+        public String aoi;              // not available -> null
+        public String college;          // not available on User -> null
+        public List<String> majors = new ArrayList<>();
+        public List<String> degrees = new ArrayList<>();
+        public List<TermRef> majorRequirementVersions = new ArrayList<>();
+        public List<String> minors = new ArrayList<>();
+        public List<TermRef> minorRequirementVersions = new ArrayList<>();
+        public List<String> plannedMajors = new ArrayList<>();
+        public List<TermRef> plannedMajorRequirementVersions = new ArrayList<>();
+        public List<String> plannedDegrees = new ArrayList<>();
+        public List<String> plannedMinors = new ArrayList<>();
+        public List<TermRef> plannedMinorRequirementVersions = new ArrayList<>();
+        public TermRef graduation; // can be filled from graduationYear if desired
+
+        public static FullStudentDetailsDto fromUser(User u) {
+            FullStudentDetailsDto d = new FullStudentDetailsDto();
+            d.sbuId = u.getStudentId();
+            d.firstName = u.getFirstName();
+            d.lastName = u.getLastName();
+            d.email = u.getEmail();
+            d.college = null;
+
+            if (u.getMajor() != null && !u.getMajor().isBlank()) {
+                d.majors.add(u.getMajor());
+            }
+
+            // Optionally map graduationYear to TermRef (year only)
+            if (u.getGraduationYear() != null) {
+                TermRef g = new TermRef();
+                g.year = u.getGraduationYear();
+                g.semester = null;
+                d.graduation = g;
+            }
+            return d;
+        }
+    }
+
+    /* ======================================================================
+     * Helpers - common
+     * ====================================================================== */
+    private static String buildName(String fn, String ln) {
+        String a = fn == null ? "" : fn.trim();
+        String b = ln == null ? "" : ln.trim();
+        String both = (a + " " + b).trim();
+        return both.isEmpty() ? "-" : both;
+    }
+
+    private static String nvl(String s, String def) {
+        return (s == null || s.isBlank()) ? def : s;
+    }
+
+    private void requireTerm(String term) {
+        if (term == null || term.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "term is required, e.g., 2025-Fall");
+        }
+    }
+
+    // REMOVED: findStudentsPkByStudentNumber
+    // The logic is now to use User's studentId directly.
+
+    /* ======================================================================
+     * Current user profile (users only)
+     * ====================================================================== */
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public StudentProfileDto getProfileMe() {
+        User u = resolveUserForMe();
+        return StudentProfileDto.fromUser(u);
+    }
+
+    @GetMapping("/me/details")
+    @PreAuthorize("isAuthenticated()")
+    public FullStudentDetailsDto getProfileMeDetails() {
+        User u = resolveUserForMe();
+        return FullStudentDetailsDto.fromUser(u);
+    }
+
+    /* ======================================================================
+     * Lookup by studentId (users only) - used by the frontend
+     * ====================================================================== */
+    @GetMapping("/student-id/{sid}")
+    @PreAuthorize("permitAll()")
+    public StudentProfileDto getProfileByStudentId(@PathVariable String sid) {
+        User u = resolveUserByStudentId(sid);
+        return StudentProfileDto.fromUser(u);
+    }
+
+    @GetMapping("/student-id/{sid}/details")
+    @PreAuthorize("permitAll()")
+    public FullStudentDetailsDto getDetailsByStudentId(@PathVariable String sid) {
+        User u = resolveUserByStudentId(sid);
+        return FullStudentDetailsDto.fromUser(u);
+    }
+
+    /* ======================================================================
+     * Legacy: lookup by email (users only)
+     * ====================================================================== */
     @GetMapping("/student-by-email")
     @PreAuthorize("permitAll()")
-    public Student getStudentByEmail(@RequestParam("email") String email) {
+    public StudentProfileDto getProfileByEmail(@RequestParam("email") String email) {
         if (email == null || email.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email is required");
         }
-        return studentRepository.findByEmailIgnoreCase(email.trim())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Student not found: " + email));
+        User u = userRepository.findByEmailIgnoreCase(email.trim())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found by email: " + email));
+        return StudentProfileDto.fromUser(u);
     }
 
-    // --------------------------------------------------------------------------------------------
-    // 1) Basic profile (current user)
-    // --------------------------------------------------------------------------------------------
-    @GetMapping("/me")
-    @PreAuthorize("isAuthenticated()")
-    public Student getProfile() {
-        return resolveCurrentStudent();
+    /* ======================================================================
+     * Data endpoints (GPA, schedule, etc.)
+     * NOW USING User.studentId (String) directly in queries.
+     * ====================================================================== */
+    @GetMapping("/student-id/{sid}/gpa")
+    @PreAuthorize("permitAll()")
+    public Map<String, Object> getGpaBySid(@PathVariable String sid) {
+        User u = resolveUserByStudentId(sid);
+        if (u.getStudentId() == null) return emptyGpa();
+        return buildGpaSummary(u.getStudentId());
     }
 
-    // --------------------------------------------------------------------------------------------
-    // 2) GPA summary (current user)
-    // --------------------------------------------------------------------------------------------
-    @GetMapping("/me/gpa")
-    @PreAuthorize("isAuthenticated()")
-    public Map<String, Object> getGpaSummary() {
-        Student me = resolveCurrentStudent();
-        return buildGpaSummary(me.getId());
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // 3) Current schedule by term (current user)
-    // --------------------------------------------------------------------------------------------
-    @GetMapping("/me/schedule")
-    @PreAuthorize("isAuthenticated()")
-    public List<Map<String, Object>> getSchedule(@RequestParam String term) {
+    @GetMapping("/student-id/{sid}/schedule")
+    @PreAuthorize("permitAll()")
+    public List<Map<String, Object>> getScheduleBySid(@PathVariable String sid, @RequestParam String term) {
         requireTerm(term);
-        Student me = resolveCurrentStudent();
-        return querySchedule(me.getId(), term);
+        User u = resolveUserByStudentId(sid);
+        if (u.getStudentId() == null) return Collections.emptyList();
+        return querySchedule(u.getStudentId(), term);
     }
 
-    // --------------------------------------------------------------------------------------------
-    // 4) Programs (declared & planned) (current user)
-    // --------------------------------------------------------------------------------------------
-    @GetMapping("/me/plans")
-    @PreAuthorize("isAuthenticated()")
-    public List<Map<String, Object>> getPlans() {
-        Student me = resolveCurrentStudent();
-        return queryPlans(me.getId());
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // 5) Requirement status: admission (current user)
-    // --------------------------------------------------------------------------------------------
-    @GetMapping("/me/requirements/admission")
-    @PreAuthorize("isAuthenticated()")
-    public List<Map<String, Object>> getAdmissionRequirements() {
-        Student me = resolveCurrentStudent();
-        return queryRequirements(me.getId(), "ADMISSION");
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // 6) Requirement status: degree (current user)
-    // --------------------------------------------------------------------------------------------
-    @GetMapping("/me/requirements/degree")
-    @PreAuthorize("isAuthenticated()")
-    public List<Map<String, Object>> getDegreeRequirements() {
-        Student me = resolveCurrentStudent();
-        return queryRequirements(me.getId(), "DEGREE");
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // 7) Registration holds (current user)
-    // --------------------------------------------------------------------------------------------
-    @GetMapping("/me/holds")
-    @PreAuthorize("isAuthenticated()")
-    public List<Map<String, Object>> getHolds() {
-        Student me = resolveCurrentStudent();
-        return queryHolds(me.getId());
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // 8) Waived time conflicts (current user)
-    // --------------------------------------------------------------------------------------------
-    @GetMapping("/me/waivers/time-conflicts")
-    @PreAuthorize("isAuthenticated()")
-    public List<Map<String, Object>> getTimeConflictWaivers() {
-        Student me = resolveCurrentStudent();
-        return queryTimeConflictWaivers(me.getId());
-    }
-
-    // --------------------------------------------------------------------------------------------
-    // 9) Audit log (current user)
-    // --------------------------------------------------------------------------------------------
-    @GetMapping("/me/audit-log")
-    @PreAuthorize("isAuthenticated()")
-    public List<Map<String, Object>> getAuditLog() {
-        Student me = resolveCurrentStudent();
-        return queryAuditLog(me.getId());
-    }
-
-    // ============================================================================================
-    // A) Student-scoped endpoints (by netId) - mirror of /me versions
-    // ============================================================================================
-    @GetMapping("/student/{netId}")
+    @GetMapping("/student-id/{sid}/plans")
     @PreAuthorize("permitAll()")
-    public Student getStudentProfile(@PathVariable String netId) {
-        return resolveStudentByNetId(netId);
+    public List<Map<String, Object>> getPlansBySid(@PathVariable String sid) {
+        User u = resolveUserByStudentId(sid);
+        if (u.getStudentId() == null) return Collections.emptyList();
+        return queryPlans(u.getStudentId());
     }
 
-    @GetMapping("/student/{netId}/gpa")
+    @GetMapping("/student-id/{sid}/requirements/admission")
     @PreAuthorize("permitAll()")
-    public Map<String, Object> getStudentGpa(@PathVariable String netId) {
-        Student s = resolveStudentByNetId(netId);
-        return buildGpaSummary(s.getId());
+    public List<Map<String, Object>> getAdmissionReqsBySid(@PathVariable String sid) {
+        User u = resolveUserByStudentId(sid);
+        if (u.getStudentId() == null) return Collections.emptyList();
+        return queryRequirements(u.getStudentId(), "ADMISSION");
     }
 
-    @GetMapping("/student/{netId}/schedule")
+    @GetMapping("/student-id/{sid}/requirements/degree")
     @PreAuthorize("permitAll()")
-    public List<Map<String, Object>> getStudentSchedule(@PathVariable String netId,
-                                                        @RequestParam String term) {
-        requireTerm(term);
-        Student s = resolveStudentByNetId(netId);
-        return querySchedule(s.getId(), term);
+    public List<Map<String, Object>> getDegreeReqsBySid(@PathVariable String sid) {
+        User u = resolveUserByStudentId(sid);
+        if (u.getStudentId() == null) return Collections.emptyList();
+        return queryRequirements(u.getStudentId(), "DEGREE");
     }
 
-    @GetMapping("/student/{netId}/plans")
+    @GetMapping("/student-id/{sid}/holds")
     @PreAuthorize("permitAll()")
-    public List<Map<String, Object>> getStudentPlans(@PathVariable String netId) {
-        Student s = resolveStudentByNetId(netId);
-        return queryPlans(s.getId());
+    public List<Map<String, Object>> getHoldsBySid(@PathVariable String sid) {
+        User u = resolveUserByStudentId(sid);
+        if (u.getStudentId() == null) return Collections.emptyList();
+        return queryHolds(u.getStudentId());
     }
 
-    @GetMapping("/student/{netId}/requirements/admission")
+    @GetMapping("/student-id/{sid}/waivers/time-conflicts")
     @PreAuthorize("permitAll()")
-    public List<Map<String, Object>> getStudentAdmissionReqs(@PathVariable String netId) {
-        Student s = resolveStudentByNetId(netId);
-        return queryRequirements(s.getId(), "ADMISSION");
+    public List<Map<String, Object>> getWaiversBySid(@PathVariable String sid) {
+        User u = resolveUserByStudentId(sid);
+        if (u.getStudentId() == null) return Collections.emptyList();
+        return queryTimeConflictWaivers(u.getStudentId());
     }
 
-    @GetMapping("/student/{netId}/requirements/degree")
+    @GetMapping("/student-id/{sid}/audit-log")
     @PreAuthorize("permitAll()")
-    public List<Map<String, Object>> getStudentDegreeReqs(@PathVariable String netId) {
-        Student s = resolveStudentByNetId(netId);
-        return queryRequirements(s.getId(), "DEGREE");
+    public List<Map<String, Object>> getAuditLogBySid(@PathVariable String sid) {
+        User u = resolveUserByStudentId(sid);
+        if (u.getStudentId() == null) return Collections.emptyList();
+        return queryAuditLog(u.getStudentId());
     }
 
-    @GetMapping("/student/{netId}/holds")
-    @PreAuthorize("permitAll()")
-    public List<Map<String, Object>> getStudentHolds(@PathVariable String netId) {
-        Student s = resolveStudentByNetId(netId);
-        return queryHolds(s.getId());
-    }
-
-    @GetMapping("/student/{netId}/waivers/time-conflicts")
-    @PreAuthorize("permitAll()")
-    public List<Map<String, Object>> getStudentTimeConflictWaivers(@PathVariable String netId) {
-        Student s = resolveStudentByNetId(netId);
-        return queryTimeConflictWaivers(s.getId());
-    }
-
-    @GetMapping("/student/{netId}/audit-log")
-    @PreAuthorize("permitAll()")
-    public List<Map<String, Object>> getStudentAuditLog(@PathVariable String netId) {
-        Student s = resolveStudentByNetId(netId);
-        return queryAuditLog(s.getId());
-    }
-
-    // ============================================================================================
-    // Internal query builders (DRY)
-    // ============================================================================================
-    private Map<String, Object> buildGpaSummary(Long studentId) {
+    /* ======================================================================
+     * GPA summary
+     * ====================================================================== */
+    // CHANGED: Long studentId -> String studentId
+    private Map<String, Object> buildGpaSummary(String studentId) {
         String termSql =
             "SELECT e.term_code AS term, " +
             "       ROUND(SUM(gp.points * e.credits) / NULLIF(SUM(e.credits),0), 2) AS gpa, " +
@@ -233,7 +269,7 @@ public class ProfileController {
                 m.put("gpa", readDouble(rs, "gpa"));
                 m.put("credits", rs.getInt("credits"));
                 return m;
-            }, studentId)
+            }, studentId) // CHANGED: studentId is now String
         );
 
         String cumSql =
@@ -256,7 +292,7 @@ public class ProfileController {
                 m.put("gpa", null);
                 m.put("credits", 0);
                 return m;
-            }, studentId)
+            }, studentId) // CHANGED: studentId is now String
         );
 
         int cumCredits = (cumulative.get("credits") instanceof Number)
@@ -270,7 +306,22 @@ public class ProfileController {
         return resp;
     }
 
-    private List<Map<String, Object>> querySchedule(Long studentId, String term) {
+    private Map<String, Object> emptyGpa() {
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("terms", Collections.emptyList());
+        Map<String, Object> cumulative = new LinkedHashMap<>();
+        cumulative.put("gpa", null);
+        cumulative.put("credits", 0);
+        resp.put("cumulative", cumulative);
+        resp.put("standing", "U1");
+        return resp;
+    }
+
+    /* ======================================================================
+     * JDBC queries for other data
+     * ====================================================================== */
+    // CHANGED: Long studentId -> String studentId
+    private List<Map<String, Object>> querySchedule(String studentId, String term) {
         String sql =
             "SELECT c.class_id AS classId, " +
             "       c.subject, " +
@@ -301,11 +352,12 @@ public class ProfileController {
                 m.put("instructor", rs.getString("instructor"));
                 m.put("credits", readIntNullable(rs, "credits"));
                 return m;
-            }, studentId, term)
+            }, studentId, term) // CHANGED: studentId is now String
         );
     }
 
-    private List<Map<String, Object>> queryPlans(Long studentId) {
+    // CHANGED: Long studentId -> String studentId
+    private List<Map<String, Object>> queryPlans(String studentId) {
         String sql =
             "SELECT kind, program_code AS code, program_name AS name, " +
             "       declared, requirement_version AS version " +
@@ -322,11 +374,12 @@ public class ProfileController {
                 m.put("declared", rs.getBoolean("declared"));
                 m.put("version", rs.getString("version"));
                 return m;
-            }, studentId)
+            }, studentId) // CHANGED: studentId is now String
         );
     }
 
-    private List<Map<String, Object>> queryRequirements(Long studentId, String area) {
+    // CHANGED: Long studentId -> String studentId
+    private List<Map<String, Object>> queryRequirements(String studentId, String area) {
         String baseSql =
             "SELECT r.id AS rid, r.area, r.program_code AS programCode, r.program_name AS programName, " +
             "       r.req_code AS code, r.title, r.status " +
@@ -347,7 +400,7 @@ public class ProfileController {
                 m.put("status", rs.getString("status"));
                 m.put("usingClasses", new ArrayList<Map<String, Object>>());
                 return m;
-            }, studentId, area)
+            }, studentId, area) // CHANGED: studentId is now String
         );
 
         String usedSql =
@@ -374,7 +427,8 @@ public class ProfileController {
         return rows;
     }
 
-    private List<Map<String, Object>> queryHolds(Long studentId) {
+    // CHANGED: Long studentId -> String studentId
+    private List<Map<String, Object>> queryHolds(String studentId) {
         String sql =
             "SELECT hold_code AS code, title, placed_at AS placedAt, placed_by AS placedBy " +
             "FROM registration_holds " +
@@ -389,11 +443,12 @@ public class ProfileController {
                 m.put("placedAt", rs.getString("placedAt"));
                 m.put("placedBy", rs.getString("placedBy"));
                 return m;
-            }, studentId)
+            }, studentId) // CHANGED: studentId is now String
         );
     }
 
-    private List<Map<String, Object>> queryTimeConflictWaivers(Long studentId) {
+    // CHANGED: Long studentId -> String studentId
+    private List<Map<String, Object>> queryTimeConflictWaivers(String studentId) {
         String sql =
             "SELECT class_a AS classA, class_b AS classB, term_code AS term, " +
             "       waived_by AS waivedBy, waived_at AS waivedAt " +
@@ -410,11 +465,12 @@ public class ProfileController {
                 m.put("waivedBy", rs.getString("waivedBy"));
                 m.put("waivedAt", rs.getString("waivedAt"));
                 return m;
-            }, studentId)
+            }, studentId) // CHANGED: studentId is now String
         );
     }
 
-    private List<Map<String, Object>> queryAuditLog(Long studentId) {
+    // CHANGED: Long studentId -> String studentId
+    private List<Map<String, Object>> queryAuditLog(String studentId) {
         String sql =
             "SELECT id, ts AS timestamp, actor_role AS actorRole, actor_display AS actorDisplay, " +
             "       action, details " +
@@ -432,33 +488,33 @@ public class ProfileController {
                 m.put("action", rs.getString("action"));
                 m.put("details", rs.getString("details"));
                 return m;
-            }, studentId)
+            }, studentId) // CHANGED: studentId is now String
         );
     }
 
-    // ============================================================================================
-    // Helpers
-    // ============================================================================================
-    private void requireTerm(String term) {
-        if (term == null || term.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "term is required, e.g., 2025-Fall");
+    /* ======================================================================
+     * Auth/user resolvers (users only)
+     * ====================================================================== */
+    private User resolveUserForMe() {
+        String email = currentUser.getEmail();
+        if (email != null && !email.isBlank()) {
+            return userRepository.findByEmailIgnoreCase(email.trim())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found by email: " + email));
         }
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No logged-in user");
     }
 
-    private Student resolveCurrentStudent() {
-        String netId = currentUser.getNetId();
-        if (netId == null || netId.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No logged-in user");
+    private User resolveUserByStudentId(String sid) {
+        if (sid == null || sid.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "studentId is required");
         }
-        return resolveStudentByNetId(netId);
+        return userRepository.findByStudentId(sid.trim())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found by studentId: " + sid));
     }
 
-    private Student resolveStudentByNetId(String netId) {
-        return studentRepository.findByNetIdIgnoreCase(netId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Student not found: " + netId));
-    }
-
+    /* ======================================================================
+     * Utils
+     * ====================================================================== */
     private static String toStanding(int credits) {
         if (credits < 24) return "U1";
         if (credits < 57) return "U2";
@@ -466,7 +522,6 @@ public class ProfileController {
         return "U4";
     }
 
-    // ---------- JDBC helpers ----------
     private static Double readDouble(ResultSet rs, String col) throws SQLException {
         double v = rs.getDouble(col);
         return rs.wasNull() ? null : v;
@@ -474,8 +529,7 @@ public class ProfileController {
 
     private static Integer readInt(ResultSet rs, String col) throws SQLException {
         int v = rs.getInt(col);
-        if (rs.wasNull()) return 0;
-        return v;
+        return rs.wasNull() ? 0 : v;
     }
 
     private static Integer readIntNullable(ResultSet rs, String col) throws SQLException {
@@ -483,22 +537,19 @@ public class ProfileController {
         return rs.wasNull() ? null : v;
     }
 
-    // ---------- Safe wrappers ----------
     private interface SqlSupplier<T> { T get() throws Exception; }
 
     private <T> T safeQueryOne(SqlSupplier<T> supplier) {
-        try {
-            return supplier.get();
-        } catch (Exception ex) {
+        try { return supplier.get(); }
+        catch (Exception ex) {
             if (ex instanceof ResponseStatusException) throw (ResponseStatusException) ex;
             return (T) new LinkedHashMap<String, Object>();
         }
     }
 
     private List<Map<String, Object>> safeQueryList(SqlSupplier<List<Map<String, Object>>> supplier) {
-        try {
-            return supplier.get();
-        } catch (Exception ex) {
+        try { return supplier.get(); }
+        catch (Exception ex) {
             if (ex instanceof ResponseStatusException) throw (ResponseStatusException) ex;
             return Collections.emptyList();
         }
