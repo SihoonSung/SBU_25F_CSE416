@@ -165,39 +165,6 @@ const CourseCatalogManagement: React.FC = () => {
   };
 
 
-  // Reset Term functionality
-  /*
-  const handleResetTerm = async () => {
-    if (!selectedTerm) {
-      setMessage({ type: 'warning', text: 'Please select a term to reset.' });
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to reset "${selectedTerm}"? This will allow re-scraping but won't delete existing data.`)) {
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `http://localhost:8080/api/scraping/reset-term?termName=${encodeURIComponent(selectedTerm)}`,
-        { method: 'POST' }
-      );
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setMessage({ type: 'success', text: result.message });
-        await fetchTerms(); // Refresh terms
-      } else {
-        setMessage({ type: 'error', text: result.message });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to reset term. Please try again.' });
-      console.error('Reset error:', error);
-    }
-  };
-  */
-
   const getTermStatusDisplay = (termName: string) => {
     if (!isValidTermFormat(termName)) {
       return <span className="status-badge invalid">⚠ Invalid Format</span>;
