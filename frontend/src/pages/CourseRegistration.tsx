@@ -112,14 +112,21 @@ function CourseRegistration() {
    */
   const fetchAvailableTerms = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/classes/terms')
+      const response = await fetch('http://localhost:8080/api/scraping/terms')
       const data = await response.json()
-      setAvailableTerms(data)
+      
+      // Transform scraping terms data to course registration format
+      const transformedTerms = data.map((term: any) => ({
+        semester: term.name.split(' ')[0], // "Fall" from "Fall 2025"
+        year: parseInt(term.name.split(' ')[1]) // 2025 from "Fall 2025"
+      }))
+      
+      setAvailableTerms(transformedTerms)
       
       // Auto-select the first term if available
-      if (data.length > 0) {
-        setSelectedSemester(data[0].semester)
-        setSelectedYear(data[0].year)
+      if (transformedTerms.length > 0) {
+        setSelectedSemester(transformedTerms[0].semester)
+        setSelectedYear(transformedTerms[0].year)
       }
     } catch (error) {
       console.error('Error fetching terms:', error)
@@ -132,12 +139,37 @@ function CourseRegistration() {
    */
   const fetchClassesByTerm = async (semester: string, year: number | string) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/classes/by-term?semester=${semester}&year=${year}`)
+      const termName = `${semester} ${year}` // "Fall 2025"
+      const response = await fetch(`http://localhost:8080/api/scraping/courses/byTerm?term=${encodeURIComponent(termName)}`)
       const data = await response.json()
       
-      // Transform and sort data
-      const transformedData = data.map(transformClassData)
-      setSearchResults(sortClasses(transformedData))
+      // Transform course data to class format for registration
+      const transformedData = data.map((course: any) => ({
+        id: course.id,
+        code: `${course.subject}${course.courseNumber}`,
+        courseId: course.id.toString(),
+        department: course.subject,
+        courseNum: course.courseNumber,
+        section: '01', // Default section
+        sectionType: 'LEC',
+        title: course.courseName,
+        schedule: 'TBA', // Default schedule
+        instructor: 'TBA', // Default instructor
+        location: 'TBA', // Default location
+        lecSchedule: 'TBA',
+        lecLocation: 'TBA',
+        prerequisites: course.prerequisites || 'None',
+        corequisites: course.corequisites || 'None',
+        antirequisites: course.antirequisites || 'None',
+        sbc: course.sbcsSatisfied || 'None',
+        minCredits: course.credits,
+        maxCredits: course.credits,
+        credits: course.credits,
+        semester: semester,
+        year: year
+      }))
+      
+      setSearchResults(transformedData)
     } catch (error) {
       console.error('Error fetching classes:', error)
     }
@@ -147,7 +179,7 @@ function CourseRegistration() {
   /**
    * Handle search functionality
    * If search term is empty, fetch classes for selected term
-   * Otherwise, search using the backend API (filtered by selected term)
+   * Otherwise, filter the current results by search term
    */
   const handleSearch = async (term: string) => {
     if (!term.trim()) {
@@ -157,20 +189,15 @@ function CourseRegistration() {
       return
     }
     
-    try {
-      const response = await fetch(`http://localhost:8080/api/classes/search?q=${encodeURIComponent(term)}`)
-      const data = await response.json()
-      
-      // Transform, filter, and sort data
-      const transformedData = data
-        .map(transformClassData)
-        .filter((cls: any) => cls.semester === selectedSemester && cls.year === selectedYear)
-      
-      setSearchResults(sortClasses(transformedData))
-      setCurrentPage(1) // Reset to first page on new search
-    } catch (error) {
-      console.error('Error searching classes:', error)
-    }
+    // Filter current search results by search term
+    const filteredResults = searchResults.filter((course: any) => 
+      course.code.toLowerCase().includes(term.toLowerCase()) ||
+      course.title.toLowerCase().includes(term.toLowerCase()) ||
+      course.department.toLowerCase().includes(term.toLowerCase())
+    )
+    
+    setSearchResults(filteredResults)
+    setCurrentPage(1) // Reset to first page on new search
   }
 
   /**

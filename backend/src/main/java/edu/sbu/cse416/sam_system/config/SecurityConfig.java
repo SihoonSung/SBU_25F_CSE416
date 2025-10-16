@@ -32,8 +32,8 @@ public class SecurityConfig {
             )
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/oauth2/authorization/google")
-                .defaultSuccessUrl("http://localhost:5175/home", true)
-                .failureUrl("http://localhost:5175/login?error=true")
+                .defaultSuccessUrl("http://localhost:5173/home", true)
+                .failureUrl("http://localhost:5173/login?error=true")
             )
             .logout(logout -> logout
                 // Default is POST /logout
@@ -51,8 +51,6 @@ public class SecurityConfig {
         CorsConfiguration c = new CorsConfiguration();
         c.setAllowedOrigins(List.of(
             "http://localhost:5173",
-            "http://localhost:5174",
-            "http://localhost:5175",
             "http://localhost:3000"
         ));
         c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS","PATCH"));

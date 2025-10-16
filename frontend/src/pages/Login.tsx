@@ -10,56 +10,23 @@ function Login() {
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const googleUrl = `${backendBase}/oauth2/authorization/google`
   
-  // Debug logging
-  console.log('Backend Base URL:', backendBase)
-  console.log('Google OAuth URL:', googleUrl)
-
   // OAuth callback handling
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      const success = searchParams.get('success')
-      const error = searchParams.get('error')
-      
-      if (error) {
-        console.error('OAuth error:', error)
-        return
-      }
-      
-      if (success === 'true') {
-        setIsLoading(true)
-        try {
-          // Get user info after OAuth authentication
-          const response = await fetch(`${backendBase}/api/auth/success`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            mode: 'cors',
-          })
-          
-          if (response.ok) {
-            const data = await response.json()
-            if (data.success && data.user) {
-              // Store user info in localStorage
-              signIn('oauth-token', data.user.email)
-              
-              // Redirect to home page
-              navigate('/home', { replace: true })
-            }
-          } else {
-            console.error('Failed to get user info')
-          }
-        } catch (error) {
-          console.error('Error during OAuth callback:', error)
-        } finally {
-          setIsLoading(false)
-        }
-      }
+    const success = searchParams.get('success')
+    const error = searchParams.get('error')
+    
+    if (error) {
+      console.error('OAuth error:', error)
+      return
     }
-
-    handleOAuthCallback()
-  }, [searchParams, navigate, backendBase])
+    
+    if (success === 'true') {
+      setIsLoading(true)
+      // Redirect to home page after successful login
+      navigate('/home', { replace: true })
+      setIsLoading(false)
+    }
+  }, [searchParams, navigate])
 
   return (
     <div className="login-page">
@@ -73,7 +40,7 @@ function Login() {
           {isLoading ? (
             <div className="loading-container">
               <div className="loading-spinner"></div>
-                  <p>Logging in...</p>
+                  <p>로그인 중...</p>
             </div>
           ) : (
             <a className="google-button" href={googleUrl}>

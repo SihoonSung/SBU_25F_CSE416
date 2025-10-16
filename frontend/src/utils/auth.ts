@@ -7,9 +7,7 @@ export function getAuthToken(): string | null {
 }
 
 export function isAuthenticated(): boolean {
-  // Temporarily return true for development
-  return true
-  // return Boolean(getAuthToken())
+  return Boolean(getAuthToken())
 }
 
 export function signIn(token: string, email: string): void {
