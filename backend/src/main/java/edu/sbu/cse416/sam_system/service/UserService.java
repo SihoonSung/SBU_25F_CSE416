@@ -4,7 +4,6 @@ import edu.sbu.cse416.sam_system.entity.User;
 import edu.sbu.cse416.sam_system.entity.UserRole;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +13,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.Locale;
 
 @Service
 public class UserService {
@@ -21,15 +21,20 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
-    /** Google OIDC 로그인 후 사용자 조회/생성 (OidcUser 버전) */
-    public User findOrCreateUserFromOAuth2(OidcUser principal) {
-        String googleId = principal.getSubject();
-        String email = safeLower(principal.getEmail());
-        String firstName = nvl(principal.getGivenName(), principal.getAttribute("given_name"));
-        String lastName  = nvl(principal.getFamilyName(), principal.getAttribute("family_name"));
-        String fullName  = nvl(principal.getFullName(), principal.getAttribute("name"));
-        String picture   = nvl(principal.getPicture(), principal.getAttribute("picture"));
+    /** Google OAuth2 로그인 후 사용자 조회/생성 */
+    @Transactional
+    public User findOrCreateUserFromOAuth2(OAuth2User principal) {
+        // OIDC 표준 키 먼저 시도, 없으면 대체
+        String googleId = strAttr(principal, "sub");
+        if (isBlank(googleId)) googleId = principal.getName(); // fallback
 
+        String email     = safeLower(strAttr(principal, "email"));
+        String firstName = nvl(strAttr(principal, "given_name"),  strAttr(principal, "firstName"));
+        String lastName  = nvl(strAttr(principal, "family_name"), strAttr(principal, "lastName"));
+        String fullName  = strAttr(principal, "name");
+        String picture   = strAttr(principal, "picture");
+
+        // 이름 보정
         if (isBlank(firstName) && !isBlank(fullName)) {
             String[] parts = fullName.trim().split("\\s+", 2);
             firstName = parts[0];
@@ -38,31 +43,38 @@ public class UserService {
         if (isBlank(firstName)) firstName = "Unknown";
         if (isBlank(lastName))  lastName  = "User";
 
-        // 1) googleId 로 존재하면 업데이트
-        Optional<User> existingByGoogleId = userRepository.findByGoogleId(googleId);
-        if (existingByGoogleId.isPresent()) {
-            User u = existingByGoogleId.get();
-            if (!isBlank(picture)) u.setProfilePictureUrl(picture);
-            if (!isBlank(email) && isBlank(u.getEmail())) u.setEmail(email);
-            u.updateLastLogin();
-            return userRepository.save(u);
-        }
+        // (선택) SBU 메일만 허용하려면 주석 해제
+        // if (email == null || !email.endsWith("@stonybrook.edu")) {
+        //     throw new RuntimeException("Only SBU accounts are allowed");
+        // }
 
-        // 2) email 로 존재하면 연결
-        if (!isBlank(email)) {
-            Optional<User> existingByEmail = userRepository.findByEmail(email);
-            if (existingByEmail.isPresent()) {
-                User u = existingByEmail.get();
-                u.setGoogleId(googleId);
+        // 1) googleId로 먼저 찾기
+        if (!isBlank(googleId)) {
+            Optional<User> byGoogle = userRepository.findByGoogleId(googleId);
+            if (byGoogle.isPresent()) {
+                User u = byGoogle.get();
                 if (!isBlank(picture)) u.setProfilePictureUrl(picture);
+                if (!isBlank(email) && isBlank(u.getEmail())) u.setEmail(email);
                 u.updateLastLogin();
-                if (isBlank(u.getFirstName())) u.setFirstName(firstName);
-                if (isBlank(u.getLastName()))  u.setLastName(lastName);
                 return userRepository.save(u);
             }
         }
 
-        // 3) 신규 생성
+        // 2) email 매칭 -> 기존 계정에 googleId 연결
+        if (!isBlank(email)) {
+            Optional<User> byEmail = userRepository.findByEmail(email);
+            if (byEmail.isPresent()) {
+                User u = byEmail.get();
+                if (!isBlank(googleId)) u.setGoogleId(googleId);
+                if (!isBlank(picture))  u.setProfilePictureUrl(picture);
+                if (isBlank(u.getFirstName())) u.setFirstName(firstName);
+                if (isBlank(u.getLastName()))  u.setLastName(lastName);
+                u.updateLastLogin();
+                return userRepository.save(u);
+            }
+        }
+
+        // 3) 새 사용자 생성 (기본 STUDENT, 활성)
         User nu = new User();
         nu.setGoogleId(googleId);
         nu.setEmail(email);
@@ -75,74 +87,17 @@ public class UserService {
         return userRepository.save(nu);
     }
 
-    /** Google OAuth2 로그인 후 사용자 조회/생성 (OAuth2User 버전, OIDC 아닐 때도 커버) */
-    public User findOrCreateUserFromOAuth2(OAuth2User principal) {
-        if (principal instanceof OidcUser oidc) {
-            return findOrCreateUserFromOAuth2(oidc);
-        }
-        String googleId = principal.getName();
-        String email    = safeLower(principal.getAttribute("email"));
-        String first    = principal.getAttribute("given_name");
-        String last     = principal.getAttribute("family_name");
-        String fullName = principal.getAttribute("name");
-        String picture  = principal.getAttribute("picture");
-
-        if (isBlank(first) && !isBlank(fullName)) {
-            String[] parts = fullName.trim().split("\\s+", 2);
-            first = parts[0];
-            if (isBlank(last) && parts.length > 1) last = parts[1];
-        }
-        if (isBlank(first)) first = "Unknown";
-        if (isBlank(last))  last  = "User";
-
-        Optional<User> byGoogle = userRepository.findByGoogleId(googleId);
-        if (byGoogle.isPresent()) {
-            User u = byGoogle.get();
-            if (!isBlank(picture)) u.setProfilePictureUrl(picture);
-            if (!isBlank(email) && isBlank(u.getEmail())) u.setEmail(email);
-            u.updateLastLogin();
-            return userRepository.save(u);
-        }
-
-        if (!isBlank(email)) {
-            Optional<User> byEmail = userRepository.findByEmail(email);
-            if (byEmail.isPresent()) {
-                User u = byEmail.get();
-                u.setGoogleId(googleId);
-                if (!isBlank(picture)) u.setProfilePictureUrl(picture);
-                if (isBlank(u.getFirstName())) u.setFirstName(first);
-                if (isBlank(u.getLastName()))  u.setLastName(last);
-                u.updateLastLogin();
-                return userRepository.save(u);
-            }
-        }
-
-        User nu = new User();
-        nu.setGoogleId(googleId);
-        nu.setEmail(email);
-        nu.setFirstName(first);
-        nu.setLastName(last);
-        nu.setProfilePictureUrl(picture);
-        nu.setRole(UserRole.STUDENT);
-        nu.setIsActive(true);
-        nu.updateLastLogin();
-        return userRepository.save(nu);
-    }
-
+    // ===== 조회 메서드 =====
     public Optional<User> getUserById(Long userId) { return userRepository.findById(userId); }
 
-    public Optional<User> getUserByEmail(String email) {
-        return userRepository.findByEmail(safeLower(email));
-    }
+    public Optional<User> getUserByEmail(String email) { return userRepository.findByEmail(safeLower(email)); }
 
     public Optional<User> getUserByEmailIgnoreCase(String email) {
         if (email == null) return Optional.empty();
         return userRepository.findByEmailIgnoreCase(email);
     }
 
-    public Optional<User> getUserByGoogleId(String googleId) {
-        return userRepository.findByGoogleId(googleId);
-    }
+    public Optional<User> getUserByGoogleId(String googleId) { return userRepository.findByGoogleId(googleId); }
 
     public Optional<User> getUserByStudentId(String studentId) {
         if (studentId == null) return Optional.empty();
@@ -153,18 +108,21 @@ public class UserService {
 
     public List<User> getUsersByRole(UserRole role) { return userRepository.findByRole(role); }
 
-    public List<User> searchUsersByName(String term) { return userRepository.findByNameContaining(term); }
+    public List<User> searchUsersByName(String searchTerm) { return userRepository.findByNameContaining(searchTerm); }
 
-    public List<User> searchUsersByNameAndRole(String term, UserRole role) {
-        return userRepository.findByNameContainingAndRole(term, role);
+    public List<User> searchUsersByNameAndRole(String searchTerm, UserRole role) {
+        return userRepository.findByNameContainingAndRole(searchTerm, role);
     }
 
     public List<User> searchUsersByEmailDomain(String domain) { return userRepository.findByEmailDomain(domain); }
 
     public List<User> searchStudentsByMajor(String major) { return userRepository.findByMajorContaining(major); }
 
-    public List<User> searchInstructorsByDepartment(String dept) { return userRepository.findByDepartmentContaining(dept); }
+    public List<User> searchInstructorsByDepartment(String department) {
+        return userRepository.findByDepartmentContaining(department);
+    }
 
+    // ===== 변경 메서드 =====
     @Transactional
     public User updateUser(User user) {
         if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
@@ -174,41 +132,41 @@ public class UserService {
     @Transactional
     public User deactivateUser(Long userId) {
         return userRepository.findById(userId)
-            .map(u -> { u.setIsActive(false); return userRepository.save(u); })
-            .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+                .map(u -> { u.setIsActive(false); return userRepository.save(u); })
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
     }
 
     @Transactional
     public User activateUser(Long userId) {
         return userRepository.findById(userId)
-            .map(u -> { u.setIsActive(true); return userRepository.save(u); })
-            .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+                .map(u -> { u.setIsActive(true); return userRepository.save(u); })
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
     }
 
-    /** YAML import (일반 포맷 + SBU 포맷 모두 지원) */
+    // ===== YAML Import (users 배열 + SBU 포맷 지원) =====
     public List<User> importUsersFromYaml(MultipartFile file) throws IOException {
         List<User> importedUsers = new ArrayList<>();
         Yaml yaml = new Yaml();
 
         try (InputStream inputStream = file.getInputStream()) {
             Map<String, Object> data = yaml.load(inputStream);
-            if (data != null) {
-                if (data.containsKey("users")) {
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> usersData = (List<Map<String, Object>>) data.get("users");
-                    for (Map<String, Object> userData : usersData) {
-                        User user = createUserFromYamlData(userData);
-                        if (user != null) {
-                            User saved = processUserForImport(user);
-                            if (saved != null) importedUsers.add(saved);
-                        }
+            if (data == null) return importedUsers;
+
+            if (data.containsKey("users")) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> usersData = (List<Map<String, Object>>) data.get("users");
+                for (Map<String, Object> userData : usersData) {
+                    User user = createUserFromYamlData(userData);
+                    if (user != null) {
+                        User saved = processUserForImport(user);
+                        if (saved != null) importedUsers.add(saved);
                     }
-                } else {
-                    importUsersByRole(data, "registrars", UserRole.REGISTRAR, importedUsers);
-                    importUsersByRole(data, "academic_advisors", UserRole.ADVISOR, importedUsers);
-                    importUsersByRole(data, "instructors", UserRole.INSTRUCTOR, importedUsers);
-                    importUsersByRole(data, "students", UserRole.STUDENT, importedUsers);
                 }
+            } else {
+                importUsersByRole(data, "registrars",        UserRole.REGISTRAR,  importedUsers);
+                importUsersByRole(data, "academic_advisors", UserRole.ADVISOR,    importedUsers);
+                importUsersByRole(data, "instructors",       UserRole.INSTRUCTOR, importedUsers);
+                importUsersByRole(data, "students",          UserRole.STUDENT,    importedUsers);
             }
         }
         return importedUsers;
@@ -228,6 +186,7 @@ public class UserService {
         }
     }
 
+    /** 이메일 정규화 + 중복 체크 후 저장 */
     private User processUserForImport(User user) {
         if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
         Optional<User> existing = userRepository.findByEmail(user.getEmail());
@@ -245,9 +204,8 @@ public class UserService {
             String roleStr = (String) userData.get("role");
             user.setRole(roleStr != null ? UserRole.valueOf(roleStr.toUpperCase()) : UserRole.STUDENT);
 
-            if (userData.containsKey("studentId")) user.setStudentId((String) userData.get("studentId"));
-            if (userData.containsKey("major"))     user.setMajor((String) userData.get("major"));
-
+            if (userData.containsKey("studentId"))   user.setStudentId((String) userData.get("studentId"));
+            if (userData.containsKey("major"))       user.setMajor((String) userData.get("major"));
             if (userData.containsKey("gpa")) {
                 Object gpaObj = userData.get("gpa");
                 if (gpaObj instanceof Number) user.setGpa(((Number) gpaObj).doubleValue());
@@ -256,7 +214,6 @@ public class UserService {
                 Object yearObj = userData.get("graduationYear");
                 if (yearObj instanceof Number) user.setGraduationYear(((Number) yearObj).intValue());
             }
-
             if (userData.containsKey("department"))     user.setDepartment((String) userData.get("department"));
             if (userData.containsKey("officeLocation")) user.setOfficeLocation((String) userData.get("officeLocation"));
             if (userData.containsKey("officeHours"))    user.setOfficeHours((String) userData.get("officeHours"));
@@ -312,8 +269,12 @@ public class UserService {
         return stats;
     }
 
-    // ---- helpers ----
+    // ===== helpers =====
     private static boolean isBlank(String s) { return s == null || s.trim().isEmpty(); }
     private static String nvl(String a, String b) { return !isBlank(a) ? a : b; }
     private static String safeLower(String s) { return s == null ? null : s.toLowerCase(Locale.ROOT).trim(); }
+    private static String strAttr(OAuth2User p, String key) {
+        Object v = p.getAttribute(key);
+        return v == null ? null : String.valueOf(v);
+    }
 }

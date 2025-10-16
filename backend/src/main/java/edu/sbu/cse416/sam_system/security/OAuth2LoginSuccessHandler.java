@@ -14,7 +14,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.io.IOException;
 
 @Component
-public class OAuth2LoginSuccessHandler implements org.springframework.security.web.authentication.AuthenticationSuccessHandler {
+public class OAuth2LoginSuccessHandler
+        implements org.springframework.security.web.authentication.AuthenticationSuccessHandler {
 
     private final UserService userService;
 
@@ -26,14 +27,15 @@ public class OAuth2LoginSuccessHandler implements org.springframework.security.w
     public void onAuthenticationSuccess(
             HttpServletRequest request,
             HttpServletResponse response,
-            Authentication authentication) throws IOException, ServletException {
+            Authentication authentication
+    ) throws IOException, ServletException {
 
         OAuth2User o2 = (OAuth2User) authentication.getPrincipal();
 
         // 1) DB에 사용자 생성/업데이트
         User saved = userService.findOrCreateUserFromOAuth2(o2);
 
-        // 2) 프론트로 리다이렉트 (필요한 최소 정보 쿼리로 전달하거나, 프론트가 /api/auth/me 호출)
+        // 2) 프론트로 리다이렉트
         String redirect = UriComponentsBuilder
                 .fromHttpUrl("http://localhost:5173/home")
                 .queryParam("success", "true")

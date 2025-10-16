@@ -31,7 +31,9 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
+                // 로그인/콜백/에러 경로는 모두 허용
                 .requestMatchers("/oauth2/**", "/login/**", "/login/oauth2/**", "/error").permitAll()
+                // 데모 동안은 API도 허용 (실서비스에선 제한 권장)
                 .requestMatchers("/api/**").permitAll()
                 .anyRequest().authenticated()
             )
