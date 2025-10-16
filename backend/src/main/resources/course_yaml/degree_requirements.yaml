@@ -1,0 +1,177 @@
+effective_term: "Fall 2025"
+
+degree_requirements:
+  - subject_code: "CSE"
+    degree_type: "BS"
+    total_credits_required: 120
+    is_restricted: true
+    gpa_requirement: 2.0
+    admission_requirements:
+      - "CSE 114"
+      - "CSE 214"
+      - "CSE 215"
+      - "CSE 216"
+      - "CSE 220"
+    course_requirements:
+      required_courses:
+        - "CSE 114"
+        - "CSE 214"
+        - "CSE 215"
+        - "CSE 216"
+        - "CSE 220"
+        - "CSE 303"
+        - "CSE 310"
+        - "CSE 316"
+        - "CSE 320"
+        - "CSE 373"
+        - "CSE 416"
+      elective_courses:
+        - "CSE 300+"
+        - "CSE 400+"
+    sbc_requirements:
+      - "ARTS"
+      - "GLO"
+      - "HUM"
+      - "LANG"
+      - "QPS"
+      - "SBS"
+      - "SNW"
+      - "TECH"
+      - "USA"
+      - "WRT"
+      - "EXP+"
+      - "HFA+"
+      - "SBS+"
+      - "STEM+"
+      - "CER"
+      - "DIV"
+      - "ESI"
+      - "SPK"
+      - "WRTD"
+
+  - subject_code: "PSY"
+    degree_type: "BA"
+    total_credits_required: 120
+    is_restricted: false
+    gpa_requirement: 2.0
+    admission_requirements:
+      - "PSY 103"
+    course_requirements:
+      required_courses:
+        - "PSY 103"
+        - "PSY 201"
+        - "PSY 310"
+        - "PSY 220"
+        - "PSY 230"
+        - "PSY 240"
+        - "PSY 250"
+        - "PSY 260"
+        - "PSY 301"
+        - "PSY 325"
+      elective_courses:
+        - "PSY 300+"
+        - "PSY 400+"
+    sbc_requirements:
+      - "ARTS"
+      - "GLO"
+      - "HUM"
+      - "LANG"
+      - "QPS"
+      - "SBS"
+      - "SNW"
+      - "TECH"
+      - "USA"
+      - "WRT"
+      - "EXP+"
+      - "HFA+"
+      - "SBS+"
+      - "STEM+"
+      - "CER"
+      - "DIV"
+      - "ESI"
+      - "SPK"
+      - "WRTD"
+
+  - subject_code: "BIO"
+    degree_type: "BA"
+    total_credits_required: 120
+    is_restricted: false
+    gpa_requirement: 2.0
+    admission_requirements:
+      - "BIO 201"
+      - "BIO 202"
+    course_requirements:
+      required_courses:
+        - "BIO 203"
+        - "BIO 204"
+        - "BIO 205"
+        - "BIO 320"
+        - "BIO 321"
+        - "BIO 325"
+        - "BIO 350"
+        - "BIO 360"
+      elective_courses:
+        - "BIO 300+"
+        - "BIO 400+"
+    sbc_requirements:
+      - "ARTS"
+      - "GLO"
+      - "HUM"
+      - "LANG"
+      - "QPS"
+      - "SBS"
+      - "SNW"
+      - "TECH"
+      - "USA"
+      - "WRT"
+      - "EXP+"
+      - "HFA+"
+      - "SBS+"
+      - "STEM+"
+      - "CER"
+      - "DIV"
+      - "ESI"
+      - "SPK"
+      - "WRTD"
+
+  - subject_code: "AMS"
+    degree_type: "BS"
+    total_credits_required: 120
+    is_restricted: false
+    gpa_requirement: 2.0
+    admission_requirements:
+      - "AMS 151"
+      - "AMS 161"
+    course_requirements:
+      required_courses:
+        - "AMS 151"
+        - "AMS 161"
+        - "AMS 210"
+        - "AMS 261"
+        - "AMS 301"
+        - "AMS 310"
+        - "AMS 315"
+        - "AMS 361"
+      elective_courses:
+        - "AMS 300+"
+        - "AMS 400+"
+    sbc_requirements:
+      - "ARTS"
+      - "GLO"
+      - "HUM"
+      - "LANG"
+      - "QPS"
+      - "SBS"
+      - "SNW"
+      - "TECH"
+      - "USA"
+      - "WRT"
+      - "EXP+"
+      - "HFA+"
+      - "SBS+"
+      - "STEM+"
+      - "CER"
+      - "DIV"
+      - "ESI"
+      - "SPK"
+      - "WRTD"

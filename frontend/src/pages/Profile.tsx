@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 
+/**
+ * Profile Page Component
+ * Comprehensive student profile management with academic information display.
+ * 
+ * Note: Student profile functionality and data visualization were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper data management 
+ * and user interface design.
+ */
+
 /** ===== Types ===== */
 type Role = "STUDENT" | "ADVISOR" | "REGISTRAR" | "ADMIN";
 

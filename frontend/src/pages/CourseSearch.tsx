@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import './CourseSearch.css'
 
-/*
+/**
  * Course Search Page Component
  * Displays course catalog from courses table (scraped data).
  * Shows detailed course information including descriptions, prerequisites, SBCs, etc.
  * 
- * TP: Used Cursor to implement backend integration with courses table.
+ * Note: Backend integration and course search functionality were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper API integration 
+ * and advanced search filtering capabilities.
  */
 
 interface Course {

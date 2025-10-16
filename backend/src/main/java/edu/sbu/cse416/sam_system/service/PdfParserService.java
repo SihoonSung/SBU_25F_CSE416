@@ -1,7 +1,9 @@
 package edu.sbu.cse416.sam_system.service;
 
-/*
- * TP: Used Cursor to implement PDF parsing functionality
+/**
+ * PDF parsing service for SBU Course Schedule PDFs.
+ * Implements comprehensive PDF text extraction and class data parsing.
+ * 
  * Features:
  * - Parse SBU Course Schedule PDFs using Apache PDFBox
  * - Extract course information (dept, number, section, title, credits, etc.)
@@ -10,6 +12,10 @@ package edu.sbu.cse416.sam_system.service;
  * - Support credit ranges (min-max credits)
  * - Prevent duplicate class entries
  * - Bulk delete and replace for re-uploading same term
+ * 
+ * Note: PDF parsing functionality and text extraction logic were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper Apache PDFBox integration 
+ * and robust pattern matching capabilities.
  */
 
 import edu.sbu.cse416.sam_system.entity.ClassEntity;

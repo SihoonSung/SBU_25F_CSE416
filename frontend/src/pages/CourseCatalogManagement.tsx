@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import './CourseCatalogManagement.css';
 
-
-//TP : Used cursor to display course catalog data in temrs of design
+/**
+ * Course Catalog Management Component
+ * Provides interface for managing course catalog scraping and data display.
+ * 
+ * Note: Course catalog data display and management interface were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper UI design 
+ * and data visualization.
+ */
 
 
 interface ScrapingResponse {

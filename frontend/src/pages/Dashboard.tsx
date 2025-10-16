@@ -1,4 +1,3 @@
-// src/pages/Dashboard.tsx
 import React, { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import './Dashboard.css'
@@ -14,6 +13,14 @@ type Me = {
   isActive?: boolean
 } | null
 
+/**
+ * Dashboard component with Google OAuth2 integration.
+ * Handles OAuth callback processing and displays user dashboard.
+ * 
+ * Note: Google OAuth2 integration and authentication flow were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper OAuth handling 
+ * and secure authentication patterns.
+ */
 function Dashboard() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -22,32 +29,32 @@ function Dashboard() {
 
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
 
-  // 1) OAuth 성공 콜백 처리 + 2) 세션으로 현재 유저 불러오기
+  // 1) Handle OAuth success callback + 2) Load current user from session
   useEffect(() => {
     const run = async () => {
       const success = searchParams.get('success')
       try {
         setIsLoading(true)
 
-        // OAuth 성공으로 돌아왔으면, 백엔드에 성공 처리(유저 생성/업데이트)를 요청
+        // If returned from OAuth success, request backend to process success (user creation/update)
         if (success === 'true') {
           const ok = await fetch(`${backendBase}/api/auth/success`, {
             method: 'GET',
-            credentials: 'include', // ★ 서버 세션 쿠키 포함
+            credentials: 'include', // Include server session cookie
             headers: { 'Content-Type': 'application/json' },
             mode: 'cors',
           })
           if (!ok.ok) {
-            console.error('auth/success 호출 실패')
+            console.error('auth/success call failed')
           }
-          // URL에서 success 파라미터 제거
+          // Remove success parameter from URL
           navigate('/home', { replace: true })
         }
 
-        // 세션 쿠키로 현재 로그인된 유저 조회
+        // Query current logged-in user with session cookie
         const meRes = await fetch(`${backendBase}/api/auth/me`, {
           method: 'GET',
-          credentials: 'include', // ★ 중요
+          credentials: 'include', // Important
           headers: { 'Content-Type': 'application/json' },
           mode: 'cors',
         })
@@ -68,14 +75,14 @@ function Dashboard() {
 
     run()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backendBase]) // success 파라미터는 처리 후 /home으로 replace하므로 의존성에서 제외
+  }, [backendBase]) // success parameter is removed after processing and replaced with /home, so excluded from dependencies
 
   if (isLoading) {
     return (
       <div className="dashboard">
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>로그인 중...</p>
+          <p>Logging in...</p>
         </div>
       </div>
     )

@@ -1,4 +1,3 @@
-// src/main/java/edu/sbu/cse416/sam_system/security/OAuth2LoginSuccessHandler.java
 package edu.sbu.cse416.sam_system.security;
 
 import edu.sbu.cse416.sam_system.entity.User;
@@ -13,6 +12,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 
+/**
+ * Handles successful OAuth2 login attempts.
+ * Creates or updates user data in the database and redirects to frontend.
+ * 
+ * Note: Google OAuth2 integration was implemented with assistance from Cursor AI and ChatGPT
+ * for proper authentication flow and user data handling.
+ */
 @Component
 public class OAuth2LoginSuccessHandler
         implements org.springframework.security.web.authentication.AuthenticationSuccessHandler {
@@ -32,10 +38,10 @@ public class OAuth2LoginSuccessHandler
 
         OAuth2User o2 = (OAuth2User) authentication.getPrincipal();
 
-        // 1) DB에 사용자 생성/업데이트
+        // 1) Create or update user in database
         User saved = userService.findOrCreateUserFromOAuth2(o2);
 
-        // 2) 프론트로 리다이렉트
+        // 2) Redirect to frontend
         String redirect = UriComponentsBuilder
                 .fromHttpUrl("http://localhost:5173/home")
                 .queryParam("success", "true")

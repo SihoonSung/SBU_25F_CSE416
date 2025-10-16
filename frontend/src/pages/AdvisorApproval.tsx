@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import './AdvisorApproval.css';
 
+/**
+ * Advisor Approval Component
+ * Provides interface for advisors to approve or reject major/minor declarations.
+ * 
+ * Note: Advisor approval functionality and administrative interface were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper workflow management 
+ * and approval processing capabilities.
+ */
+
 interface MajorMinorDeclaration {
   declarationId: number;
   studentNetId: string;

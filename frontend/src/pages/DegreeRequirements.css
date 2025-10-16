@@ -149,10 +149,32 @@
   font-size: 1.5rem;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .results-count {
   color: #7f8c8d;
   font-size: 0.9rem;
   font-weight: 500;
+}
+
+.delete-all-button {
+  background: #fee2e2;
+  color: #991b1b;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.delete-all-button:hover {
+  background: #fecaca;
 }
 
 .no-requirements {
@@ -347,12 +369,31 @@
   border-top: 1px solid #e9ecef;
   padding-top: 1rem;
   margin-top: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .created-by {
   color: #7f8c8d;
   font-size: 0.9rem;
   font-style: italic;
+}
+
+.delete-button {
+  background: #fee2e2;
+  color: #991b1b;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.delete-button:hover {
+  background: #fecaca;
 }
 
 /* Loading */

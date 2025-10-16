@@ -15,8 +15,11 @@ import java.util.Optional;
 
 /**
  * Service class for managing degree requirements.
+ * Handles YAML import, CRUD operations, and requirement validation.
  * 
- * TP: Used Cursor to implement degree requirements management system
+ * Note: Degree requirements management system was implemented 
+ * with assistance from Cursor AI and ChatGPT for proper YAML parsing 
+ * and data validation capabilities.
  */
 @Service
 @Transactional
@@ -181,5 +184,26 @@ public class DegreeRequirementService {
     @Transactional(readOnly = true)
     public List<DegreeRequirement> getRequirementsForSubjects(List<String> subjectCodes) {
         return degreeRequirementRepository.findBySubjectCodeInAndActive(subjectCodes);
+    }
+    
+    /**
+     * Delete a specific degree requirement
+     */
+    @Transactional
+    public void deleteRequirement(Long requirementId) {
+        Optional<DegreeRequirement> requirement = degreeRequirementRepository.findById(requirementId);
+        if (requirement.isPresent()) {
+            degreeRequirementRepository.delete(requirement.get());
+        } else {
+            throw new IllegalArgumentException("Degree requirement not found with ID: " + requirementId);
+        }
+    }
+    
+    /**
+     * Delete all degree requirements
+     */
+    @Transactional
+    public void deleteAllRequirements() {
+        degreeRequirementRepository.deleteAll();
     }
 }

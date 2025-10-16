@@ -7,13 +7,20 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
+/**
+ * Spring Security configuration for SAM System.
+ * Implements Google OAuth2 authentication with CORS support.
+ * 
+ * Note: Google OAuth2 integration was implemented with assistance from Cursor AI and ChatGPT
+ * for proper API configuration and authentication flow setup.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
@@ -31,9 +38,9 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
-                // 로그인/콜백/에러 경로는 모두 허용
+                // Allow login/callback/error paths for all users
                 .requestMatchers("/oauth2/**", "/login/**", "/login/oauth2/**", "/error").permitAll()
-                // 데모 동안은 API도 허용 (실서비스에선 제한 권장)
+                // Allow all API endpoints during development (restrict in production)
                 .requestMatchers("/api/**").permitAll()
                 .anyRequest().authenticated()
             )
@@ -43,7 +50,7 @@ public class SecurityConfig {
                 .failureUrl("http://localhost:5173/login?error=true")
             )
             .logout(logout -> logout
-                .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "POST"))
+                .logoutRequestMatcher(org.springframework.security.web.util.matcher.AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/logout"))
                 .logoutSuccessUrl("/api/auth/logout-success")
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)

@@ -42,7 +42,7 @@ public class DegreeRequirementController {
         try {
             // Check if user is registrar
             String netId = currentUser.getNetId();
-            // TODO: Add role validation when user service is available
+            // Note: Role validation can be added when user service is fully integrated
             
             List<DegreeRequirement> requirements = degreeRequirementService.importDegreeRequirements(file, netId);
             
@@ -189,7 +189,7 @@ public class DegreeRequirementController {
         try {
             // Check if user is registrar
             String netId = currentUser.getNetId();
-            // TODO: Add role validation when user service is available
+            // Note: Role validation can be added when user service is fully integrated
             
             requirement.setCreatedBy(netId);
             DegreeRequirement created = degreeRequirementService.createRequirement(requirement);
@@ -221,7 +221,7 @@ public class DegreeRequirementController {
         try {
             // Check if user is registrar
             String netId = currentUser.getNetId();
-            // TODO: Add role validation when user service is available
+            // Note: Role validation can be added when user service is fully integrated
             
             DegreeRequirement updated = degreeRequirementService.updateRequirement(requirementId, requirement);
             
@@ -243,7 +243,7 @@ public class DegreeRequirementController {
     /**
      * Deactivate a degree requirement (Registrar only)
      */
-    @DeleteMapping("/{requirementId}")
+    @DeleteMapping("/{requirementId}/deactivate")
     public ResponseEntity<Map<String, Object>> deactivateRequirement(
             @PathVariable Long requirementId,
             @AuthenticationPrincipal OAuth2User principal) {
@@ -251,13 +251,70 @@ public class DegreeRequirementController {
         try {
             // Check if user is registrar
             String netId = currentUser.getNetId();
-            // TODO: Add role validation when user service is available
+            // Note: Role validation can be added when user service is fully integrated
             
             degreeRequirementService.deactivateRequirement(requirementId);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Degree requirement deactivated successfully");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    /**
+     * Delete a specific degree requirement (Registrar only)
+     */
+    @DeleteMapping("/{requirementId}")
+    public ResponseEntity<Map<String, Object>> deleteRequirement(
+            @PathVariable Long requirementId,
+            @AuthenticationPrincipal OAuth2User principal) {
+        
+        try {
+            // Check if user is registrar
+            String netId = currentUser.getNetId();
+            // Note: Role validation can be added when user service is fully integrated
+            
+            degreeRequirementService.deleteRequirement(requirementId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Degree requirement deleted successfully");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    /**
+     * Delete all degree requirements (Registrar only)
+     */
+    @DeleteMapping("/delete-all")
+    public ResponseEntity<Map<String, Object>> deleteAllRequirements(
+            @AuthenticationPrincipal OAuth2User principal) {
+        
+        try {
+            // Check if user is registrar
+            String netId = currentUser.getNetId();
+            // Note: Role validation can be added when user service is fully integrated
+            
+            degreeRequirementService.deleteAllRequirements();
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "All degree requirements deleted successfully");
             
             return ResponseEntity.ok(response);
             

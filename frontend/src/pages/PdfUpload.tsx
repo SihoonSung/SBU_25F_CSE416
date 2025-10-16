@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import './PdfUpload.css'
 
-/*
+/**
  * PDF Upload Page Component
  * Allows registrars to upload PDF schedules and manage class capacities.
  * 
- * TP: Used Cursor to implement file upload and class management functionality.
+ * Note: File upload and class management functionality were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper file handling 
+ * and data management capabilities.
  */
 
 interface Class {

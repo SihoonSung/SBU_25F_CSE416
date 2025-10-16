@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import './UserManagement.css';
 
+/**
+ * User Management Component
+ * Provides interface for managing users, importing user data, and user administration.
+ * 
+ * Note: User management functionality and administrative interface were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper data management 
+ * and user administration capabilities.
+ */
+
 interface User {
   userId: number;
   email: string;
@@ -217,7 +226,11 @@ const UserManagement: React.FC = () => {
               accept=".yaml,.yml"
               onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
               className="file-input"
+              id="file-upload"
             />
+            <label htmlFor="file-upload" className="file-label">
+              {selectedFile ? selectedFile.name : 'Choose YAML File'}
+            </label>
             <button
               onClick={handleFileUpload}
               disabled={!selectedFile}

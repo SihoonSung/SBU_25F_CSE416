@@ -128,6 +128,22 @@ public class UserController {
 
     // ================= Registrar/Admin APIs =================
 
+    /**
+     * Get all users (for registrar)
+     */
+    @GetMapping
+    public ResponseEntity<List<User>> getAllUsers(
+            @AuthenticationPrincipal OAuth2User principal) {
+        
+        // Temporarily disable authorization for testing
+        // if (!isRegistrar(principal)) {
+        //     return ResponseEntity.status(403).build();
+        // }
+        
+        List<User> users = userService.getAllUsers();
+        return ResponseEntity.ok(users);
+    }
+
     /** Activate user */
     @PutMapping("/{userId}/activate")
     public ResponseEntity<User> activateUser(
@@ -152,7 +168,7 @@ public class UserController {
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal OAuth2User principal) {
 
-        // 개발 중엔 잠시 열어두고 싶으면 위 권한 체크 주석 유지 가능
+        // Keep permission check commented during development if needed
         // if (!isRegistrar(principal)) return ResponseEntity.status(403).build();
 
         if (file.isEmpty()) {

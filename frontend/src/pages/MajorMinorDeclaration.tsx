@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import './MajorMinorDeclaration.css';
 
+/**
+ * Major/Minor Declaration Component
+ * Provides interface for students to declare majors and minors.
+ * 
+ * Note: Major/minor declaration functionality and user interface were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper form handling 
+ * and data validation capabilities.
+ */
+
 interface DegreeRequirement {
   requirementId: number;
   subjectCode: string;

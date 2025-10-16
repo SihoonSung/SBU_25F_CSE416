@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import './DegreeRequirementsImport.css';
 
+/**
+ * Degree Requirements Import Component
+ * Provides interface for importing degree requirements from YAML files.
+ * 
+ * Note: YAML file import functionality and user interface were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper file handling 
+ * and data validation capabilities.
+ */
+
 interface ImportResult {
   success: boolean;
   message: string;
@@ -82,9 +91,11 @@ const DegreeRequirementsImport: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/degree-requirements/import', {
+      const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+      const response = await fetch(`${backendBase}/api/degree-requirements/import`, {
         method: 'POST',
         body: formData,
+        credentials: 'include'
       });
 
       const data = await response.json();

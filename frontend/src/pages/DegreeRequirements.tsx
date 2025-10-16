@@ -52,7 +52,10 @@ const DegreeRequirements: React.FC = () => {
 
   const fetchRequirements = async () => {
     try {
-      const response = await fetch('/api/degree-requirements');
+      const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+      const response = await fetch(`${backendBase}/api/degree-requirements`, {
+        credentials: 'include'
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -70,7 +73,10 @@ const DegreeRequirements: React.FC = () => {
 
   const fetchRequirementsBySubject = async (subjectCode: string) => {
     try {
-      const response = await fetch(`/api/degree-requirements/subject/${subjectCode}`);
+      const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+      const response = await fetch(`${backendBase}/api/degree-requirements/subject/${subjectCode}`, {
+        credentials: 'include'
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -102,7 +108,10 @@ const DegreeRequirements: React.FC = () => {
 
   const fetchRestrictedRequirements = async () => {
     try {
-      const response = await fetch('/api/degree-requirements/restricted');
+      const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+      const response = await fetch(`${backendBase}/api/degree-requirements/restricted`, {
+        credentials: 'include'
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -161,6 +170,56 @@ const DegreeRequirements: React.FC = () => {
     setSelectedTerm('');
     setShowRestrictedOnly(false);
     fetchRequirements();
+  };
+
+  const deleteRequirement = async (requirementId: number) => {
+    if (!window.confirm('Are you sure you want to delete this degree requirement? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+      const response = await fetch(`${backendBase}/api/degree-requirements/${requirementId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        // Refresh the requirements list
+        fetchRequirements();
+        setError(null);
+      } else {
+        setError('Failed to delete degree requirement');
+      }
+    } catch (err) {
+      setError('Error deleting degree requirement');
+      console.error('Error:', err);
+    }
+  };
+
+  const deleteAllRequirements = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL degree requirements? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+      const response = await fetch(`${backendBase}/api/degree-requirements/delete-all`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        // Refresh the requirements list
+        fetchRequirements();
+        setError(null);
+      } else {
+        setError('Failed to delete all degree requirements');
+      }
+    } catch (err) {
+      setError('Error deleting all degree requirements');
+      console.error('Error:', err);
+    }
   };
 
   const getFilteredRequirements = () => {
@@ -293,8 +352,19 @@ const DegreeRequirements: React.FC = () => {
       <div className="requirements-section">
         <div className="section-header">
           <h2>Degree Requirements</h2>
-          <div className="results-count">
-            {getFilteredRequirements().length} requirement(s) found
+          <div className="header-actions">
+            <div className="results-count">
+              {getFilteredRequirements().length} requirement(s) found
+            </div>
+            {getFilteredRequirements().length > 0 && (
+              <button 
+                className="delete-all-button"
+                onClick={deleteAllRequirements}
+                title="Delete all requirements"
+              >
+                Delete All
+              </button>
+            )}
           </div>
         </div>
 
@@ -452,6 +522,13 @@ const DegreeRequirements: React.FC = () => {
 
                 <div className="requirement-footer">
                   <span className="created-by">Created by: {requirement.createdBy}</span>
+                  <button 
+                    className="delete-button"
+                    onClick={() => deleteRequirement(requirement.requirementId)}
+                    title="Delete this requirement"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))}

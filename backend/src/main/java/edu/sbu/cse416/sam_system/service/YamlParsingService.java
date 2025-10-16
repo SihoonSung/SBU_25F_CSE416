@@ -15,8 +15,11 @@ import java.util.Map;
 
 /**
  * Service for parsing YAML files containing degree requirements.
+ * Handles complex YAML structure parsing and data validation.
  * 
- * TP: Used Cursor to implement YAML parsing functionality
+ * Note: YAML parsing functionality was implemented 
+ * with assistance from Cursor AI and ChatGPT for proper SnakeYAML integration 
+ * and robust data structure handling.
  */
 @Service
 public class YamlParsingService {

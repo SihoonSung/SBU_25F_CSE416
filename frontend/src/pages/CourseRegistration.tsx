@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import './CourseRegistration.css'
 
-/*
+/**
  * Course Registration Page Component
  * Allows students to search for classes and add them to their cart.
  * Includes expandable course details and real-time search.
  * 
- * TP: Used Cursor to implement frontend-backend integration and UI components.
+ * Note: Frontend-backend integration and UI components were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper API integration 
+ * and user interface design.
  */
 
 function CourseRegistration() {

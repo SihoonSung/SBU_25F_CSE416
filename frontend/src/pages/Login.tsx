@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import './Login.css'
 
+/**
+ * Login page component with Google OAuth2 integration.
+ * Handles OAuth callback processing and user authentication flow.
+ * 
+ * Note: Google OAuth2 integration and authentication flow were implemented 
+ * with assistance from Cursor AI and ChatGPT for proper OAuth handling 
+ * and secure authentication patterns.
+ */
 function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -39,7 +47,7 @@ function Login() {
           {isLoading ? (
             <div className="loading-container">
               <div className="loading-spinner"></div>
-                  <p>로그인 중...</p>
+                  <p>Logging in...</p>
             </div>
           ) : (
             <a className="google-button" href={googleUrl}>
