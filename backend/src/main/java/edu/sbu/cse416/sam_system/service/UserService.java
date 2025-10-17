@@ -15,24 +15,16 @@ import java.io.InputStream;
 import java.util.*;
 import java.util.Locale;
 
-/**
- * Service for user management operations.
- * Handles Google OAuth2 authentication, user creation, and YAML import functionality.
- * 
- * Note: Google OAuth2 integration and user management features were implemented 
- * with assistance from Cursor AI and ChatGPT for proper authentication flow 
- * and data handling.
- */
 @Service
 public class UserService {
 
     @Autowired
     private UserRepository userRepository;
 
-    /** Find or create user from Google OAuth2 login */
+    /** Google OAuth2 로그인 후 사용자 조회/생성 */
     @Transactional
     public User findOrCreateUserFromOAuth2(OAuth2User principal) {
-        // Try OIDC standard key first, fallback to alternative
+        // OIDC 표준 키 먼저 시도, 없으면 대체
         String googleId = strAttr(principal, "sub");
         if (isBlank(googleId)) googleId = principal.getName(); // fallback
 
@@ -42,7 +34,7 @@ public class UserService {
         String fullName  = strAttr(principal, "name");
         String picture   = strAttr(principal, "picture");
 
-        // Name correction
+        // 이름 보정
         if (isBlank(firstName) && !isBlank(fullName)) {
             String[] parts = fullName.trim().split("\\s+", 2);
             firstName = parts[0];
@@ -51,12 +43,12 @@ public class UserService {
         if (isBlank(firstName)) firstName = "Unknown";
         if (isBlank(lastName))  lastName  = "User";
 
-        // (Optional) Uncomment to restrict to SBU email addresses only
+        // (선택) SBU 메일만 허용하려면 주석 해제
         // if (email == null || !email.endsWith("@stonybrook.edu")) {
         //     throw new RuntimeException("Only SBU accounts are allowed");
         // }
 
-        // 1) Search by googleId first
+        // 1) googleId로 먼저 찾기
         if (!isBlank(googleId)) {
             Optional<User> byGoogle = userRepository.findByGoogleId(googleId);
             if (byGoogle.isPresent()) {
@@ -68,7 +60,7 @@ public class UserService {
             }
         }
 
-        // 2) Email matching -> link googleId to existing account
+        // 2) email 매칭 -> 기존 계정에 googleId 연결
         if (!isBlank(email)) {
             Optional<User> byEmail = userRepository.findByEmail(email);
             if (byEmail.isPresent()) {
@@ -82,7 +74,7 @@ public class UserService {
             }
         }
 
-        // 3) Create new user (default STUDENT, active)
+        // 3) 새 사용자 생성 (기본 STUDENT, 활성)
         User nu = new User();
         nu.setGoogleId(googleId);
         nu.setEmail(email);
@@ -95,7 +87,7 @@ public class UserService {
         return userRepository.save(nu);
     }
 
-    // ===== Query Methods =====
+    // ===== 조회 메서드 =====
     public Optional<User> getUserById(Long userId) { return userRepository.findById(userId); }
 
     public Optional<User> getUserByEmail(String email) { return userRepository.findByEmail(safeLower(email)); }
@@ -130,7 +122,7 @@ public class UserService {
         return userRepository.findByDepartmentContaining(department);
     }
 
-    // ===== Update Methods =====
+    // ===== 변경 메서드 =====
     @Transactional
     public User updateUser(User user) {
         if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
@@ -151,7 +143,7 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
     }
 
-    // ===== YAML Import (supports users array + SBU format) =====
+    // ===== YAML Import (users 배열 + SBU 포맷 지원) =====
     public List<User> importUsersFromYaml(MultipartFile file) throws IOException {
         List<User> importedUsers = new ArrayList<>();
         Yaml yaml = new Yaml();
@@ -194,7 +186,7 @@ public class UserService {
         }
     }
 
-    /** Normalize email and check for duplicates before saving */
+    /** 이메일 정규화 + 중복 체크 후 저장 */
     private User processUserForImport(User user) {
         if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
         Optional<User> existing = userRepository.findByEmail(user.getEmail());
@@ -248,71 +240,11 @@ public class UserService {
             }
 
             if (role == UserRole.STUDENT) {
-                // Handle student-specific fields
                 if (userData.containsKey("majors")) {
                     List<?> majors = (List<?>) userData.get("majors");
-                    if (majors != null && !majors.isEmpty()) {
-                        user.setMajor(String.valueOf(majors.get(0))); // Keep first major for backward compatibility
-                        user.setMajors(convertListToJson(majors)); // Store all majors as JSON
-                    }
+                    if (majors != null && !majors.isEmpty()) user.setMajor(String.valueOf(majors.get(0)));
                 }
-                
-                if (userData.containsKey("degrees")) {
-                    user.setDegrees(convertListToJson((List<?>) userData.get("degrees")));
-                }
-                
-                if (userData.containsKey("minors")) {
-                    user.setMinors(convertListToJson((List<?>) userData.get("minors")));
-                }
-                
-                if (userData.containsKey("planned_majors")) {
-                    user.setPlannedMajors(convertListToJson((List<?>) userData.get("planned_majors")));
-                }
-                
-                if (userData.containsKey("planned_minors")) {
-                    user.setPlannedMinors(convertListToJson((List<?>) userData.get("planned_minors")));
-                }
-                
-                if (userData.containsKey("university_entry")) {
-                    user.setUniversityEntry(convertObjectToJson(userData.get("university_entry")));
-                }
-                
-                if (userData.containsKey("direct_admit")) {
-                    user.setDirectAdmit((String) userData.get("direct_admit"));
-                }
-                
-                if (userData.containsKey("AOI")) {
-                    user.setAoi((String) userData.get("AOI"));
-                }
-                
-                if (userData.containsKey("college")) {
-                    user.setCollege((String) userData.get("college"));
-                }
-                
-                if (userData.containsKey("transfer_courses")) {
-                    user.setTransferCourses(convertListToJson((List<?>) userData.get("transfer_courses")));
-                }
-                
-                if (userData.containsKey("classes")) {
-                    user.setClasses(convertListToJson((List<?>) userData.get("classes")));
-                }
-                
-                if (userData.containsKey("course_plan")) {
-                    user.setCoursePlan(convertListToJson((List<?>) userData.get("course_plan")));
-                }
-                
-                if (userData.containsKey("graduation")) {
-                    user.setGraduation(convertObjectToJson(userData.get("graduation")));
-                }
-                
-            } else if (role == UserRole.ADVISOR) {
-                if (userData.containsKey("level")) {
-                    user.setLevel((String) userData.get("level"));
-                }
-                if (userData.containsKey("academic_unit")) {
-                    user.setAcademicUnit((String) userData.get("academic_unit"));
-                }
-            } else if (role == UserRole.INSTRUCTOR) {
+            } else if (role == UserRole.INSTRUCTOR || role == UserRole.ADVISOR) {
                 if (userData.containsKey("academic_unit")) {
                     user.setDepartment((String) userData.get("academic_unit"));
                 }
@@ -322,27 +254,6 @@ public class UserService {
             return user;
         } catch (Exception e) {
             System.err.println("Error creating user from SBU YAML data: " + e.getMessage());
-            return null;
-        }
-    }
-    
-    // Helper methods for JSON conversion
-    private String convertListToJson(List<?> list) {
-        if (list == null || list.isEmpty()) return null;
-        try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(list);
-        } catch (Exception e) {
-            System.err.println("Error converting list to JSON: " + e.getMessage());
-            return null;
-        }
-    }
-    
-    private String convertObjectToJson(Object obj) {
-        if (obj == null) return null;
-        try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(obj);
-        } catch (Exception e) {
-            System.err.println("Error converting object to JSON: " + e.getMessage());
             return null;
         }
     }

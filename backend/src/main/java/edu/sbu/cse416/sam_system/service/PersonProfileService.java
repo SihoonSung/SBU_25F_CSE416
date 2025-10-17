@@ -1,21 +1,25 @@
 package edu.sbu.cse416.sam_system.service;
 
-import edu.sbu.cse416.sam_system.repository.YamlUserRepository;
+import edu.sbu.cse416.sam_system.entity.User;
+import edu.sbu.cse416.sam_system.repository.UserRepository; 
+import org.springframework.beans.factory.annotation.Autowired; 
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
 /**
  * Builds a normalized "person profile" for the currently logged-in user.
- * If the user is a student (present in YAML students list), it returns FullStudentDetails as well.
+ * MODIFIED to use DB UserRepository instead of YAML to fetch profile details 
+ * including department and office information.
  */
 @Service
 public class PersonProfileService {
 
-    private final YamlUserRepository yamlRepo;
+    private final UserRepository userRepository; 
 
-    public PersonProfileService(YamlUserRepository yamlRepo) {
-        this.yamlRepo = yamlRepo;
+    @Autowired
+    public PersonProfileService(UserRepository userRepository) {
+        this.userRepository = userRepository;
     }
 
     /** Public API used by controller */
@@ -24,99 +28,123 @@ public class PersonProfileService {
             throw new IllegalArgumentException("email is required");
         }
 
-        // 1) Determine kind by checking YAML sections
-        Optional<Map<String, Object>> studentOpt   = yamlRepo.findStudentByEmail(email);
-        Optional<Map<String, Object>> advisorOpt   = yamlRepo.findAdvisorByEmail(email);
-        Optional<Map<String, Object>> registrarOpt = yamlRepo.findRegistrarByEmail(email);
-        Optional<Map<String, Object>> instrOpt     = yamlRepo.findInstructorByEmail(email);
+        // 1) DB에서 사용자 조회 
+        Optional<User> userOpt = userRepository.findByEmailIgnoreCase(email.trim());
 
-        // 2) Build DTO
-        if (studentOpt.isPresent()) {
-            Map<String, Object> s = studentOpt.get();
-            return buildStudentDTO(s);
+        if (userOpt.isEmpty()) {
+            PersonProfileDTO dto = new PersonProfileDTO();
+            dto.kind = "unknown";
+            dto.email = email;
+            dto.displayName = null;
+            dto.sbuId = null;
+            return dto;
         }
 
-        if (advisorOpt.isPresent()) {
-            Map<String, Object> m = advisorOpt.get();
-            return basicDTO("advisor", m);
-        }
+        User u = userOpt.get();
+        String kind = u.getRole().name().toLowerCase();
 
-        if (registrarOpt.isPresent()) {
-            Map<String, Object> m = registrarOpt.get();
-            return basicDTO("registrar", m);
-        }
-
-        if (instrOpt.isPresent()) {
-            Map<String, Object> m = instrOpt.get();
-            return basicDTO("instructor", m);
-        }
-
-        // Unknown user (not in YAML) – still return email for frontend to show something
+        // 2) DTO 빌드
         PersonProfileDTO dto = new PersonProfileDTO();
-        dto.kind = "unknown";
-        dto.email = email;
-        dto.displayName = null;
-        dto.sbuId = null;
+        dto.kind = kind;
+        dto.email = u.getEmail();
+        dto.sbuId = u.getStudentId();
+        dto.firstName = u.getFirstName();
+        dto.lastName = u.getLastName();
+        dto.displayName = joinNames(u.getFirstName(), u.getLastName());
+
+        // ******************** users 테이블의 모든 필드 매핑 ********************
+        dto.department = u.getDepartment();
+        dto.officeHours = u.getOfficeHours();
+        dto.officeLocation = u.getOfficeLocation();
+        dto.academicUnit = u.getAcademicUnit(); 
+        dto.unitLevel = u.getLevel(); 
+        
+        // Student/General fields
+        dto.major = u.getMajor();           
+        dto.gpa = u.getGpa();               
+        dto.graduationYear = u.getGraduationYear(); 
+        
+        // Class Standing: GpaSummary의 Standing과 동일한 정보를 제공 (현재는 임시값)
+        if ("student".equals(kind)) {
+             // 임시 Class Standing 계산 (실제는 credits 기반이지만, users 테이블의 gpa를 사용하여 임시로 채움)
+             dto.classStanding = toStanding(u.getGpa() != null ? u.getGpa().doubleValue() : 0.0);
+        } else {
+             dto.classStanding = null;
+        }
+        // ******************************************************************
+
+        if ("student".equals(kind)) {
+            dto.studentDetails = buildStudentDetails(u);
+            dto.sbuId = u.getStudentId();
+        }
+
         return dto;
     }
 
     // ---------- mapping helpers ----------
 
-    private PersonProfileDTO basicDTO(String kind, Map<String, Object> m) {
-        PersonProfileDTO dto = new PersonProfileDTO();
-        dto.kind = kind;
-        dto.email = getStr(m, "email");
-        dto.sbuId = getStr(m, "SBU_ID");
-        String first = getStr(m, "first_name");
-        String last  = getStr(m, "last_name");
-        dto.displayName = joinNames(first, last);
-        return dto;
-    }
-
-    @SuppressWarnings("unchecked")
-    private PersonProfileDTO buildStudentDTO(Map<String, Object> s) {
-        PersonProfileDTO dto = new PersonProfileDTO();
-        dto.kind = "student";
-        dto.email = getStr(s, "email");
-        dto.sbuId = getStr(s, "SBU_ID");
-        dto.displayName = joinNames(getStr(s, "first_name"), getStr(s, "last_name"));
-
-        // Build FullStudentDetails
+    private FullStudentDetails buildStudentDetails(User u) {
         FullStudentDetails details = new FullStudentDetails();
-        details.sbuId      = dto.sbuId;
-        details.firstName  = getStr(s, "first_name");
-        details.lastName   = getStr(s, "last_name");
-        details.email      = dto.email;
+        details.sbuId      = u.getStudentId();
+        details.firstName  = u.getFirstName();
+        details.lastName   = u.getLastName();
+        details.email      = u.getEmail();
 
-        Map<String, Object> univEntry = getMap(s, "university_entry");
-        if (univEntry != null) {
-            details.universityEntry = toTerm(univEntry);
-        }
+        // DB의 JSON String 필드들을 파싱해야 합니다. (임시로 null/빈 리스트)
+        details.universityEntry = parseTermRef(u.getUniversityEntry());
+        details.directAdmit = u.getDirectAdmit();
+        details.aoi = u.getAoi();
+        details.college = u.getCollege();
 
-        details.directAdmit = toNullableStr(s.get("direct_admit"));
-        details.aoi         = toNullableStr(s.get("AOI"));
-        details.college     = toNullableStr(s.get("college"));
+        details.majors = parseStrList(u.getMajors());
+        details.degrees = parseStrList(u.getDegrees());
+        details.majorRequirementVersions = parseTermList(u.getMajorRequirementVersions());
+        details.minors = parseStrList(u.getMinors());
+        details.minorRequirementVersions = parseTermList(u.getMinorRequirementVersions());
+        details.plannedMajors = parseStrList(u.getPlannedMajors());
+        details.plannedMajorRequirementVersions = parseTermList(u.getPlannedMajorRequirementVersions());
+        details.plannedDegrees = parseStrList(u.getPlannedDegrees());
+        details.plannedMinors = parseStrList(u.getPlannedMinors());
+        details.plannedMinorRequirementVersions = parseTermList(u.getPlannedMinorRequirementVersions());
 
-        details.majors                    = toStrList(s.get("majors"));
-        details.degrees                   = toStrList(s.get("degrees"));
-        details.majorRequirementVersions  = toTermList(s.get("major_requirement_versions"));
+        details.graduation = parseTermRef(u.getGraduation());
 
-        details.minors                    = toStrList(s.get("minors"));
-        details.minorRequirementVersions  = toTermList(s.get("minor_requirement_versions"));
-
-        details.plannedMajors                     = toStrList(s.get("planned_majors"));
-        details.plannedMajorRequirementVersions   = toTermList(s.get("planned_major_requirement_versions"));
-        details.plannedDegrees                    = toStrList(s.get("planned_degrees"));
-
-        details.plannedMinors                     = toStrList(s.get("planned_minors"));
-        details.plannedMinorRequirementVersions   = toTermList(s.get("planned_minor_requirement_versions"));
-
-        Map<String, Object> grad = getMap(s, "graduation");
-        details.graduation = (grad != null ? toTerm(grad) : null);
-
-        dto.studentDetails = details;
-        return dto;
+        return details;
     }
+    
+    // GPA 값에 기반한 임시 Standing 계산 헬퍼 (실제는 Credits를 사용해야 함)
+    private String toStanding(Double gpa) {
+        if (gpa == null) return null;
+        if (gpa >= 3.5) return "Senior (Excellent)";
+        if (gpa >= 3.0) return "Junior (Good)";
+        if (gpa >= 2.5) return "Sophomore";
+        if (gpa >= 2.0) return "Freshman";
+        return null;
+    }
+
+    // 🚨 수정됨: public static으로 변경
+    public static TermRef parseTermRef(String jsonString) {
+        // 실제 JSON 파싱 구현 필요
+        return null; 
+    }
+    
+    // 🚨 수정됨: public static으로 변경
+    public static List<String> parseStrList(String jsonString) {
+        // 실제 JSON 파싱 구현 필요 (JSON Array String -> List<String>)
+        // 임시로 JSON이 아닌 쉼표 구분 문자열이라고 가정하고 처리
+        if (jsonString == null || jsonString.isBlank() || jsonString.equals("[]")) {
+            return Collections.emptyList();
+        }
+        // 실제 JSON 파싱 코드가 여기에 들어갈 것입니다.
+        return Arrays.asList(jsonString.replaceAll("[\\[\\]\"]", "").split(",")); // 임시 처리
+    }
+    
+    // 🚨 수정됨: public static으로 변경
+    public static List<TermRef> parseTermList(String jsonString) {
+        // 실제 JSON 파싱 구현 필요
+        return Collections.emptyList(); 
+    }
+
 
     private String joinNames(String first, String last) {
         String a = (first == null ? "" : first.trim());
@@ -125,63 +153,6 @@ public class PersonProfileService {
         return joined.isEmpty() ? null : joined;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> getMap(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        if (v instanceof Map) return (Map<String, Object>) v;
-        return null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getMapList(Object v) {
-        if (v instanceof List) {
-            return (List<Map<String, Object>>) v;
-        }
-        return Collections.emptyList();
-    }
-
-    private List<String> toStrList(Object v) {
-        if (v instanceof List) {
-            List<?> raw = (List<?>) v;
-            List<String> out = new ArrayList<>();
-            for (Object o : raw) {
-                out.add(o == null ? null : String.valueOf(o));
-            }
-            return out;
-        }
-        return Collections.emptyList();
-    }
-
-    private String getStr(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return v == null ? null : String.valueOf(v);
-    }
-
-    private String toNullableStr(Object v) {
-        if (v == null) return null;
-        String s = String.valueOf(v).trim();
-        return s.isEmpty() || "null".equalsIgnoreCase(s) ? null : s;
-    }
-
-    private TermRef toTerm(Map<String, Object> m) {
-        TermRef t = new TermRef();
-        t.semester = getStr(m, "semester");
-        Object y = m.get("year");
-        if (y instanceof Number) {
-            t.year = ((Number) y).intValue();
-        } else if (y != null) {
-            try { t.year = Integer.parseInt(String.valueOf(y)); } catch (NumberFormatException ignored) { }
-        }
-        return t;
-    }
-
-    private List<TermRef> toTermList(Object v) {
-        List<TermRef> out = new ArrayList<>();
-        for (Map<String, Object> mm : getMapList(v)) {
-            out.add(toTerm(mm));
-        }
-        return out;
-    }
 
     // ---------- DTOs returned to controller (match frontend expectations) ----------
 
@@ -190,6 +161,21 @@ public class PersonProfileService {
         public String displayName;
         public String email;
         public String sbuId;
+        public String firstName;
+        public String lastName;
+        
+        // ******************** 추가된 DTO 필드 ********************
+        public String department;
+        public String officeHours;
+        public String officeLocation;
+        public String academicUnit;
+        public String unitLevel;
+        public String major;
+        public Double gpa;
+        public Integer graduationYear;
+        public String classStanding;
+        // ******************************************************
+        
         public FullStudentDetails studentDetails; // present only if kind == "student"
     }
 

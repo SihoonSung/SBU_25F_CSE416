@@ -8,8 +8,7 @@ import java.util.Map;
 /**
  * Entity class representing a user in the SAM system.
  * Supports four roles: STUDENT, INSTRUCTOR, ADVISOR, REGISTRAR
- * 
- * TP: Used Cursor to implement user management and authentication system
+ * * TP: Used Cursor to implement user management and authentication system
  */
 @Entity
 @Table(name = "users")
@@ -442,7 +441,7 @@ public class User {
         return graduation;
     }
     
-    public void setGraduation(String graduation) {
+    public void voidsetGraduation(String graduation) {
         this.graduation = graduation;
     }
     

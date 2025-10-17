@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 /**
  * Profile Page Component
  * Comprehensive student profile management with academic information display.
- * 
- * Note: Student profile functionality and data visualization were implemented 
+ * * Note: Student profile functionality and data visualization were implemented 
  * with assistance from Cursor AI and ChatGPT for proper data management 
  * and user interface design.
  */
@@ -14,15 +13,31 @@ type Role = "STUDENT" | "ADVISOR" | "REGISTRAR" | "ADMIN";
 
 type CurrentUserInfo = { netId: string; roles: Role[] };
 
-/** Generic person (non-student compatible) */
+/** Generic person (non-student compatible) - 수정됨 */
 type PersonBasic = {
   sbuId?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   email?: string | null;
   role?: "student" | "advisor" | "registrar" | "instructor" | "unknown";
-  unitLevel?: "university" | "college" | "department" | null; // for advisors
-  academicUnit?: string | null; // e.g., CSE, CAS, SBU
+  
+  // Advisor-specific fields
+  unitLevel?: "university" | "college" | "department" | null; 
+  academicUnit?: string | null; 
+  
+  // users 테이블에서 추가된 필드 (Instructor/General fields)
+  department?: string | null;
+  officeHours?: string | null;
+  officeLocation?: string | null;
+
+  // Student/General fields
+  major?: string | null; 
+  gpa?: number | null; 
+  graduationYear?: number | null; 
+  profilePictureUrl?: string | null;
+  
+  // 상태 표시를 위한 필드 추가
+  classStanding?: string | null; // Class Standing (e.g., U1, U2...)
 };
 
 /** Student basic + details (as before) */
@@ -181,13 +196,8 @@ export default function ProfilePage() {
   const [searchResult, setSearchResult] = useState<StudentProfile | null>(null);
 
   /** ===== Helpers ===== */
-  const buildPrefix = (key: string | null) => {
-  if (!key) return `${BASE}/api/profile/me`;
-  const isSid = /^[0-9]{6,10}$/.test(key);
-  return isSid
-    ? `${BASE}/api/profile/student-id/${encodeURIComponent(key)}`
-    : `${BASE}/api/profile/student/${encodeURIComponent(key)}`;
-};
+  const buildSidPrefix = (sid: string) =>
+    `${BASE}/api/profile/student-id/${encodeURIComponent(sid)}`;
 
   const fmt = {
     num(n?: number | null) {
@@ -212,89 +222,117 @@ export default function ProfilePage() {
     },
   };
 
-  /** ===== Initial load ===== */
-  useEffect(() => {
-    (async () => {
-      setMsg(null);
-      try {
-        // who am I (roles)
-        const who = await safeFetch(`${BASE}/api/auth/me`).catch(() => null);
-        if (who) setMe(who as CurrentUserInfo);
+  /** ===== Initial load - 수정된 부분: myPerson을 DB 기반으로 가져오기 ===== */
+    useEffect(() => {
+      (async () => {
+        setMsg(null);
+        try {
+          // 1) 로그인/권한
+          const whoRaw = await safeFetch(`${BASE}/api/auth/me`);
 
-        // generic person info from YAML (works for any role)
-        // Expected: /api/profile/person/me (basic), /api/profile/person/me/details (YAML-shaped)
-        const person = await safeFetch(`${BASE}/api/profile/person/me`).catch(() => null);
-        setMyPerson(person as PersonBasic | null);
+          // 🔧 여기 추가: roles 표준화 (배열 or user.role 단일 문자열 모두 대응)
+          const authRoles =
+            Array.isArray(whoRaw?.roles) && whoRaw.roles.length
+              ? whoRaw.roles
+              : (whoRaw?.user?.role
+                  ? [String(whoRaw.user.role).toUpperCase()] // "Student" -> "STUDENT"
+                  : []);
 
-        // am I a student?
-        const isStudent = !!(who && Array.isArray(who.roles) && who.roles.includes("STUDENT"));
-        setMyIsStudent(isStudent);
-
-        // if student, load my student bundle
-        if (isStudent) {
-          await loadStudentBundle(null, myTerm, {
-            setProfile: setMyProfile,
-            setDetails: setMyDetails,
-            setSummary: setMySummary,
-            setSchedule: setMySchedule,
-            setPlans: setMyPlans,
-            setAdmissionReqs: setMyAdmissionReqs,
-            setDegreeReqs: setMyDegreeReqs,
-            setHolds: setMyHolds,
-            setWaived: setMyWaived,
-            setAudit: setMyAudit,
-            setTransfers: setMyTransfers,
-            setClassHistory: setMyClassHistory,
-            setCoursePlan: setMyCoursePlan,
+          // 기존 타입에 맞춰 set
+          setMe({
+            netId: whoRaw?.netId ?? "",
+            roles: authRoles as Role[],
           });
-        }
 
-        // admin utilities (calendar & system date)
-        const [ev, now] = await Promise.all([
-          safeFetch(`${BASE}/api/admin/academic-calendar`).catch(() => []),
-          safeFetch(`${BASE}/api/admin/system-date`).catch(() => null),
-        ]);
-        setEvents(Array.isArray(ev) ? ev : []);
-        if (now) {
-          setSysDate(now.currentDate ?? "");
-          setOverridden(!!now.overridden);
+          const isStudent = authRoles.includes("STUDENT" as Role);
+          setMyIsStudent(isStudent);
+
+          // 2) My Account 표시용 person (DB)
+          const personRaw = await safeFetch(`${BASE}/api/profile/person/me`).catch(() => null);
+
+          // 🔧 여기 추가: person role 소문자 정규화 (타입과 UI 일관성)
+          const person = personRaw
+            ? {
+                ...personRaw,
+                role: personRaw.role ? String(personRaw.role).toLowerCase() : "unknown",
+              }
+            : null;
+
+          setMyPerson(person as PersonBasic | null);
+
+          // 3) 학생 번들
+          if (isStudent && person && (person.sbuId || person.studentId)) {
+            // studentId로 우선
+            const sid = (person as any).studentId ?? person.sbuId;
+            await loadStudentBundle(sid, myTerm, {
+              setProfile: setMyProfile,
+              setDetails: setMyDetails,
+              setSummary: setMySummary,
+              setSchedule: setMySchedule,
+              setPlans: setMyPlans,
+              setAdmissionReqs: setMyAdmissionReqs,
+              setDegreeReqs: setMyDegreeReqs,
+              setHolds: setMyHolds,
+              setWaived: setMyWaived,
+              setAudit: setMyAudit,
+              setTransfers: setMyTransfers,
+              setClassHistory: setMyClassHistory,
+              setCoursePlan: setMyCoursePlan,
+            });
+          }
+
+          // 4) Admin 유틸
+          const [ev, now] = await Promise.all([
+            safeFetch(`${BASE}/api/admin/academic-calendar`).catch(() => []),
+            safeFetch(`${BASE}/api/admin/system-date`).catch(() => null),
+          ]);
+          setEvents(Array.isArray(ev) ? ev : []);
+          if (now) {
+            setSysDate(now.currentDate ?? "");
+            setOverridden(!!now.overridden);
+          }
+        } catch (e: any) {
+          setMsg(e.message || "Failed to load.");
+          setMe(null);
+          setMyPerson(null);
+          setMyIsStudent(false);
         }
-      } catch (e: any) {
-        setMsg(e.message || "Failed to load.");
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safeFetch]);
+      })();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [safeFetch]);
 
   /** ===== My schedule reload on term change ===== */
   useEffect(() => {
     (async () => {
-      if (!myIsStudent || !myProfile) return;
+      if (!myIsStudent || !myProfile?.studentId) return;
       try {
-        const sched = await safeFetch(`${buildPrefix(null)}/schedule?term=${encodeURIComponent(myTerm)}`);
+        const sched = await safeFetch(
+          `${buildSidPrefix(myProfile.studentId)}/schedule?term=${encodeURIComponent(myTerm)}`
+        );
         setMySchedule(Array.isArray(sched) ? (sched as ScheduleClass[]) : []);
       } catch (e: any) {
         setMsg(e.message);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myTerm, myIsStudent, myProfile]);
+  }, [myTerm, myIsStudent, myProfile?.studentId]);
 
   /** ===== Target schedule reload on term change ===== */
   useEffect(() => {
     (async () => {
-      if (!profile) return;
+      if (!targetSid) return;
       try {
-        const sched = await safeFetch(`${buildPrefix(targetSid)}/schedule?term=${encodeURIComponent(term)}`);
+        const sched = await safeFetch(
+          `${buildSidPrefix(targetSid)}/schedule?term=${encodeURIComponent(term)}`
+        );
         setSchedule(Array.isArray(sched) ? (sched as ScheduleClass[]) : []);
       } catch (e: any) {
         setMsg(e.message);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [term, targetSid, profile]);
+  }, [term, targetSid]);;
 
-  /** ===== Load student bundle (me or target) ===== */
   async function loadStudentBundle(
     sid: string | null,
     t: string,
@@ -314,9 +352,34 @@ export default function ProfilePage() {
       setCoursePlan: (v: PlannedCourse[]) => void;
     }
   ) {
-    const prefix = buildPrefix(sid);
+    let theSid = sid;
+    if (!theSid) {
+      const meResp = await safeFetch(`${BASE}/api/profile/me`).catch(() => null);
+      if (!meResp) {
+        sinks.setProfile(null);
+        sinks.setDetails(null);
+        sinks.setSummary(null as any);
+        sinks.setSchedule([]);
+        sinks.setPlans([]);
+        sinks.setAdmissionReqs([]);
+        sinks.setDegreeReqs([]);
+        sinks.setHolds([]);
+        sinks.setWaived([]);
+        sinks.setAudit([]);
+        sinks.setTransfers([]);
+        sinks.setClassHistory([]);
+        sinks.setCoursePlan([]);
+        return;
+      }
+      const meProfile = meResp as StudentProfile;
+      sinks.setProfile(meProfile);
+      theSid = meProfile.studentId;
+    }
+
+    const prefix = buildSidPrefix(theSid!);
+
     const [p, d, gpa, sched, planList, adm, deg, h, w, log, tr, ch, cp] = await Promise.all([
-      safeFetch(`${prefix}`).catch(() => null),
+      sid ? safeFetch(`${prefix}`).catch(() => null) : Promise.resolve(null),
       safeFetch(`${prefix}/details`).catch(() => null),
       safeFetch(`${prefix}/gpa`).catch(() => null),
       safeFetch(`${prefix}/schedule?term=${encodeURIComponent(t)}`).catch(() => []),
@@ -331,7 +394,7 @@ export default function ProfilePage() {
       safeFetch(`${prefix}/course-plan`).catch(() => []),
     ]);
 
-    sinks.setProfile(p as StudentProfile | null);
+    if (sid) sinks.setProfile(p as StudentProfile | null);
     sinks.setDetails(d as FullStudentDetails | null);
     sinks.setSummary(gpa as GpaSummary | null);
     sinks.setSchedule(Array.isArray(sched) ? (sched as ScheduleClass[]) : []);
@@ -354,11 +417,11 @@ export default function ProfilePage() {
     setMsg(null);
     try {
       const q = search.trim();
-      const url = q.includes("@")
-        ? `${BASE}/api/users/student-lookup?email=${encodeURIComponent(q)}`
-        : `${BASE}/api/users/student-lookup?studentId=${encodeURIComponent(q)}`;
 
-      const r = await safeFetch(url); 
+      const r = q.includes("@")
+        ? await safeFetch(`${BASE}/api/profile/student-by-email?email=${encodeURIComponent(q)}`)
+        : await safeFetch(`${BASE}/api/profile/student-id/${encodeURIComponent(q)}`);
+
       const mapped: StudentProfile = {
         id: r.id,
         studentId: r.studentId ?? "-",
@@ -368,6 +431,7 @@ export default function ProfilePage() {
         status: r.status ?? "-",
         entryYear: r.entryYear ?? "-",
       };
+
       setSearchResult(mapped);
     } catch (e: any) {
       setMsg(e.message || "No student found.");
@@ -430,7 +494,7 @@ export default function ProfilePage() {
     }
   };
 
-  /** ===== Render ===== */
+  /** ===== Render - 수정된 부분: My Account UI 필드 추가 및 NetID 제거 ===== */
   return (
     <div style={{ maxWidth: 1200, margin: "24px auto", padding: "0 16px" }}>
       <h1 style={{ marginBottom: 8 }}>Account & Student Profiles</h1>
@@ -444,7 +508,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* ===== Panel 1: My Account (works for any role; YAML-backed) ===== */}
+      {/* ===== Panel 1: My Account (works for any role; DB-backed) ===== */}
       <section style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
         <h2 style={{ marginTop: 0 }}>My Account</h2>
         {!me && !myPerson ? (
@@ -452,18 +516,74 @@ export default function ProfilePage() {
         ) : (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 160px 1fr", rowGap: 8, columnGap: 12 }}>
-              <div style={{ color: "#666" }}>NetID</div>
-              <div>{me?.netId || "-"}</div>
-              <div style={{ color: "#666" }}>Roles</div>
-              <div>{me?.roles?.length ? me.roles.join(", ") : "-"}</div>
+              
+              {/* NetID 항목은 요청에 따라 제거됨 */}
+              
               <div style={{ color: "#666" }}>Name</div>
               <div>{fmt.fullName(myPerson || undefined)}</div>
-              <div style={{ color: "#666" }}>Email</div>
-              <div>{myPerson?.email || "-"}</div>
+              <div style={{ color: "#666" }}>Roles</div> 
+              {/* Roles는 CurrentUserInfo (me)에서 가져옴 */}
+              <div>{me?.roles?.length ? me.roles.join(", ") : "-"}</div> 
+              
               <div style={{ color: "#666" }}>SBU ID</div>
               <div>{myPerson?.sbuId || "-"}</div>
+              <div style={{ color: "#666" }}>Email</div>
+              <div>{myPerson?.email || "-"}</div>
+              
               <div style={{ color: "#666" }}>Role Type</div>
               <div style={{ textTransform: "capitalize" }}>{myPerson?.role || "-"}</div>
+              
+              {/* ******************** users 테이블에서 가져온 필드들 (조건부 표시) ******************** */}
+              
+              {/* Student/General fields */}
+              {myPerson?.major && (
+                <>
+                  <div style={{ color: "#666" }}>Major (Primary)</div>
+                  <div>{myPerson.major}</div>
+                </>
+              )}
+              {typeof myPerson?.gpa === 'number' && (
+                <>
+                  <div style={{ color: "#666" }}>GPA (Cumulative)</div>
+                  <div>{fmt.num(myPerson.gpa)}</div>
+                </>
+              )}
+              {myPerson?.graduationYear && (
+                <>
+                  <div style={{ color: "#666" }}>Graduation Year</div>
+                  <div>{myPerson.graduationYear}</div>
+                </>
+              )}
+              
+              {/* Class Standing 추가 */}
+              {myPerson?.classStanding && (
+                  <>
+                    <div style={{ color: "#666" }}>Class Standing</div>
+                    <div>{myPerson.classStanding}</div>
+                  </>
+              )}
+              
+              {/* Instructor/General fields */}
+              {myPerson?.department && (
+                <>
+                  <div style={{ color: "#666" }}>Department</div>
+                  <div>{myPerson.department}</div>
+                </>
+              )}
+              {myPerson?.officeLocation && (
+                <>
+                  <div style={{ color: "#666" }}>Office Location</div>
+                  <div>{myPerson.officeLocation}</div>
+                </>
+              )}
+              {myPerson?.officeHours && (
+                <>
+                  <div style={{ color: "#666" }}>Office Hours</div>
+                  <div>{myPerson.officeHours}</div>
+                </>
+              )}
+              
+              {/* Advisor-specific fields (기존 항목 유지) */}
               {myPerson?.role === "advisor" && (
                 <>
                   <div style={{ color: "#666" }}>Advisor Level</div>
@@ -472,10 +592,40 @@ export default function ProfilePage() {
                   <div>{myPerson?.academicUnit || "-"}</div>
                 </>
               )}
+               {/* ************************************************************************************* */}
             </div>
           </>
         )}
       </section>
+
+      {/* ===== Registration Status Summary (Holds & Waivers) - 추가됨 ===== */}
+      {myIsStudent && (
+        <section style={{ border: "1px solid #e0f0ff", background: "#f0f5ff", borderRadius: 12, padding: 16, marginTop: 16 }}>
+          <h3 style={{ marginTop: 0 }}>Registration Status Summary</h3>
+          
+          {/* Registration Holds 요약 */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ color: "#666", display: "inline-block", width: 150 }}>Registration Holds</div>
+            <span style={{ fontWeight: 600, color: myHolds.length > 0 ? '#fa541c' : '#52c41a' }}>
+              {myHolds.length > 0 ? `${myHolds.length} HOLD(S) placed` : 'None'}
+            </span>
+          </div>
+
+          {/* Waived Time Conflicts 요약 */}
+          <div>
+            <div style={{ color: "#666", display: "inline-block", width: 150 }}>Time Conflicts Waived</div>
+            <span style={{ fontWeight: 600, color: myWaived.length > 0 ? '#faad14' : '#666' }}>
+              {myWaived.length > 0 ? `${myWaived.length} Conflict(s)` : 'None'}
+            </span>
+          </div>
+          
+          <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
+            * 상세 정보는 아래 'My Student Profile' 섹션의 각 테이블에서 확인하세요.
+          </p>
+
+        </section>
+      )}
+
 
       {/* ===== Panel 2: My Student Profile (only if STUDENT) ===== */}
       {myIsStudent && (
@@ -804,6 +954,18 @@ function StudentBundleView(props: {
                 ))}
               </div>
             )}
+
+            {/* Admission Requirements */}
+            <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
+              <h3 style={{ marginTop: 0 }}>Admission Requirements</h3>
+              <ReqTable data={admissionReqs} />
+            </section>
+
+            {/* Degree Requirements */}
+            <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
+              <h3 style={{ marginTop: 0 }}>Degree Requirements</h3>
+              <ReqTable data={degreeReqs} />
+            </section>
           </section>
 
           {/* Academic Summary */}
@@ -1005,7 +1167,7 @@ function StudentBundleView(props: {
             )}
           </section>
 
-          {/* Audit Log */}
+          /* Audit Log */
           <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Audit Log</h3>
             {audit.length === 0 ? (

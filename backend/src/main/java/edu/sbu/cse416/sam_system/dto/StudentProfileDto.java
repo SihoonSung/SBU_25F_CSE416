@@ -9,5 +9,7 @@ public class StudentProfileDto {
     public String status;    
     public String entryYear; 
 
+
+    
     public StudentProfileDto() {}
 }

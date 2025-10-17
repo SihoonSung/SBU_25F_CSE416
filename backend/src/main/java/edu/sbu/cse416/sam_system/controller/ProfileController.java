@@ -10,6 +10,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import edu.sbu.cse416.sam_system.entity.User;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.security.CurrentUser;
+import edu.sbu.cse416.sam_system.service.PersonProfileService; 
+import edu.sbu.cse416.sam_system.service.PersonProfileService.TermRef; // PersonProfileService의 TermRef를 가져와 사용
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -23,12 +25,14 @@ public class ProfileController {
     private final UserRepository userRepository;
     private final JdbcTemplate jdbc;
     private final CurrentUser currentUser;
+    private final PersonProfileService personProfileService; 
 
     @Autowired
-    public ProfileController(UserRepository userRepository, JdbcTemplate jdbc, CurrentUser currentUser) {
+    public ProfileController(UserRepository userRepository, JdbcTemplate jdbc, CurrentUser currentUser, PersonProfileService personProfileService) {
         this.userRepository = userRepository;
         this.jdbc = jdbc;
         this.currentUser = currentUser;
+        this.personProfileService = personProfileService; 
     }
 
     /* ======================================================================
@@ -40,8 +44,8 @@ public class ProfileController {
         public String name;
         public String major;
         public String email;
-        public String status;     // mapped from isActive
-        public String entryYear;  // not present on User -> "-"
+        public String status;     
+        public String entryYear;  
 
         public static StudentProfileDto fromUser(User u) {
             StudentProfileDto d = new StudentProfileDto();
@@ -57,20 +61,15 @@ public class ProfileController {
         }
     }
 
-    public static class TermRef {
-        public String semester; // "Fall" | "Spring" | "SummerI" | "SummerII"
-        public Integer year;
-    }
-
     public static class FullStudentDetailsDto {
         public String sbuId;
         public String firstName;
         public String lastName;
         public String email;
-        public TermRef universityEntry; // not available -> null
-        public String directAdmit;      // not available -> null
-        public String aoi;              // not available -> null
-        public String college;          // not available on User -> null
+        public TermRef universityEntry;
+        public String directAdmit;      
+        public String aoi;              
+        public String college;          
         public List<String> majors = new ArrayList<>();
         public List<String> degrees = new ArrayList<>();
         public List<TermRef> majorRequirementVersions = new ArrayList<>();
@@ -81,7 +80,7 @@ public class ProfileController {
         public List<String> plannedDegrees = new ArrayList<>();
         public List<String> plannedMinors = new ArrayList<>();
         public List<TermRef> plannedMinorRequirementVersions = new ArrayList<>();
-        public TermRef graduation; // can be filled from graduationYear if desired
+        public TermRef graduation;
 
         public static FullStudentDetailsDto fromUser(User u) {
             FullStudentDetailsDto d = new FullStudentDetailsDto();
@@ -89,19 +88,42 @@ public class ProfileController {
             d.firstName = u.getFirstName();
             d.lastName = u.getLastName();
             d.email = u.getEmail();
-            d.college = null;
+            d.college = u.getCollege();
 
-            if (u.getMajor() != null && !u.getMajor().isBlank()) {
-                d.majors.add(u.getMajor());
+            // Core Details
+            d.universityEntry = PersonProfileService.parseTermRef(u.getUniversityEntry());
+            d.directAdmit = u.getDirectAdmit();
+            d.aoi = u.getAoi();
+            
+            // Declared Programs: DB의 JSON 문자열 필드를 파싱하여 DTO의 List 필드에 추가합니다.
+            
+            // Fallback: majors 배열 필드가 비어있으면, 단일 major 필드를 사용합니다.
+            if (u.getMajor() != null && !u.getMajor().isBlank() && PersonProfileService.parseStrList(u.getMajors()).isEmpty()) {
+                 d.majors.add(u.getMajor()); 
             }
+            d.majors.addAll(PersonProfileService.parseStrList(u.getMajors()));
+            d.degrees.addAll(PersonProfileService.parseStrList(u.getDegrees()));
+            d.majorRequirementVersions.addAll(PersonProfileService.parseTermList(u.getMajorRequirementVersions()));
+            d.minors.addAll(PersonProfileService.parseStrList(u.getMinors()));
+            d.minorRequirementVersions.addAll(PersonProfileService.parseTermList(u.getMinorRequirementVersions()));
 
-            // Optionally map graduationYear to TermRef (year only)
-            if (u.getGraduationYear() != null) {
+            // Planned Programs
+            d.plannedMajors.addAll(PersonProfileService.parseStrList(u.getPlannedMajors()));
+            d.plannedMajorRequirementVersions.addAll(PersonProfileService.parseTermList(u.getPlannedMajorRequirementVersions()));
+            d.plannedDegrees.addAll(PersonProfileService.parseStrList(u.getPlannedDegrees()));
+            d.plannedMinors.addAll(PersonProfileService.parseStrList(u.getPlannedMinors()));
+            d.plannedMinorRequirementVersions.addAll(PersonProfileService.parseTermList(u.getPlannedMinorRequirementVersions()));
+
+            // Graduation
+            if (u.getGraduation() != null) {
+                d.graduation = PersonProfileService.parseTermRef(u.getGraduation());
+            } else if (u.getGraduationYear() != null) {
                 TermRef g = new TermRef();
                 g.year = u.getGraduationYear();
                 g.semester = null;
                 d.graduation = g;
             }
+            
             return d;
         }
     }
@@ -125,17 +147,53 @@ public class ProfileController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "term is required, e.g., 2025-Fall");
         }
     }
+    
+    /* ======================================================================
+     * Auth Endpoint (Temporary replacement for missing AuthController)
+     * ====================================================================== */
+    // 🚨 /api/auth/me 엔드포인트 구현을 위해 경로를 수정함 (프론트엔드도 수정 필요)
+    @GetMapping("/auth-info") // 새로운 경로: /api/profile/auth-info
+    @PreAuthorize("isAuthenticated()")
+    public Map<String, Object> getAuthMe() {
+        User u = resolveUserForMe();
+        
+        // DB의 role을 기반으로 roles 배열을 생성
+        List<String> roles = Arrays.asList(u.getRole().name()); 
 
-    // REMOVED: findStudentsPkByStudentNumber
-    // The logic is now to use User's studentId directly.
+        Map<String, Object> response = new HashMap<>();
+        // 프론트엔드의 CurrentUserInfo 타입에 맞춥니다.
+        response.put("netId", u.getEmail()); 
+        response.put("roles", roles); 
+        
+        // Role Type (PersonBasic.role) 필드를 채우기 위해 추가
+        response.put("role", u.getRole().name().toLowerCase());
+        
+        return response;
+    }
 
     /* ======================================================================
      * Current user profile (users only)
      * ====================================================================== */
+    
+    // ******************** 엔드포인트: /api/profile/person/me ********************
+    @GetMapping("/person/me")
+    @PreAuthorize("isAuthenticated()")
+    public PersonProfileService.PersonProfileDTO getPersonProfileMe() {
+        String email = currentUser.getEmail();
+        if (email == null || email.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No logged-in user email");
+        }
+        return personProfileService.getPersonProfileByEmail(email);
+    }
+    // *********************************************************************************
+
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public StudentProfileDto getProfileMe() {
         User u = resolveUserForMe();
+        if (!u.isStudent()) {
+             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User is not a student");
+        }
         return StudentProfileDto.fromUser(u);
     }
 
@@ -143,6 +201,9 @@ public class ProfileController {
     @PreAuthorize("isAuthenticated()")
     public FullStudentDetailsDto getProfileMeDetails() {
         User u = resolveUserForMe();
+         if (!u.isStudent()) {
+             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User is not a student");
+        }
         return FullStudentDetailsDto.fromUser(u);
     }
 
@@ -179,7 +240,7 @@ public class ProfileController {
 
     /* ======================================================================
      * Data endpoints (GPA, schedule, etc.)
-     * NOW USING User.studentId (String) directly in queries.
+     * Using User.studentId (String) directly in queries.
      * ====================================================================== */
     @GetMapping("/student-id/{sid}/gpa")
     @PreAuthorize("permitAll()")
@@ -247,9 +308,29 @@ public class ProfileController {
     }
 
     /* ======================================================================
+     * Optional extras for frontend compatibility
+     * ====================================================================== */
+    @GetMapping("/student-id/{sid}/transfers")
+    @PreAuthorize("permitAll()")
+    public List<Map<String, Object>> getTransfersBySid(@PathVariable String sid) {
+        return Collections.emptyList();
+    }
+
+    @GetMapping("/student-id/{sid}/classes")
+    @PreAuthorize("permitAll()")
+    public List<Map<String, Object>> getClassesBySid(@PathVariable String sid) {
+        return Collections.emptyList();
+    }
+
+    @GetMapping("/student-id/{sid}/course-plan")
+    @PreAuthorize("permitAll()")
+    public List<Map<String, Object>> getCoursePlanBySid(@PathVariable String sid) {
+        return Collections.emptyList();
+    }
+
+    /* ======================================================================
      * GPA summary
      * ====================================================================== */
-    // CHANGED: Long studentId -> String studentId
     private Map<String, Object> buildGpaSummary(String studentId) {
         String termSql =
             "SELECT e.term_code AS term, " +
@@ -269,7 +350,7 @@ public class ProfileController {
                 m.put("gpa", readDouble(rs, "gpa"));
                 m.put("credits", rs.getInt("credits"));
                 return m;
-            }, studentId) // CHANGED: studentId is now String
+            }, studentId)
         );
 
         String cumSql =
@@ -292,7 +373,7 @@ public class ProfileController {
                 m.put("gpa", null);
                 m.put("credits", 0);
                 return m;
-            }, studentId) // CHANGED: studentId is now String
+            }, studentId)
         );
 
         int cumCredits = (cumulative.get("credits") instanceof Number)
@@ -320,7 +401,6 @@ public class ProfileController {
     /* ======================================================================
      * JDBC queries for other data
      * ====================================================================== */
-    // CHANGED: Long studentId -> String studentId
     private List<Map<String, Object>> querySchedule(String studentId, String term) {
         String sql =
             "SELECT c.class_id AS classId, " +
@@ -352,11 +432,10 @@ public class ProfileController {
                 m.put("instructor", rs.getString("instructor"));
                 m.put("credits", readIntNullable(rs, "credits"));
                 return m;
-            }, studentId, term) // CHANGED: studentId is now String
+            }, studentId, term)
         );
     }
 
-    // CHANGED: Long studentId -> String studentId
     private List<Map<String, Object>> queryPlans(String studentId) {
         String sql =
             "SELECT kind, program_code AS code, program_name AS name, " +
@@ -374,11 +453,10 @@ public class ProfileController {
                 m.put("declared", rs.getBoolean("declared"));
                 m.put("version", rs.getString("version"));
                 return m;
-            }, studentId) // CHANGED: studentId is now String
+            }, studentId)
         );
     }
 
-    // CHANGED: Long studentId -> String studentId
     private List<Map<String, Object>> queryRequirements(String studentId, String area) {
         String baseSql =
             "SELECT r.id AS rid, r.area, r.program_code AS programCode, r.program_name AS programName, " +
@@ -400,7 +478,7 @@ public class ProfileController {
                 m.put("status", rs.getString("status"));
                 m.put("usingClasses", new ArrayList<Map<String, Object>>());
                 return m;
-            }, studentId, area) // CHANGED: studentId is now String
+            }, studentId, area)
         );
 
         String usedSql =
@@ -427,7 +505,6 @@ public class ProfileController {
         return rows;
     }
 
-    // CHANGED: Long studentId -> String studentId
     private List<Map<String, Object>> queryHolds(String studentId) {
         String sql =
             "SELECT hold_code AS code, title, placed_at AS placedAt, placed_by AS placedBy " +
@@ -443,11 +520,10 @@ public class ProfileController {
                 m.put("placedAt", rs.getString("placedAt"));
                 m.put("placedBy", rs.getString("placedBy"));
                 return m;
-            }, studentId) // CHANGED: studentId is now String
+            }, studentId)
         );
     }
 
-    // CHANGED: Long studentId -> String studentId
     private List<Map<String, Object>> queryTimeConflictWaivers(String studentId) {
         String sql =
             "SELECT class_a AS classA, class_b AS classB, term_code AS term, " +
@@ -465,11 +541,10 @@ public class ProfileController {
                 m.put("waivedBy", rs.getString("waivedBy"));
                 m.put("waivedAt", rs.getString("waivedAt"));
                 return m;
-            }, studentId) // CHANGED: studentId is now String
+            }, studentId)
         );
     }
 
-    // CHANGED: Long studentId -> String studentId
     private List<Map<String, Object>> queryAuditLog(String studentId) {
         String sql =
             "SELECT id, ts AS timestamp, actor_role AS actorRole, actor_display AS actorDisplay, " +
@@ -488,7 +563,7 @@ public class ProfileController {
                 m.put("action", rs.getString("action"));
                 m.put("details", rs.getString("details"));
                 return m;
-            }, studentId) // CHANGED: studentId is now String
+            }, studentId)
         );
     }
 
@@ -539,6 +614,7 @@ public class ProfileController {
 
     private interface SqlSupplier<T> { T get() throws Exception; }
 
+    @SuppressWarnings("unchecked")
     private <T> T safeQueryOne(SqlSupplier<T> supplier) {
         try { return supplier.get(); }
         catch (Exception ex) {
