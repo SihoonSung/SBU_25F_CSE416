@@ -13,7 +13,7 @@ type Role = "STUDENT" | "ADVISOR" | "REGISTRAR" | "ADMIN";
 
 type CurrentUserInfo = { netId: string; roles: Role[] };
 
-/** Generic person (non-student compatible) - 수정됨 */
+/** Generic person (non-student compatible) - modified */
 type PersonBasic = {
   sbuId?: string | null;
   firstName?: string | null;
@@ -25,7 +25,7 @@ type PersonBasic = {
   unitLevel?: "university" | "college" | "department" | null; 
   academicUnit?: string | null; 
   
-  // users 테이블에서 추가된 필드 (Instructor/General fields)
+  // Additional fields from users table (Instructor/General fields)
   department?: string | null;
   officeHours?: string | null;
   officeLocation?: string | null;
@@ -36,7 +36,7 @@ type PersonBasic = {
   graduationYear?: number | null; 
   profilePictureUrl?: string | null;
   
-  // 상태 표시를 위한 필드 추가
+  // Additional fields for status display
   classStanding?: string | null; // Class Standing (e.g., U1, U2...)
 };
 
@@ -222,15 +222,15 @@ export default function ProfilePage() {
     },
   };
 
-  /** ===== Initial load - 수정된 부분: myPerson을 DB 기반으로 가져오기 ===== */
+  /** ===== Initial load - Modified: Get myPerson from database ===== */
     useEffect(() => {
       (async () => {
         setMsg(null);
         try {
-          // 1) 로그인/권한
+          // 1) Login/authorization
           const whoRaw = await safeFetch(`${BASE}/api/auth/me`);
 
-          // 🔧 여기 추가: roles 표준화 (배열 or user.role 단일 문자열 모두 대응)
+          // 🔧 Added here: roles standardization (support both array and user.role single string)
           const authRoles =
             Array.isArray(whoRaw?.roles) && whoRaw.roles.length
               ? whoRaw.roles
@@ -238,7 +238,7 @@ export default function ProfilePage() {
                   ? [String(whoRaw.user.role).toUpperCase()] // "Student" -> "STUDENT"
                   : []);
 
-          // 기존 타입에 맞춰 set
+          // Set according to existing type
           setMe({
             netId: whoRaw?.netId ?? "",
             roles: authRoles as Role[],
@@ -247,10 +247,10 @@ export default function ProfilePage() {
           const isStudent = authRoles.includes("STUDENT" as Role);
           setMyIsStudent(isStudent);
 
-          // 2) My Account 표시용 person (DB)
+          // 2) Person for My Account display (from DB)
           const personRaw = await safeFetch(`${BASE}/api/profile/person/me`).catch(() => null);
 
-          // 🔧 여기 추가: person role 소문자 정규화 (타입과 UI 일관성)
+          // 🔧 Added here: person role lowercase normalization (type and UI consistency)
           const person = personRaw
             ? {
                 ...personRaw,
@@ -260,9 +260,9 @@ export default function ProfilePage() {
 
           setMyPerson(person as PersonBasic | null);
 
-          // 3) 학생 번들
+          // 3) Student bundle
           if (isStudent && person && (person.sbuId || person.studentId)) {
-            // studentId로 우선
+            // Prioritize studentId
             const sid = (person as any).studentId ?? person.sbuId;
             await loadStudentBundle(sid, myTerm, {
               setProfile: setMyProfile,
@@ -281,7 +281,7 @@ export default function ProfilePage() {
             });
           }
 
-          // 4) Admin 유틸
+          // 4) Admin utilities
           const [ev, now] = await Promise.all([
             safeFetch(`${BASE}/api/admin/academic-calendar`).catch(() => []),
             safeFetch(`${BASE}/api/admin/system-date`).catch(() => null),
@@ -494,7 +494,7 @@ export default function ProfilePage() {
     }
   };
 
-  /** ===== Render - 수정된 부분: My Account UI 필드 추가 및 NetID 제거 ===== */
+  /** ===== Render - Modified: Added My Account UI fields and removed NetID ===== */
   return (
     <div style={{ maxWidth: 1200, margin: "24px auto", padding: "0 16px" }}>
       <h1 style={{ marginBottom: 8 }}>Account & Student Profiles</h1>
@@ -517,12 +517,12 @@ export default function ProfilePage() {
           <>
             <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 160px 1fr", rowGap: 8, columnGap: 12 }}>
               
-              {/* NetID 항목은 요청에 따라 제거됨 */}
+              {/* NetID field removed by request */}
               
               <div style={{ color: "#666" }}>Name</div>
               <div>{fmt.fullName(myPerson || undefined)}</div>
               <div style={{ color: "#666" }}>Roles</div> 
-              {/* Roles는 CurrentUserInfo (me)에서 가져옴 */}
+              {/* Roles are taken from CurrentUserInfo (me) */}
               <div>{me?.roles?.length ? me.roles.join(", ") : "-"}</div> 
               
               <div style={{ color: "#666" }}>SBU ID</div>
@@ -533,7 +533,7 @@ export default function ProfilePage() {
               <div style={{ color: "#666" }}>Role Type</div>
               <div style={{ textTransform: "capitalize" }}>{myPerson?.role || "-"}</div>
               
-              {/* ******************** users 테이블에서 가져온 필드들 (조건부 표시) ******************** */}
+              {/* ******************** Fields from users table (conditional display) ******************** */}
               
               {/* Student/General fields */}
               {myPerson?.major && (
@@ -555,7 +555,7 @@ export default function ProfilePage() {
                 </>
               )}
               
-              {/* Class Standing 추가 */}
+              {/* Added Class Standing */}
               {myPerson?.classStanding && (
                   <>
                     <div style={{ color: "#666" }}>Class Standing</div>
@@ -583,7 +583,7 @@ export default function ProfilePage() {
                 </>
               )}
               
-              {/* Advisor-specific fields (기존 항목 유지) */}
+              {/* Advisor-specific fields (existing items maintained) */}
               {myPerson?.role === "advisor" && (
                 <>
                   <div style={{ color: "#666" }}>Advisor Level</div>
@@ -598,12 +598,12 @@ export default function ProfilePage() {
         )}
       </section>
 
-      {/* ===== Registration Status Summary (Holds & Waivers) - 추가됨 ===== */}
+      {/* ===== Registration Status Summary (Holds & Waivers) - Added ===== */}
       {myIsStudent && (
         <section style={{ border: "1px solid #e0f0ff", background: "#f0f5ff", borderRadius: 12, padding: 16, marginTop: 16 }}>
           <h3 style={{ marginTop: 0 }}>Registration Status Summary</h3>
           
-          {/* Registration Holds 요약 */}
+          {/* Registration Holds summary */}
           <div style={{ marginBottom: 8 }}>
             <div style={{ color: "#666", display: "inline-block", width: 150 }}>Registration Holds</div>
             <span style={{ fontWeight: 600, color: myHolds.length > 0 ? '#fa541c' : '#52c41a' }}>
@@ -611,7 +611,7 @@ export default function ProfilePage() {
             </span>
           </div>
 
-          {/* Waived Time Conflicts 요약 */}
+          {/* Waived Time Conflicts summary */}
           <div>
             <div style={{ color: "#666", display: "inline-block", width: 150 }}>Time Conflicts Waived</div>
             <span style={{ fontWeight: 600, color: myWaived.length > 0 ? '#faad14' : '#666' }}>
@@ -620,7 +620,7 @@ export default function ProfilePage() {
           </div>
           
           <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
-            * 상세 정보는 아래 'My Student Profile' 섹션의 각 테이블에서 확인하세요.
+            * For detailed information, check the respective tables in the 'My Student Profile' section below.
           </p>
 
         </section>

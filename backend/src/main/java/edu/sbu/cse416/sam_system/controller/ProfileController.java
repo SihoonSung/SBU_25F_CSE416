@@ -11,7 +11,7 @@ import edu.sbu.cse416.sam_system.entity.User;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.security.CurrentUser;
 import edu.sbu.cse416.sam_system.service.PersonProfileService; 
-import edu.sbu.cse416.sam_system.service.PersonProfileService.TermRef; // PersonProfileService의 TermRef를 가져와 사용
+import edu.sbu.cse416.sam_system.service.PersonProfileService.TermRef; // Import TermRef from PersonProfileService for use
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -95,9 +95,9 @@ public class ProfileController {
             d.directAdmit = u.getDirectAdmit();
             d.aoi = u.getAoi();
             
-            // Declared Programs: DB의 JSON 문자열 필드를 파싱하여 DTO의 List 필드에 추가합니다.
+            // Declared Programs: Parse JSON string fields from DB and add to DTO List fields.
             
-            // Fallback: majors 배열 필드가 비어있으면, 단일 major 필드를 사용합니다.
+            // Fallback: If majors array field is empty, use single major field.
             if (u.getMajor() != null && !u.getMajor().isBlank() && PersonProfileService.parseStrList(u.getMajors()).isEmpty()) {
                  d.majors.add(u.getMajor()); 
             }
@@ -151,21 +151,21 @@ public class ProfileController {
     /* ======================================================================
      * Auth Endpoint (Temporary replacement for missing AuthController)
      * ====================================================================== */
-    // 🚨 /api/auth/me 엔드포인트 구현을 위해 경로를 수정함 (프론트엔드도 수정 필요)
-    @GetMapping("/auth-info") // 새로운 경로: /api/profile/auth-info
+    // 🚨 Modified path to implement /api/auth/me endpoint (frontend also needs modification)
+    @GetMapping("/auth-info") // New path: /api/profile/auth-info
     @PreAuthorize("isAuthenticated()")
     public Map<String, Object> getAuthMe() {
         User u = resolveUserForMe();
         
-        // DB의 role을 기반으로 roles 배열을 생성
+        // Create roles array based on DB role
         List<String> roles = Arrays.asList(u.getRole().name()); 
 
         Map<String, Object> response = new HashMap<>();
-        // 프론트엔드의 CurrentUserInfo 타입에 맞춥니다.
+        // Match frontend CurrentUserInfo type.
         response.put("netId", u.getEmail()); 
         response.put("roles", roles); 
         
-        // Role Type (PersonBasic.role) 필드를 채우기 위해 추가
+        // Added to fill Role Type (PersonBasic.role) field
         response.put("role", u.getRole().name().toLowerCase());
         
         return response;
@@ -175,7 +175,7 @@ public class ProfileController {
      * Current user profile (users only)
      * ====================================================================== */
     
-    // ******************** 엔드포인트: /api/profile/person/me ********************
+    // ******************** Endpoint: /api/profile/person/me ********************
     @GetMapping("/person/me")
     @PreAuthorize("isAuthenticated()")
     public PersonProfileService.PersonProfileDTO getPersonProfileMe() {

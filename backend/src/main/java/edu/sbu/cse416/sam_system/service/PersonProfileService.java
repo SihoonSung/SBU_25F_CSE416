@@ -28,7 +28,7 @@ public class PersonProfileService {
             throw new IllegalArgumentException("email is required");
         }
 
-        // 1) DB에서 사용자 조회 
+        // 1) Query user from database 
         Optional<User> userOpt = userRepository.findByEmailIgnoreCase(email.trim());
 
         if (userOpt.isEmpty()) {
@@ -43,7 +43,7 @@ public class PersonProfileService {
         User u = userOpt.get();
         String kind = u.getRole().name().toLowerCase();
 
-        // 2) DTO 빌드
+        // 2) Build DTO
         PersonProfileDTO dto = new PersonProfileDTO();
         dto.kind = kind;
         dto.email = u.getEmail();
@@ -52,7 +52,7 @@ public class PersonProfileService {
         dto.lastName = u.getLastName();
         dto.displayName = joinNames(u.getFirstName(), u.getLastName());
 
-        // ******************** users 테이블의 모든 필드 매핑 ********************
+        // ******************** Map all fields from users table ********************
         dto.department = u.getDepartment();
         dto.officeHours = u.getOfficeHours();
         dto.officeLocation = u.getOfficeLocation();
@@ -64,9 +64,9 @@ public class PersonProfileService {
         dto.gpa = u.getGpa();               
         dto.graduationYear = u.getGraduationYear(); 
         
-        // Class Standing: GpaSummary의 Standing과 동일한 정보를 제공 (현재는 임시값)
+        // Class Standing: Provides same information as GpaSummary Standing (currently temporary value)
         if ("student".equals(kind)) {
-             // 임시 Class Standing 계산 (실제는 credits 기반이지만, users 테이블의 gpa를 사용하여 임시로 채움)
+             // Temporary Class Standing calculation (should be credit-based, but using GPA from users table as temporary)
              dto.classStanding = toStanding(u.getGpa() != null ? u.getGpa().doubleValue() : 0.0);
         } else {
              dto.classStanding = null;
@@ -90,7 +90,7 @@ public class PersonProfileService {
         details.lastName   = u.getLastName();
         details.email      = u.getEmail();
 
-        // DB의 JSON String 필드들을 파싱해야 합니다. (임시로 null/빈 리스트)
+        // Need to parse JSON String fields from database (temporarily null/empty list)
         details.universityEntry = parseTermRef(u.getUniversityEntry());
         details.directAdmit = u.getDirectAdmit();
         details.aoi = u.getAoi();
@@ -112,7 +112,7 @@ public class PersonProfileService {
         return details;
     }
     
-    // GPA 값에 기반한 임시 Standing 계산 헬퍼 (실제는 Credits를 사용해야 함)
+    // Temporary Standing calculation helper based on GPA value (should use Credits)
     private String toStanding(Double gpa) {
         if (gpa == null) return null;
         if (gpa >= 3.5) return "Senior (Excellent)";
@@ -122,26 +122,26 @@ public class PersonProfileService {
         return null;
     }
 
-    // 🚨 수정됨: public static으로 변경
+    // 🚨 Modified: Changed to public static
     public static TermRef parseTermRef(String jsonString) {
-        // 실제 JSON 파싱 구현 필요
+        // Need to implement actual JSON parsing
         return null; 
     }
     
-    // 🚨 수정됨: public static으로 변경
+    // 🚨 Modified: Changed to public static
     public static List<String> parseStrList(String jsonString) {
-        // 실제 JSON 파싱 구현 필요 (JSON Array String -> List<String>)
-        // 임시로 JSON이 아닌 쉼표 구분 문자열이라고 가정하고 처리
+        // Need to implement actual JSON parsing (JSON Array String -> List<String>)
+        // Temporarily assume comma-separated string instead of JSON and process
         if (jsonString == null || jsonString.isBlank() || jsonString.equals("[]")) {
             return Collections.emptyList();
         }
-        // 실제 JSON 파싱 코드가 여기에 들어갈 것입니다.
-        return Arrays.asList(jsonString.replaceAll("[\\[\\]\"]", "").split(",")); // 임시 처리
+        // Actual JSON parsing code will go here.
+        return Arrays.asList(jsonString.replaceAll("[\\[\\]\"]", "").split(",")); // temporary processing
     }
     
-    // 🚨 수정됨: public static으로 변경
+    // 🚨 Modified: Changed to public static
     public static List<TermRef> parseTermList(String jsonString) {
-        // 실제 JSON 파싱 구현 필요
+        // Need to implement actual JSON parsing
         return Collections.emptyList(); 
     }
 
@@ -164,7 +164,7 @@ public class PersonProfileService {
         public String firstName;
         public String lastName;
         
-        // ******************** 추가된 DTO 필드 ********************
+        // ******************** Added DTO fields ********************
         public String department;
         public String officeHours;
         public String officeLocation;

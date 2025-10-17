@@ -21,10 +21,10 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
-    /** Google OAuth2 로그인 후 사용자 조회/생성 */
+    /** Find or create user after Google OAuth2 login */
     @Transactional
     public User findOrCreateUserFromOAuth2(OAuth2User principal) {
-        // OIDC 표준 키 먼저 시도, 없으면 대체
+        // Try OIDC standard key first, fallback if not available
         String googleId = strAttr(principal, "sub");
         if (isBlank(googleId)) googleId = principal.getName(); // fallback
 
@@ -34,7 +34,7 @@ public class UserService {
         String fullName  = strAttr(principal, "name");
         String picture   = strAttr(principal, "picture");
 
-        // 이름 보정
+        // Name correction
         if (isBlank(firstName) && !isBlank(fullName)) {
             String[] parts = fullName.trim().split("\\s+", 2);
             firstName = parts[0];
@@ -43,12 +43,12 @@ public class UserService {
         if (isBlank(firstName)) firstName = "Unknown";
         if (isBlank(lastName))  lastName  = "User";
 
-        // (선택) SBU 메일만 허용하려면 주석 해제
+        // (Optional) Uncomment to allow only SBU email addresses
         // if (email == null || !email.endsWith("@stonybrook.edu")) {
         //     throw new RuntimeException("Only SBU accounts are allowed");
         // }
 
-        // 1) googleId로 먼저 찾기
+        // 1) Search by googleId first
         if (!isBlank(googleId)) {
             Optional<User> byGoogle = userRepository.findByGoogleId(googleId);
             if (byGoogle.isPresent()) {
@@ -60,7 +60,7 @@ public class UserService {
             }
         }
 
-        // 2) email 매칭 -> 기존 계정에 googleId 연결
+        // 2) Email matching -> link googleId to existing account
         if (!isBlank(email)) {
             Optional<User> byEmail = userRepository.findByEmail(email);
             if (byEmail.isPresent()) {
@@ -74,7 +74,7 @@ public class UserService {
             }
         }
 
-        // 3) 새 사용자 생성 (기본 STUDENT, 활성)
+        // 3) Create new user (default STUDENT, active)
         User nu = new User();
         nu.setGoogleId(googleId);
         nu.setEmail(email);
@@ -87,7 +87,7 @@ public class UserService {
         return userRepository.save(nu);
     }
 
-    // ===== 조회 메서드 =====
+    // ===== Query methods =====
     public Optional<User> getUserById(Long userId) { return userRepository.findById(userId); }
 
     public Optional<User> getUserByEmail(String email) { return userRepository.findByEmail(safeLower(email)); }
@@ -122,7 +122,7 @@ public class UserService {
         return userRepository.findByDepartmentContaining(department);
     }
 
-    // ===== 변경 메서드 =====
+    // ===== Modification methods =====
     @Transactional
     public User updateUser(User user) {
         if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
@@ -143,7 +143,7 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
     }
 
-    // ===== YAML Import (users 배열 + SBU 포맷 지원) =====
+    // ===== YAML Import (users array + SBU format support) =====
     public List<User> importUsersFromYaml(MultipartFile file) throws IOException {
         List<User> importedUsers = new ArrayList<>();
         Yaml yaml = new Yaml();
@@ -186,7 +186,7 @@ public class UserService {
         }
     }
 
-    /** 이메일 정규화 + 중복 체크 후 저장 */
+    /** Normalize email + check for duplicates before saving */
     private User processUserForImport(User user) {
         if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
         Optional<User> existing = userRepository.findByEmail(user.getEmail());
@@ -269,7 +269,7 @@ public class UserService {
         return stats;
     }
 
-    // ===== helpers =====
+    // helpers 
     private static boolean isBlank(String s) { return s == null || s.trim().isEmpty(); }
     private static String nvl(String a, String b) { return !isBlank(a) ? a : b; }
     private static String safeLower(String s) { return s == null ? null : s.toLowerCase(Locale.ROOT).trim(); }
