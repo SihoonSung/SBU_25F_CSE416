@@ -39,6 +39,7 @@ function PdfUpload() {
   const [searchTerm, setSearchTerm] = useState('')
   const [loadingCapacity, setLoadingCapacity] = useState(false)
   const [capacityMessage, setCapacityMessage] = useState('')
+  const [formatWarning, setFormatWarning] = useState('')
 
   /**
    * Fetch all classes on component mount
@@ -65,8 +66,25 @@ function PdfUpload() {
    */
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
+      const file = e.target.files[0]
+      
+      // Check if file is PDF
+      if (file.type !== 'application/pdf') {
+        setFormatWarning('⚠️ Warning: Selected file is not a PDF. Please select a valid PDF file.')
+        setSelectedFile(null)
+        return
+      }
+      
+      // Check file size (limit to 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setFormatWarning('⚠️ Warning: File size is too large. Please select a PDF file smaller than 10MB.')
+        setSelectedFile(null)
+        return
+      }
+      
+      setSelectedFile(file)
       setUploadMessage('')
+      setFormatWarning('')
     }
   }
 
@@ -101,13 +119,33 @@ function PdfUpload() {
       if (data.success) {
         setUploadMessage(`✅ ${data.message}`)
         setSelectedFile(null)
+        setFormatWarning('')
         // Refresh class list
         fetchClasses()
       } else {
-        setUploadMessage(`❌ ${data.message}`)
+        // Check for format-related errors
+        if (data.message && (
+          data.message.toLowerCase().includes('format') || 
+          data.message.toLowerCase().includes('invalid') || 
+          data.message.toLowerCase().includes('parse') ||
+          data.message.toLowerCase().includes('structure') ||
+          data.message.toLowerCase().includes('unable to') ||
+          data.message.toLowerCase().includes('corrupted') ||
+          data.message.toLowerCase().includes('course schedule') ||
+          data.message.toLowerCase().includes('sbU') ||
+          data.message.toLowerCase().includes('not a valid') ||
+          data.message.toLowerCase().includes('does not appear')
+        )) {
+          setFormatWarning(`⚠️ PDF Format Issue: ${data.message}`)
+          setUploadMessage('❌ Upload failed - Please upload the correct SBU Course Schedule PDF')
+        } else {
+          setUploadMessage(`❌ ${data.message}`)
+        }
       }
     } catch (error) {
-      setUploadMessage('❌ Error uploading file: ' + error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      setUploadMessage('❌ Error uploading file: ' + errorMessage)
+      setFormatWarning('')
     } finally {
       setUploading(false)
     }
@@ -295,6 +333,11 @@ function PdfUpload() {
               onChange={handleFileChange}
             />
             {selectedFile && <span className="file-name">📎 {selectedFile.name}</span>}
+            {formatWarning && (
+              <div className="format-warning">
+                {formatWarning}
+              </div>
+            )}
           </div>
 
           <button 

@@ -28,7 +28,7 @@
 /* Instructions Section */
 .instructions-section {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
@@ -111,7 +111,7 @@
 /* Upload Section */
 .upload-section {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
@@ -127,7 +127,7 @@
 /* File Drop Zone */
 .file-drop-zone {
   border: 3px dashed #bdc3c7;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 3rem 2rem;
   text-align: center;
   transition: all 0.3s ease;
@@ -302,7 +302,7 @@
 /* Results Section */
 .results-section {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   border: 1px solid #e1e8ed;
@@ -404,7 +404,7 @@
   background: #fff3cd;
   color: #856404;
   padding: 0.25rem 0.5rem;
-  border-radius: 12px;
+  border-radius: 8px;
   font-size: 0.8rem;
   font-weight: 600;
   align-self: flex-start;

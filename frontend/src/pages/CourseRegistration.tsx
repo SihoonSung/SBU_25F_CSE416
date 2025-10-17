@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
 import './CourseRegistration.css'
 
-/**
+/*
  * Course Registration Page Component
  * Allows students to search for classes and add them to their cart.
  * Includes expandable course details and real-time search.
  * 
- * Note: Frontend-backend integration and UI components were implemented 
- * with assistance from Cursor AI and ChatGPT for proper API integration 
- * and user interface design.
+ * TP: Used Cursor to implement frontend-backend integration and UI components.
  */
 
 function CourseRegistration() {
@@ -114,21 +112,15 @@ function CourseRegistration() {
    */
   const fetchAvailableTerms = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/scraping/terms')
+      const response = await fetch('http://localhost:8080/api/classes/terms')
       const data = await response.json()
-      
-      // Transform scraping terms data to course registration format
-      const transformedTerms = data.map((term: any) => ({
-        semester: term.name.split(' ')[0], // "Fall" from "Fall 2025"
-        year: parseInt(term.name.split(' ')[1]) // 2025 from "Fall 2025"
-      }))
-      
-      setAvailableTerms(transformedTerms)
+
+      setAvailableTerms(data)
       
       // Auto-select the first term if available
-      if (transformedTerms.length > 0) {
-        setSelectedSemester(transformedTerms[0].semester)
-        setSelectedYear(transformedTerms[0].year)
+      if (data.length > 0) {
+        setSelectedSemester(data[0].semester)
+        setSelectedYear(data[0].year)
       }
     } catch (error) {
       console.error('Error fetching terms:', error)
@@ -141,37 +133,13 @@ function CourseRegistration() {
    */
   const fetchClassesByTerm = async (semester: string, year: number | string) => {
     try {
-      const termName = `${semester} ${year}` // "Fall 2025"
-      const response = await fetch(`http://localhost:8080/api/scraping/courses/byTerm?term=${encodeURIComponent(termName)}`)
+      const response = await fetch(`http://localhost:8080/api/classes/by-term?semester=${semester}&year=${year}`)
       const data = await response.json()
       
-      // Transform course data to class format for registration
-      const transformedData = data.map((course: any) => ({
-        id: course.id,
-        code: `${course.subject}${course.courseNumber}`,
-        courseId: course.id.toString(),
-        department: course.subject,
-        courseNum: course.courseNumber,
-        section: '01', // Default section
-        sectionType: 'LEC',
-        title: course.courseName,
-        schedule: 'TBA', // Default schedule
-        instructor: 'TBA', // Default instructor
-        location: 'TBA', // Default location
-        lecSchedule: 'TBA',
-        lecLocation: 'TBA',
-        prerequisites: course.prerequisites || 'None',
-        corequisites: course.corequisites || 'None',
-        antirequisites: course.antirequisites || 'None',
-        sbc: course.sbcsSatisfied || 'None',
-        minCredits: course.credits,
-        maxCredits: course.credits,
-        credits: course.credits,
-        semester: semester,
-        year: year
-      }))
-      
-      setSearchResults(transformedData)
+      // Transform and sort data
+      const transformedData = data.map(transformClassData)
+      setSearchResults(sortClasses(transformedData))
+
     } catch (error) {
       console.error('Error fetching classes:', error)
     }
@@ -181,7 +149,7 @@ function CourseRegistration() {
   /**
    * Handle search functionality
    * If search term is empty, fetch classes for selected term
-   * Otherwise, filter the current results by search term
+   * Otherwise, search using the backend API (filtered by selected term)
    */
   const handleSearch = async (term: string) => {
     if (!term.trim()) {
@@ -191,15 +159,21 @@ function CourseRegistration() {
       return
     }
     
-    // Filter current search results by search term
-    const filteredResults = searchResults.filter((course: any) => 
-      course.code.toLowerCase().includes(term.toLowerCase()) ||
-      course.title.toLowerCase().includes(term.toLowerCase()) ||
-      course.department.toLowerCase().includes(term.toLowerCase())
-    )
-    
-    setSearchResults(filteredResults)
-    setCurrentPage(1) // Reset to first page on new search
+    try {
+      const response = await fetch(`http://localhost:8080/api/classes/search?q=${encodeURIComponent(term)}`)
+      const data = await response.json()
+      
+      // Transform, filter, and sort data
+      const transformedData = data
+        .map(transformClassData)
+        .filter((cls: any) => cls.semester === selectedSemester && cls.year === selectedYear)
+
+        setSearchResults(sortClasses(transformedData))
+
+      } catch (error) {
+        console.error('Error searching classes:', error)
+      }
+  
   }
 
   /**

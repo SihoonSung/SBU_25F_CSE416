@@ -57,7 +57,7 @@
 /* Declaration Summary */
 .declaration-summary {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
@@ -142,7 +142,7 @@
 /* Declaration Form */
 .declaration-form-section {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
@@ -272,7 +272,7 @@
 /* My Declarations Section */
 .my-declarations-section {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   border: 1px solid #e1e8ed;

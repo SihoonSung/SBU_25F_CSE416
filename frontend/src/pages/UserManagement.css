@@ -31,7 +31,7 @@
 .stat-card {
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 20px;
   text-align: center;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -175,7 +175,7 @@
 .users-table-container {
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }

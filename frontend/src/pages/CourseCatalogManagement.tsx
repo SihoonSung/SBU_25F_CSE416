@@ -276,6 +276,10 @@ const CourseCatalogManagement: React.FC = () => {
             <div className="custom-subject-help">
               <strong>⚠️ Warning:</strong> Other subjects will extract <strong>Description, Credits, and SBCs</strong>.
               Requisite fields (prerequisites, corequisites, antirequisites, advisory prerequisites) will be marked as "unknown".
+              <br/><br/>
+              <strong>📝 Instructions:</strong> Enter <strong>ONE subject at a time</strong> (e.g., MAT, PHY, CHE). 
+              Do <strong>NOT</strong> use commas or multiple subjects. Add one subject, click "Add Subject", 
+              then repeat for additional subjects.
             </div>
           </div>
 

@@ -220,78 +220,63 @@
   }
   
   .schedule-table {
+    width: 100%;
+    border-collapse: collapse;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     overflow: hidden;
     margin-bottom: 1rem;
+    background: white;
+    table-layout: fixed;
   }
   
-.schedule-header {
-  display: grid;
-  grid-template-columns: 50px repeat(5, 1fr);
-  background-color: #f7fafc;
-  border-bottom: 1px solid #e2e8f0;
-}
+  .schedule-table thead {
+    background-color: #f7fafc;
+  }
+  
+  .schedule-table th,
+  .schedule-table td {
+    border: 1px solid #e2e8f0;
+    text-align: center;
+    vertical-align: middle;
+  }
   
   .time-header, .day-header {
     padding: 0.75rem 0.5rem;
     font-size: 12px;
     font-weight: 600;
     color: #4a5568;
-    text-align: center;
-    border-right: 1px solid #e2e8f0;
   }
   
-  .day-header:last-child {
-    border-right: none;
+  .time-header {
+    width: 60px;
+    min-width: 60px;
   }
   
-.schedule-body {
-  display: flex;
-  flex-direction: column;
-}
-
-.schedule-row {
-  display: grid;
-  grid-template-columns: 50px repeat(5, 1fr);
-  border-bottom: 1px solid #e2e8f0;
-  min-height: 40px;
-}
-
-.schedule-row:last-child {
-  border-bottom: none;
-}
-  
-.time-cell {
-  padding: 0.5rem 0.25rem;
-  font-size: 11px;
-  font-weight: 500;
-  color: #718096;
-  text-align: center;
-  background-color: #f7fafc;
-  border-right: 1px solid #e2e8f0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-  
-.course-cell {
-  padding: 0.25rem;
-  font-size: 9px;
-  font-weight: 500;
-  color: white;
-  text-align: center;
-  border-right: 1px solid #e2e8f0;
-  min-height: 35px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1.1;
-}
-  
-  .course-cell:last-child {
-    border-right: none;
+  .day-header {
+    width: calc((100% - 60px) / 5);
   }
+  
+  .time-cell {
+    padding: 0.5rem 0.25rem;
+    font-size: 11px;
+    font-weight: 500;
+    color: #718096;
+    background-color: #f7fafc;
+    width: 60px;
+    min-width: 60px;
+  }
+  
+  .course-cell {
+    padding: 0.25rem;
+    font-size: 9px;
+    font-weight: 500;
+    color: white;
+    min-height: 35px;
+    line-height: 1.1;
+    width: calc((100% - 60px) / 5);
+  }
+  
   
   .course-cell.cse373 {
     background-color: #48bb78;
@@ -423,9 +408,6 @@
       grid-template-columns: 1fr;
     }
     
-    .schedule-grid {
-      grid-template-columns: 1fr;
-    }
     
     .dashboard-content {
       gap: 1rem;
@@ -449,11 +431,6 @@
       font-size: 1.5rem;
     }
     
-    .schedule-block {
-      font-size: 10px;
-      padding: 0.5rem;
-      min-height: 50px;
-    }
     
     .course-btn {
       font-size: 10px;

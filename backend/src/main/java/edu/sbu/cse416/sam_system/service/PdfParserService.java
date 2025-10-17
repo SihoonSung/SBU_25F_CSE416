@@ -64,6 +64,9 @@ public class PdfParserService {
         // Extract text from PDF
         String pdfText = extractTextFromPdf(file);
         
+        // Validate that this is a course schedule PDF
+        validateSchedulePdf(pdfText);
+        
         // Parse classes from text
         List<ClassEntity> classes = parseClassesFromText(pdfText, subjects, semester, year);
         
@@ -80,6 +83,57 @@ public class PdfParserService {
         try (PDDocument document = org.apache.pdfbox.Loader.loadPDF(file.getBytes())) {
             PDFTextStripper stripper = new PDFTextStripper();
             return stripper.getText(document);
+        }
+    }
+    
+    /**
+     * Validate that the PDF contains course schedule data
+     * Throws RuntimeException if the PDF is not a valid course schedule
+     */
+    private void validateSchedulePdf(String pdfText) {
+        if (pdfText == null || pdfText.trim().isEmpty()) {
+            throw new RuntimeException("Invalid PDF: The PDF file is empty or corrupted. Please upload a valid SBU Course Schedule PDF.");
+        }
+        
+        // Check for SBU course schedule indicators
+        boolean hasScheduleIndicators = false;
+        String[] scheduleIndicators = {
+            "Credit(s):",
+            "SBC:",
+            "LEC",
+            "LAB",
+            "REC",
+            "SEM",
+            "TUT",
+            "Course Offerings",
+            "Schedule of Classes",
+            "Class Schedule"
+        };
+        
+        // Check for course pattern (3-letter department code + 3-digit number)
+        Pattern coursePattern = Pattern.compile("\\b[A-Z]{3}\\s+\\d{3}\\s+[A-Z]?\\s+");
+        
+        for (String indicator : scheduleIndicators) {
+            if (pdfText.contains(indicator)) {
+                hasScheduleIndicators = true;
+                break;
+            }
+        }
+        
+        // Check if we found course patterns
+        boolean hasCoursePatterns = coursePattern.matcher(pdfText).find();
+        
+        // If neither schedule indicators nor course patterns are found, it's likely not a schedule PDF
+        if (!hasScheduleIndicators && !hasCoursePatterns) {
+            throw new RuntimeException("Invalid PDF Format: This PDF does not appear to be a valid SBU Course Schedule. " +
+                "Please upload the official Course Schedule PDF from SBU's Course Offerings page. " +
+                "The PDF should contain course listings with department codes, course numbers, credits, and class schedules.");
+        }
+        
+        // Additional check: if text is too short, it's probably not a schedule
+        if (pdfText.trim().length() < 500) {
+            throw new RuntimeException("Invalid PDF: The PDF content is too short to be a valid course schedule. " +
+                "Please upload a complete SBU Course Schedule PDF.");
         }
     }
     

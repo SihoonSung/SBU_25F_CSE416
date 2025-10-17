@@ -24,7 +24,7 @@
 .capacity-section,
 .management-section {
   background: white;
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: 2rem;
   margin-bottom: 2rem;
@@ -101,6 +101,17 @@
   color: #4299e1;
   font-size: 14px;
   margin-top: 0.5rem;
+}
+
+.format-warning {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  color: #856404;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 /* Upload Button */
