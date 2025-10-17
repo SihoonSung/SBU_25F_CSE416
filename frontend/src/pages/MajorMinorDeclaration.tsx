@@ -216,178 +216,155 @@ const MajorMinorDeclaration: React.FC = () => {
   return (
     <div className="major-minor-declaration">
       <div className="page-header">
-        <h1>Major & Minor Declaration</h1>
-        <p>Declare your majors and minors for upcoming terms</p>
+        <h1>Important Alerts and Request Override</h1>
       </div>
 
-      {error && (
-        <div className="message error">
-          <span className="message-icon">⚠️</span>
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="message success">
-          <span className="message-icon">✅</span>
-          {success}
-        </div>
-      )}
-
-      {/* Current Declarations Summary */}
-      <div className="declaration-summary">
-        <h2>Current Declarations</h2>
-        <div className="summary-cards">
-          <div className="summary-card">
-            <h3>Majors</h3>
-            <div className="count">{getCurrentDeclarationsCount('MAJOR')}/2</div>
-            <div className="status">
-              {canDeclareMore('MAJOR') ? 'Can declare more' : 'Maximum reached'}
-            </div>
-          </div>
-          <div className="summary-card">
-            <h3>Minors</h3>
-            <div className="count">{getCurrentDeclarationsCount('MINOR')}/3</div>
-            <div className="status">
-              {canDeclareMore('MINOR') ? 'Can declare more' : 'Maximum reached'}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* New Declaration Button */}
-      <div className="action-section">
-        <button 
-          className="new-declaration-button"
-          onClick={() => setShowDeclarationForm(true)}
-          disabled={!canDeclareMore('MAJOR') && !canDeclareMore('MINOR')}
-        >
-          + New Declaration
-        </button>
-      </div>
-
-      {/* Declaration Form */}
-      {showDeclarationForm && (
-        <div className="declaration-form-section">
-          <h2>Submit New Declaration</h2>
-          <form onSubmit={handleSubmitDeclaration} className="declaration-form">
-            <div className="form-group">
-              <label htmlFor="declarationType">Declaration Type *</label>
-              <select
-                id="declarationType"
-                value={selectedDeclarationType}
-                onChange={(e) => setSelectedDeclarationType(e.target.value as 'MAJOR' | 'MINOR')}
-                required
-              >
-                <option value="MAJOR" disabled={!canDeclareMore('MAJOR')}>
-                  Major {!canDeclareMore('MAJOR') ? '(Maximum reached)' : ''}
-                </option>
-                <option value="MINOR" disabled={!canDeclareMore('MINOR')}>
-                  Minor {!canDeclareMore('MINOR') ? '(Maximum reached)' : ''}
-                </option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="subjectCode">Subject Code *</label>
-              <select
-                id="subjectCode"
-                value={selectedSubject}
-                onChange={(e) => {
-                  setSelectedSubject(e.target.value);
-                  setSelectedDegreeType('BA'); // Reset degree type
-                }}
-                required
-              >
-                <option value="">Select a subject</option>
-                {availableSubjects.map(subject => (
-                  <option key={subject} value={subject}>{subject}</option>
-                ))}
-              </select>
-            </div>
-
-            {selectedSubject && (
-              <div className="form-group">
-                <label htmlFor="degreeType">Degree Type *</label>
-                <select
-                  id="degreeType"
-                  value={selectedDegreeType}
-                  onChange={(e) => setSelectedDegreeType(e.target.value as 'BA' | 'BS' | 'MINOR')}
-                  required
-                >
-                  {getAvailableDegreeTypes(selectedSubject).map(degreeType => (
-                    <option key={degreeType} value={degreeType}>
-                      {degreeType === 'MINOR' ? 'Minor' : degreeType}
-                    </option>
-                  ))}
-                </select>
+      {/* Alerts Section */}
+      <div className="alerts-section">
+        <div className="alerts-grid">
+          <div className="alert alert-error">
+            <div className="alert-icon">i</div>
+            <div className="alert-content">
+              <div className="alert-text">
+                Maximum Majors Reached: You have reached the maximum limit of 2 majors. Please withdraw an existing major before declaring a new one.
               </div>
-            )}
+            </div>
+          </div>
+          
+          <div className="alert alert-warning">
+            <div className="alert-icon">i</div>
+            <div className="alert-content">
+              <div className="alert-text">
+                Class Closed: CSE416 class closed. Please resolve before submitting.
+              </div>
+            </div>
+          </div>
+          
+          <div className="alert alert-error">
+            <div className="alert-icon">i</div>
+            <div className="alert-content">
+              <div className="alert-text">
+                Prerequisite: AMS161 need C or higher in AMS 151 or MAT 131, or level 7 on the mathematics placement examination. Please resolve before submitting.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
+      {/* Request Override Form */}
+      <div className="request-override-section">
+        <div className="student-info">
+          <p><strong>Student:</strong> Sihoon Sung (SBU ID 113949353)</p>
+        </div>
+
+        <form onSubmit={handleSubmitDeclaration} className="override-form">
+          <div className="form-row">
             <div className="form-group">
-              <label htmlFor="effectiveTerm">Effective Term *</label>
+              <label>Term:</label>
               <select
-                id="effectiveTerm"
                 value={effectiveTerm}
                 onChange={(e) => setEffectiveTerm(e.target.value)}
                 required
               >
-                <option value="">Select a term</option>
+                <option value="">Select Term</option>
                 {availableTerms.map(term => (
                   <option key={term} value={term}>{term}</option>
                 ))}
               </select>
             </div>
-
-            {/* Requirement Information */}
-            {selectedSubject && selectedDegreeType && (
-              <div className="requirement-info">
-                <h3>Requirement Information</h3>
-                {(() => {
-                  const requirement = getRequirementInfo(selectedSubject, selectedDegreeType);
-                  if (requirement) {
-                    return (
-                      <div className="requirement-details">
-                        <p><strong>Total Credits Required:</strong> {requirement.totalCreditsRequired}</p>
-                        {requirement.gpaRequirement && (
-                          <p><strong>GPA Requirement:</strong> {requirement.gpaRequirement}</p>
-                        )}
-                        <p><strong>Restricted Program:</strong> {requirement.isRestricted ? 'Yes' : 'No'}</p>
-                        {requirement.isRestricted && (
-                          <p className="restricted-note">
-                            ⚠️ This is a restricted program and requires advisor approval.
-                          </p>
-                        )}
-                      </div>
-                    );
-                  }
-                  return <p>No requirement information available.</p>;
-                })()}
-              </div>
-            )}
-
-            <div className="form-actions">
-              <button 
-                type="button" 
-                className="cancel-button"
-                onClick={() => {
-                  setShowDeclarationForm(false);
-                  resetForm();
+            
+            <div className="form-group">
+              <label>Sections:</label>
+              <select
+                value={selectedSubject}
+                onChange={(e) => {
+                  setSelectedSubject(e.target.value);
+                  setSelectedDegreeType('BA');
                 }}
+                required
               >
-                Cancel
-              </button>
-              <button 
-                type="submit" 
-                className="submit-button"
-                disabled={submitting}
-              >
-                {submitting ? 'Submitting...' : 'Submit Declaration'}
-              </button>
+                <option value="">Select Subject</option>
+                {availableSubjects.map(subject => (
+                  <option key={subject} value={subject}>{subject} - 01</option>
+                ))}
+              </select>
             </div>
-          </form>
-        </div>
-      )}
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Instructor:</label>
+              <input type="text" value="William Bernhard" readOnly />
+            </div>
+            
+            <div className="form-group">
+              <label>Advisor:</label>
+              <input type="text" value="Yujeong Choi" readOnly />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Override Type:</label>
+            <select
+              value={selectedDeclarationType}
+              onChange={(e) => setSelectedDeclarationType(e.target.value as 'MAJOR' | 'MINOR')}
+              required
+            >
+              <option value="MAJOR" disabled={!canDeclareMore('MAJOR')}>
+                Major {!canDeclareMore('MAJOR') ? '(Maximum reached)' : ''}
+              </option>
+              <option value="MINOR" disabled={!canDeclareMore('MINOR')}>
+                Minor {!canDeclareMore('MINOR') ? '(Maximum reached)' : ''}
+              </option>
+            </select>
+          </div>
+
+          {selectedSubject && (
+            <div className="form-group">
+              <label>Degree Type:</label>
+              <select
+                value={selectedDegreeType}
+                onChange={(e) => setSelectedDegreeType(e.target.value as 'BA' | 'BS' | 'MINOR')}
+                required
+              >
+                {getAvailableDegreeTypes(selectedSubject).map(degreeType => (
+                  <option key={degreeType} value={degreeType}>
+                    {degreeType === 'MINOR' ? 'Minor' : degreeType}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label>Justification:</label>
+            <textarea
+              placeholder="Please provide a detailed justification for your major/minor declaration request..."
+              rows={4}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Supporting Files (optional):</label>
+            <div className="file-upload">
+              <input type="file" accept=".pdf" />
+              <span>Upload supporting file (PDF only)</span>
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button 
+              type="submit" 
+              className="submit-request-button"
+              disabled={submitting || (!canDeclareMore('MAJOR') && !canDeclareMore('MINOR'))}
+            >
+              {submitting ? 'Submitting...' : 'Submit Request'}
+            </button>
+          </div>
+        </form>
+      </div>
+
 
       {/* My Declarations */}
       <div className="my-declarations-section">
