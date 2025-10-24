@@ -17,6 +17,8 @@ import java.util.Locale;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
 import java.util.Optional;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class UserService {
@@ -162,26 +164,42 @@ public class UserService {
             return getAllUsers();
         }
         
-        // Apply filters
-        if (role != null) {
-            UserRole userRole = UserRole.valueOf(role.toUpperCase());
-            results = getUsersByRole(userRole);
-        } else {
-            results = getAllUsers();
+        // Start with all users
+        results = getAllUsers();
+        
+        // Filter by role first
+        if (role != null && !role.trim().isEmpty()) {
+            try {
+                UserRole userRole = UserRole.valueOf(role.toUpperCase());
+                results = results.stream()
+                        .filter(user -> user.getRole() == userRole)
+                        .collect(Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                // Invalid role, return empty list
+                return new ArrayList<>();
+            }
         }
         
-        // Filter by name
+        // Filter by name (prefix matching)
         if (name != null && !name.trim().isEmpty()) {
+            String searchName = name.trim().toLowerCase();
             results = results.stream()
-                    .filter(user -> user.getFullName().toLowerCase().contains(name.toLowerCase()))
+                    .filter(user -> {
+                        String fullName = user.getFullName().toLowerCase();
+                        return fullName.startsWith(searchName) || 
+                               user.getFirstName().toLowerCase().startsWith(searchName) ||
+                               user.getLastName().toLowerCase().startsWith(searchName);
+                    })
                     .collect(Collectors.toList());
         }
         
         // Filter by major (for students)
         if (major != null && !major.trim().isEmpty()) {
+            String searchMajor = major.trim().toLowerCase();
             results = results.stream()
                     .filter(user -> user.getRole() == UserRole.STUDENT && 
-                            (user.getMajor() != null && user.getMajor().toLowerCase().contains(major.toLowerCase())))
+                            user.getMajor() != null && 
+                            user.getMajor().toLowerCase().contains(searchMajor))
                     .collect(Collectors.toList());
         }
         
@@ -211,19 +229,23 @@ public class UserService {
             }
         }
         
-        // Filter by advisor level
+        // Filter by advisor level (for advisors only)
         if (advisorLevel != null && !advisorLevel.trim().isEmpty()) {
-            List<User> levelResults = searchAdvisorsByLevel(advisorLevel);
+            String searchLevel = advisorLevel.trim();
             results = results.stream()
-                    .filter(levelResults::contains)
+                    .filter(user -> user.getRole() == UserRole.ADVISOR && 
+                            user.getLevel() != null && 
+                            user.getLevel().equals(searchLevel))
                     .collect(Collectors.toList());
         }
         
-        // Filter by academic unit
+        // Filter by academic unit (for advisors only)
         if (academicUnit != null && !academicUnit.trim().isEmpty()) {
-            List<User> unitResults = searchAdvisorsByAcademicUnit(academicUnit);
+            String searchUnit = academicUnit.trim();
             results = results.stream()
-                    .filter(unitResults::contains)
+                    .filter(user -> user.getRole() == UserRole.ADVISOR && 
+                            user.getAcademicUnit() != null && 
+                            user.getAcademicUnit().equals(searchUnit))
                     .collect(Collectors.toList());
         }
         
@@ -513,6 +535,136 @@ public class UserService {
         stats.put("registrars", userRepository.countByRole(UserRole.REGISTRAR));
         return stats;
     }
+
+    // ===== Export functionality =====
+    public Map<String, Object> exportUserToYamlFormat(Long userId) {
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return null;
+        }
+        
+        User user = userOpt.get();
+        Map<String, Object> yamlData = new HashMap<>();
+        
+        // Convert user to YAML format based on role
+        if (user.getRole() == UserRole.STUDENT) {
+            yamlData = convertStudentToYamlFormat(user);
+        } else if (user.getRole() == UserRole.ADVISOR) {
+            yamlData = convertAdvisorToYamlFormat(user);
+        } else if (user.getRole() == UserRole.INSTRUCTOR) {
+            yamlData = convertInstructorToYamlFormat(user);
+        } else if (user.getRole() == UserRole.REGISTRAR) {
+            yamlData = convertRegistrarToYamlFormat(user);
+        }
+        
+        return yamlData;
+    }
+    
+    private Map<String, Object> convertStudentToYamlFormat(User user) {
+        Map<String, Object> studentData = new HashMap<>();
+        studentData.put("SBU_ID", user.getSbuId());
+        studentData.put("first_name", user.getFirstName());
+        studentData.put("last_name", user.getLastName());
+        studentData.put("email", user.getEmail());
+        
+        // Add all student-specific fields from JSON columns
+        if (user.getUniversityEntry() != null) {
+            studentData.put("university_entry", parseJson(user.getUniversityEntry()));
+        }
+        if (user.getDirectAdmit() != null) {
+            studentData.put("direct_admit", user.getDirectAdmit());
+        }
+        if (user.getAoi() != null) {
+            studentData.put("AOI", user.getAoi());
+        }
+        if (user.getCollege() != null) {
+            studentData.put("college", user.getCollege());
+        }
+        if (user.getMajors() != null) {
+            studentData.put("majors", parseJson(user.getMajors()));
+        }
+        if (user.getDegrees() != null) {
+            studentData.put("degrees", parseJson(user.getDegrees()));
+        }
+        if (user.getMajorRequirementVersions() != null) {
+            studentData.put("major_requirement_versions", parseJson(user.getMajorRequirementVersions()));
+        }
+        if (user.getMinors() != null) {
+            studentData.put("minors", parseJson(user.getMinors()));
+        }
+        if (user.getMinorRequirementVersions() != null) {
+            studentData.put("minor_requirement_versions", parseJson(user.getMinorRequirementVersions()));
+        }
+        if (user.getPlannedMajors() != null) {
+            studentData.put("planned_majors", parseJson(user.getPlannedMajors()));
+        }
+        if (user.getPlannedMajorRequirementVersions() != null) {
+            studentData.put("planned_major_requirement_versions", parseJson(user.getPlannedMajorRequirementVersions()));
+        }
+        if (user.getPlannedDegrees() != null) {
+            studentData.put("planned_degrees", parseJson(user.getPlannedDegrees()));
+        }
+        if (user.getPlannedMinors() != null) {
+            studentData.put("planned_minors", parseJson(user.getPlannedMinors()));
+        }
+        if (user.getPlannedMinorRequirementVersions() != null) {
+            studentData.put("planned_minor_requirement_versions", parseJson(user.getPlannedMinorRequirementVersions()));
+        }
+        if (user.getGraduation() != null) {
+            studentData.put("graduation", parseJson(user.getGraduation()));
+        }
+        if (user.getTransferCourses() != null) {
+            studentData.put("transfer_courses", parseJson(user.getTransferCourses()));
+        }
+        if (user.getClasses() != null) {
+            studentData.put("classes", parseJson(user.getClasses()));
+        }
+        if (user.getCoursePlan() != null) {
+            studentData.put("course_plan", parseJson(user.getCoursePlan()));
+        }
+        
+        return studentData;
+    }
+    
+    private Map<String, Object> convertAdvisorToYamlFormat(User user) {
+        Map<String, Object> advisorData = new HashMap<>();
+        advisorData.put("SBU_ID", user.getSbuId());
+        advisorData.put("first_name", user.getFirstName());
+        advisorData.put("last_name", user.getLastName());
+        advisorData.put("email", user.getEmail());
+        advisorData.put("level", user.getLevel());
+        advisorData.put("academic_unit", user.getAcademicUnit());
+        return advisorData;
+    }
+    
+    private Map<String, Object> convertInstructorToYamlFormat(User user) {
+        Map<String, Object> instructorData = new HashMap<>();
+        instructorData.put("SBU_ID", user.getSbuId());
+        instructorData.put("first_name", user.getFirstName());
+        instructorData.put("last_name", user.getLastName());
+        instructorData.put("email", user.getEmail());
+        return instructorData;
+    }
+    
+    private Map<String, Object> convertRegistrarToYamlFormat(User user) {
+        Map<String, Object> registrarData = new HashMap<>();
+        registrarData.put("SBU_ID", user.getSbuId());
+        registrarData.put("first_name", user.getFirstName());
+        registrarData.put("last_name", user.getLastName());
+        registrarData.put("email", user.getEmail());
+        return registrarData;
+    }
+    
+    private Object parseJson(String jsonString) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.readValue(jsonString, Object.class);
+        } catch (Exception e) {
+            System.err.println("Error parsing JSON: " + e.getMessage());
+            return jsonString; // Return as string if parsing fails
+        }
+    }
+    
 
     // helpers 
     private static boolean isBlank(String s) { return s == null || s.trim().isEmpty(); }

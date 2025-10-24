@@ -2,6 +2,7 @@ package edu.sbu.cse416.sam_system.controller;
 
 import edu.sbu.cse416.sam_system.dto.StudentProfileDto;
 import edu.sbu.cse416.sam_system.entity.User;
+import edu.sbu.cse416.sam_system.entity.UserRole;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.service.UserService;
 
@@ -34,6 +35,13 @@ public class UserController {
         this.userRepository = userRepository;
         this.userService = userService;
     }
+
+    /** Test endpoint to verify controller is loaded */
+    @GetMapping("/test")
+    public ResponseEntity<String> test() {
+        return ResponseEntity.ok("UserController is working!");
+    }
+
 
     /**
      * Lookup by email or studentId from users table only.
@@ -167,8 +175,10 @@ public class UserController {
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal OAuth2User principal) {
 
-        // Keep permission check commented during development if needed
-        // if (!isRegistrar(principal)) return ResponseEntity.status(403).build();
+        // Temporarily disable authorization for testing
+        // if (!isRegistrar(principal)) {
+        //     return ResponseEntity.status(403).build();
+        // }
 
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
@@ -199,11 +209,62 @@ public class UserController {
         return ResponseEntity.ok(stats);
     }
 
+    /** Search users with multiple filters (for registrars and advisors) */
+    @GetMapping("/search")
+    public ResponseEntity<List<User>> searchUsers(
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "role", required = false) String role,
+            @RequestParam(value = "major", required = false) String major,
+            @RequestParam(value = "minor", required = false) String minor,
+            @RequestParam(value = "graduationTerm", required = false) String graduationTerm,
+            @RequestParam(value = "advisorLevel", required = false) String advisorLevel,
+            @RequestParam(value = "academicUnit", required = false) String academicUnit,
+            @AuthenticationPrincipal OAuth2User principal) {
+        
+        // Temporarily disable authorization for testing
+        // if (!isRegistrar(principal) && !isAdvisor(principal)) {
+        //     return ResponseEntity.status(403).build();
+        // }
+        
+        List<User> users = userService.searchUsers(name, role, major, minor, 
+                                                 graduationTerm, advisorLevel, academicUnit);
+        return ResponseEntity.ok(users);
+    }
+
+    /** Export user data as YAML (for registrars only) */
+    @GetMapping("/{userId}/export")
+    public ResponseEntity<Map<String, Object>> exportUserData(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal OAuth2User principal) {
+        
+        if (!isRegistrar(principal)) {
+            return ResponseEntity.status(403).build();
+        }
+        
+        try {
+            Map<String, Object> userData = userService.exportUserToYamlFormat(userId);
+            if (userData == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(userData);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to export user data: " + e.getMessage()));
+        }
+    }
+
     /** Check if current user is registrar */
     private boolean isRegistrar(OAuth2User principal) {
         if (principal == null) return false;
         String googleId = principal.getName();
         var userOpt = userService.getUserByGoogleId(googleId);
         return userOpt.isPresent() && userOpt.get().isRegistrar();
+    }
+
+    /** Check if current user is advisor */
+    private boolean isAdvisor(OAuth2User principal) {
+        if (principal == null) return false;
+        String googleId = principal.getName();
+        var userOpt = userService.getUserByGoogleId(googleId);
+        return userOpt.isPresent() && userOpt.get().isAdvisor();
     }
 }
