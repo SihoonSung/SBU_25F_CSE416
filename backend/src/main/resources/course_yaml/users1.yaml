@@ -13,10 +13,18 @@ registrars:
   first_name: Rob
   last_name: Rogers
   email: rob.rogers@stonybrook.edu
+
 - SBU_ID: 100654321
   first_name: Ralph
   last_name: Randall
   email: ralph.randall@stonybrook.edu
+
+- SBU_ID: 114665643
+  first_name: Minseo
+  last_name: Kim
+  email: minseo.kim@stonybrook.edu
+
+
 
 academic_advisors:
 - SBU_ID: 100765431
@@ -55,7 +63,7 @@ students:
   degrees: [BS,BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
   major_requirement_versions: [{semester: Fall, year: 2020}, {semester: Fall, year: 2021}] # the degree requirements version the student is following for each major.  entry i in this list corresponds to entry i in the majors list.
   minors: [] # list of minors, identified by 3-letter codes
-  minor_requirement_versions: []
+  minor_requirement_versions: []   
   planned_majors: [] # planned additional majors that are not yet declared.
   planned_major_requirement_versions: [] # degree requirements version for each planned major
   planned_degrees: [] # degree types corresponding to planned_majors

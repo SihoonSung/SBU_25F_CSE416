@@ -20,6 +20,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByGoogleId(String googleId);
 
     Optional<User> findByStudentId(String studentId);
+    
+    Optional<User> findBySbuId(String sbuId);
 
     List<User> findByRole(UserRole role);
 
@@ -49,7 +51,34 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.role = 'INSTRUCTOR' AND LOWER(u.department) LIKE LOWER(CONCAT('%', :department, '%'))")
     List<User> findByDepartmentContaining(@Param("department") String department);
 
+    // Advanced search methods for students using native queries for JSON fields
+    @Query(value = "SELECT * FROM users WHERE role = 'STUDENT' AND " +
+            "JSON_SEARCH(minors, 'one', :minor) IS NOT NULL", nativeQuery = true)
+    List<User> findByMinorContaining(@Param("minor") String minor);
+
+    @Query(value = "SELECT * FROM users WHERE role = 'STUDENT' AND " +
+            "JSON_EXTRACT(graduation, '$.year') = :year", nativeQuery = true)
+    List<User> findByGraduationYear(@Param("year") Integer year);
+
+    @Query(value = "SELECT * FROM users WHERE role = 'STUDENT' AND " +
+            "JSON_EXTRACT(graduation, '$.semester') = :semester AND " +
+            "JSON_EXTRACT(graduation, '$.year') = :year", nativeQuery = true)
+    List<User> findByGraduationTerm(@Param("semester") String semester, @Param("year") Integer year);
+
+    // Academic advisor search methods
+    @Query("SELECT u FROM User u WHERE u.role = 'ADVISOR' AND u.level = :level")
+    List<User> findByAdvisorLevel(@Param("level") String level);
+
+    @Query("SELECT u FROM User u WHERE u.role = 'ADVISOR' AND u.academicUnit = :academicUnit")
+    List<User> findByAcademicUnit(@Param("academicUnit") String academicUnit);
+
+    @Query("SELECT u FROM User u WHERE u.role = 'ADVISOR' AND " +
+            "u.level = :level AND u.academicUnit = :academicUnit")
+    List<User> findByAdvisorLevelAndAcademicUnit(@Param("level") String level, @Param("academicUnit") String academicUnit);
+
     boolean existsByEmail(String email);
+
+    boolean existsBySbuId(String sbuId);
 
     boolean existsByGoogleId(String googleId);
 

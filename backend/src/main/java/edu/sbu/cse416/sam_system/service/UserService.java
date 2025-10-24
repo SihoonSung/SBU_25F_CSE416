@@ -14,6 +14,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
+import java.util.Optional;
 
 @Service
 public class UserService {
@@ -42,11 +45,6 @@ public class UserService {
         }
         if (isBlank(firstName)) firstName = "Unknown";
         if (isBlank(lastName))  lastName  = "User";
-
-        // (Optional) Uncomment to allow only SBU email addresses
-        // if (email == null || !email.endsWith("@stonybrook.edu")) {
-        //     throw new RuntimeException("Only SBU accounts are allowed");
-        // }
 
         // 1) Search by googleId first
         if (!isBlank(googleId)) {
@@ -103,6 +101,11 @@ public class UserService {
         if (studentId == null) return Optional.empty();
         return userRepository.findByStudentId(studentId);
     }
+    
+    public Optional<User> getUserBySbuId(String sbuId) {
+        if (sbuId == null) return Optional.empty();
+        return userRepository.findBySbuId(sbuId);
+    }
 
     public List<User> getAllUsers() { return userRepository.findAll(); }
 
@@ -120,6 +123,111 @@ public class UserService {
 
     public List<User> searchInstructorsByDepartment(String department) {
         return userRepository.findByDepartmentContaining(department);
+    }
+    
+    // Advanced search methods for students
+    public List<User> searchStudentsByMinor(String minor) {
+        return userRepository.findByMinorContaining(minor);
+    }
+    
+    public List<User> searchStudentsByGraduationYear(Integer year) {
+        return userRepository.findByGraduationYear(year);
+    }
+    
+    public List<User> searchStudentsByGraduationTerm(String semester, Integer year) {
+        return userRepository.findByGraduationTerm(semester, year);
+    }
+    
+    // Academic advisor search methods
+    public List<User> searchAdvisorsByLevel(String level) {
+        return userRepository.findByAdvisorLevel(level);
+    }
+    
+    public List<User> searchAdvisorsByAcademicUnit(String academicUnit) {
+        return userRepository.findByAcademicUnit(academicUnit);
+    }
+    
+    public List<User> searchAdvisorsByLevelAndAcademicUnit(String level, String academicUnit) {
+        return userRepository.findByAdvisorLevelAndAcademicUnit(level, academicUnit);
+    }
+    
+    // Comprehensive search method
+    public List<User> searchUsers(String name, String role, String major, String minor, 
+                                  String graduationTerm, String advisorLevel, String academicUnit) {
+        List<User> results = new ArrayList<>();
+        
+        // Start with all users if no filters
+        if (name == null && role == null && major == null && minor == null && 
+            graduationTerm == null && advisorLevel == null && academicUnit == null) {
+            return getAllUsers();
+        }
+        
+        // Apply filters
+        if (role != null) {
+            UserRole userRole = UserRole.valueOf(role.toUpperCase());
+            results = getUsersByRole(userRole);
+        } else {
+            results = getAllUsers();
+        }
+        
+        // Filter by name
+        if (name != null && !name.trim().isEmpty()) {
+            results = results.stream()
+                    .filter(user -> user.getFullName().toLowerCase().contains(name.toLowerCase()))
+                    .collect(Collectors.toList());
+        }
+        
+        // Filter by major (for students)
+        if (major != null && !major.trim().isEmpty()) {
+            results = results.stream()
+                    .filter(user -> user.getRole() == UserRole.STUDENT && 
+                            (user.getMajor() != null && user.getMajor().toLowerCase().contains(major.toLowerCase())))
+                    .collect(Collectors.toList());
+        }
+        
+        // Filter by minor (for students)
+        if (minor != null && !minor.trim().isEmpty()) {
+            List<User> minorResults = searchStudentsByMinor(minor);
+            results = results.stream()
+                    .filter(minorResults::contains)
+                    .collect(Collectors.toList());
+        }
+        
+        // Filter by graduation term
+        if (graduationTerm != null && !graduationTerm.trim().isEmpty()) {
+            // Parse graduation term (e.g., "Fall 2025")
+            String[] parts = graduationTerm.trim().split(" ");
+            if (parts.length == 2) {
+                String semester = parts[0];
+                try {
+                    Integer year = Integer.parseInt(parts[1]);
+                    List<User> termResults = searchStudentsByGraduationTerm(semester, year);
+                    results = results.stream()
+                            .filter(termResults::contains)
+                            .collect(Collectors.toList());
+                } catch (NumberFormatException e) {
+                    // Invalid year format, skip this filter
+                }
+            }
+        }
+        
+        // Filter by advisor level
+        if (advisorLevel != null && !advisorLevel.trim().isEmpty()) {
+            List<User> levelResults = searchAdvisorsByLevel(advisorLevel);
+            results = results.stream()
+                    .filter(levelResults::contains)
+                    .collect(Collectors.toList());
+        }
+        
+        // Filter by academic unit
+        if (academicUnit != null && !academicUnit.trim().isEmpty()) {
+            List<User> unitResults = searchAdvisorsByAcademicUnit(academicUnit);
+            results = results.stream()
+                    .filter(unitResults::contains)
+                    .collect(Collectors.toList());
+        }
+        
+        return results;
     }
 
     // ===== Modification methods =====
@@ -185,15 +293,7 @@ public class UserService {
             }
         }
     }
-
-    /** Normalize email + check for duplicates before saving */
-    private User processUserForImport(User user) {
-        if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
-        Optional<User> existing = userRepository.findByEmail(user.getEmail());
-        if (existing.isEmpty()) return userRepository.save(user);
-        return null;
-    }
-
+    
     private User createUserFromYamlData(Map<String, Object> userData) {
         try {
             User user = new User();
@@ -226,6 +326,36 @@ public class UserService {
         }
     }
 
+    /** Normalize email + check for duplicates before saving */
+    private User processUserForImport(User user) {
+        if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
+        
+        // Check for existing user by SBU ID (primary identifier)
+        if (user.getSbuId() != null) {
+            Optional<User> existingBySbuId = userRepository.findBySbuId(user.getSbuId());
+            if (existingBySbuId.isPresent()) {
+                // User exists - delete existing and replace with new data
+                System.out.println("Warning: User with SBU ID " + user.getSbuId() + " already exists. Replacing existing data.");
+                userRepository.delete(existingBySbuId.get());
+            }
+        }
+        
+        // Also check by email as fallback
+        Optional<User> existingByEmail = userRepository.findByEmail(user.getEmail());
+        if (existingByEmail.isPresent() && (user.getSbuId() == null || !existingByEmail.get().getSbuId().equals(user.getSbuId()))) {
+            System.out.println("Warning: User with email " + user.getEmail() + " already exists. Skipping import.");
+            return null;
+        }
+        
+        // Validate SBU ID before saving
+        if (user.getSbuId() == null || user.getSbuId().trim().isEmpty()) {
+            System.err.println("ERROR: Cannot save user without SBU ID. User: " + user.getFirstName() + " " + user.getLastName());
+            return null;
+        }
+        
+        return userRepository.save(user);
+    }
+
     private User createUserFromSBUYamlData(Map<String, Object> userData, UserRole role) {
         try {
             User user = new User();
@@ -234,26 +364,141 @@ public class UserService {
             user.setLastName((String) userData.get("last_name"));
             user.setRole(role);
 
+            // Set SBU ID as primary identifier
             if (userData.containsKey("SBU_ID")) {
                 String sbuId = String.valueOf(userData.get("SBU_ID"));
+                user.setSbuId(sbuId);
                 if (role == UserRole.STUDENT) user.setStudentId(sbuId);
+            } else {
+                System.err.println("ERROR: SBU_ID not found in user data for: " + user.getFirstName() + " " + user.getLastName());
+                System.err.println("Available keys: " + userData.keySet());
             }
 
+            // Role-specific data handling
             if (role == UserRole.STUDENT) {
-                if (userData.containsKey("majors")) {
-                    List<?> majors = (List<?>) userData.get("majors");
-                    if (majors != null && !majors.isEmpty()) user.setMajor(String.valueOf(majors.get(0)));
-                }
-            } else if (role == UserRole.INSTRUCTOR || role == UserRole.ADVISOR) {
-                if (userData.containsKey("academic_unit")) {
-                    user.setDepartment((String) userData.get("academic_unit"));
-                }
+                processStudentData(user, userData);
+            } else if (role == UserRole.ADVISOR) {
+                processAdvisorData(user, userData);
+            } else if (role == UserRole.INSTRUCTOR) {
+                processInstructorData(user, userData);
+            } else if (role == UserRole.REGISTRAR) {
+                // Registrars have minimal additional data
             }
 
             user.setIsActive(true);
             return user;
         } catch (Exception e) {
             System.err.println("Error creating user from SBU YAML data: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    private void processStudentData(User user, Map<String, Object> userData) {
+        // Basic student fields
+        if (userData.containsKey("majors")) {
+            List<?> majors = (List<?>) userData.get("majors");
+            if (majors != null && !majors.isEmpty()) {
+                user.setMajor(String.valueOf(majors.get(0)));
+                // Store full majors array as JSON
+                user.setMajors(convertToJson(majors));
+            }
+        }
+        
+        if (userData.containsKey("degrees")) {
+            user.setDegrees(convertToJson(userData.get("degrees")));
+        }
+        
+        if (userData.containsKey("minors")) {
+            user.setMinors(convertToJson(userData.get("minors")));
+        }
+        
+        if (userData.containsKey("planned_majors")) {
+            user.setPlannedMajors(convertToJson(userData.get("planned_majors")));
+        }
+        
+        if (userData.containsKey("planned_minors")) {
+            user.setPlannedMinors(convertToJson(userData.get("planned_minors")));
+        }
+        
+        // Add missing requirement versions and planned degrees
+        if (userData.containsKey("major_requirement_versions")) {
+            user.setMajorRequirementVersions(convertToJson(userData.get("major_requirement_versions")));
+        }
+        
+        if (userData.containsKey("minor_requirement_versions")) {
+            user.setMinorRequirementVersions(convertToJson(userData.get("minor_requirement_versions")));
+        }
+        
+        if (userData.containsKey("planned_major_requirement_versions")) {
+            user.setPlannedMajorRequirementVersions(convertToJson(userData.get("planned_major_requirement_versions")));
+        }
+        
+        if (userData.containsKey("planned_degrees")) {
+            user.setPlannedDegrees(convertToJson(userData.get("planned_degrees")));
+        }
+        
+        if (userData.containsKey("planned_minor_requirement_versions")) {
+            user.setPlannedMinorRequirementVersions(convertToJson(userData.get("planned_minor_requirement_versions")));
+        }
+        
+        if (userData.containsKey("university_entry")) {
+            user.setUniversityEntry(convertToJson(userData.get("university_entry")));
+        }
+        
+        if (userData.containsKey("graduation")) {
+            user.setGraduation(convertToJson(userData.get("graduation")));
+        }
+        
+        if (userData.containsKey("transfer_courses")) {
+            user.setTransferCourses(convertToJson(userData.get("transfer_courses")));
+        }
+        
+        if (userData.containsKey("classes")) {
+            user.setClasses(convertToJson(userData.get("classes")));
+        }
+        
+        if (userData.containsKey("course_plan")) {
+            user.setCoursePlan(convertToJson(userData.get("course_plan")));
+        }
+        
+        if (userData.containsKey("AOI")) {
+            user.setAoi((String) userData.get("AOI"));
+        }
+        
+        if (userData.containsKey("college")) {
+            user.setCollege((String) userData.get("college"));
+        }
+        
+        if (userData.containsKey("direct_admit")) {
+            user.setDirectAdmit((String) userData.get("direct_admit"));
+        }
+        
+        // Store all student data as JSON for easy access
+        user.setStudentData(convertToJson(userData));
+    }
+    
+    private void processAdvisorData(User user, Map<String, Object> userData) {
+        if (userData.containsKey("level")) {
+            user.setLevel((String) userData.get("level"));
+        }
+        
+        if (userData.containsKey("academic_unit")) {
+            user.setAcademicUnit((String) userData.get("academic_unit"));
+        }
+    }
+    
+    private void processInstructorData(User user, Map<String, Object> userData) {
+        if (userData.containsKey("academic_unit")) {
+            user.setDepartment((String) userData.get("academic_unit"));
+        }
+    }
+    
+    private String convertToJson(Object obj) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            System.err.println("Error converting to JSON: " + e.getMessage());
             return null;
         }
     }

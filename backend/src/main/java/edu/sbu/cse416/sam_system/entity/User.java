@@ -19,7 +19,10 @@ public class User {
     @Column(name = "user_id")
     private Long userId;
     
-    @Column(name = "email", nullable = false, unique = true)
+    @Column(name = "sbu_id", unique = true, nullable = false)
+    private String sbuId;
+    
+    @Column(name = "email", unique = true)
     private String email;
     
     @Column(name = "first_name", nullable = false)
@@ -132,6 +135,10 @@ public class User {
     @Column(name = "academic_unit")
     private String academicUnit; // SBU, CSE, etc.
     
+    // Student data stored as JSON
+    @Column(name = "student_data", columnDefinition = "LONGTEXT")
+    private String studentData; // JSON containing all student-specific fields
+    
     // Constructors
     public User() {
         this.createdAt = LocalDateTime.now();
@@ -152,6 +159,14 @@ public class User {
     
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+    
+    public String getSbuId() {
+        return sbuId;
+    }
+    
+    public void setSbuId(String sbuId) {
+        this.sbuId = sbuId;
     }
     
     public String getEmail() {
@@ -396,6 +411,14 @@ public class User {
         this.academicUnit = academicUnit;
     }
     
+    public String getStudentData() {
+        return studentData;
+    }
+    
+    public void setStudentData(String studentData) {
+        this.studentData = studentData;
+    }
+    
     // Additional getters and setters for missing fields
     public String getMajorRequirementVersions() {
         return majorRequirementVersions;
@@ -441,7 +464,7 @@ public class User {
         return graduation;
     }
     
-    public void voidsetGraduation(String graduation) {
+    public void setGraduation(String graduation) {
         this.graduation = graduation;
     }
     
