@@ -182,6 +182,7 @@ public class PdfParserService {
         // Store LEC information for courses with LAB sections
         String lecSchedule = null;
         String lecLocation = null;
+        String lecInstructor = null;
         
         // Track processed class IDs to avoid duplicates
         java.util.Set<Long> processedClassIds = new java.util.HashSet<>();
@@ -407,6 +408,7 @@ public class PdfParserService {
                     
                     lecSchedule = days + " " + timeSchedule;
                     lecLocation = locBuilder.length() > 0 ? locBuilder.toString().trim() : "TBA";
+                    lecInstructor = instrBuilder.length() > 0 ? instrBuilder.toString().trim() : "TBA";
                 }
                 continue;
             }
@@ -505,6 +507,7 @@ public class PdfParserService {
                     if ((sectionType.equals("LAB") || sectionType.equals("REC")) && lecSchedule != null) {
                         classEntity.setLecSchedule(lecSchedule);
                         classEntity.setLecLocation(lecLocation);
+                        classEntity.setLecInstructor(lecInstructor);
                     }
                     
                     classEntity.setSemester(semester);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './CourseRegistration.css'
+import { checkTimeConflict } from '../utils/timeConflict'
 
 /*
  * Course Registration Page Component
@@ -44,6 +45,10 @@ function CourseRegistration() {
       status: 'Conflict'
     }
   ])
+  
+  // Cart conflict tracking
+  const [cartConflicts, setCartConflicts] = useState<any[]>([])
+  const [isCheckingConflicts, setIsCheckingConflicts] = useState(false)
 
   /**
    * Fetch available terms and classes on component mount
@@ -51,6 +56,29 @@ function CourseRegistration() {
   useEffect(() => {
     fetchAvailableTerms()
   }, [])
+  
+  /**
+   * Check for conflicts whenever cart changes
+   */
+  useEffect(() => {
+    const checkConflicts = async () => {
+      if (cart.length > 1) {
+        setIsCheckingConflicts(true)
+        try {
+          const conflicts = await checkCartConflicts()
+          setCartConflicts(conflicts)
+        } catch (error) {
+          console.error('Error checking cart conflicts:', error)
+        } finally {
+          setIsCheckingConflicts(false)
+        }
+      } else {
+        setCartConflicts([])
+      }
+    }
+    
+    checkConflicts()
+  }, [cart])
   
   /**
    * Fetch classes when term selection changes
@@ -78,6 +106,7 @@ function CourseRegistration() {
     location: cls.location,
     lecSchedule: cls.lecSchedule, // LEC schedule
     lecLocation: cls.lecLocation, // LEC location
+    lecInstructor: cls.lecInstructor, // LEC instructor
     prerequisites: cls.prerequisites,
     corequisites: cls.corequisites,
     antirequisites: cls.antirequisites,
@@ -218,9 +247,77 @@ function CourseRegistration() {
   }
 
   /**
-   * Add a course to the cart
+   * Combine LEC and REC schedules into a single string
    */
-  const handleAddToCart = (course: any) => {
+  const combineSchedules = (course: any) => {
+    const schedules = []
+    if (course.lecSchedule) schedules.push(course.lecSchedule)
+    if (course.schedule) schedules.push(course.schedule)
+    return schedules.join(', ')
+  }
+
+  /**
+   * Check for time conflicts within the cart
+   */
+  const checkCartConflicts = async () => {
+    const conflicts = []
+    
+    for (let i = 0; i < cart.length; i++) {
+      for (let j = i + 1; j < cart.length; j++) {
+        const schedule1 = combineSchedules(cart[i])
+        const schedule2 = combineSchedules(cart[j])
+        
+        if (schedule1 && schedule2) {
+          try {
+            const result = await checkTimeConflict(schedule1, schedule2)
+            if (result.hasConflict) {
+              conflicts.push({
+                item1: cart[i],
+                item2: cart[j]
+              })
+            }
+          } catch (error) {
+            console.error('Error checking time conflict:', error)
+          }
+        }
+      }
+    }
+    
+    return conflicts
+  }
+
+  /**
+   * Add a course to the cart with time conflict checking
+   */
+  const handleAddToCart = async (course: any) => {
+    // Check for time conflicts with existing cart items
+    const courseSchedule = combineSchedules(course)
+    
+    if (courseSchedule && cart.length > 0) {
+      let hasConflict = false
+      let conflictMessage = ''
+
+      for (const cartItem of cart) {
+        const cartSchedule = combineSchedules(cartItem)
+        
+        if (cartSchedule) {
+          try {
+            const result = await checkTimeConflict(courseSchedule, cartSchedule)
+            if (result.hasConflict) {
+              hasConflict = true
+              conflictMessage += `⚠️ Time conflict with ${cartItem.code} (${cartItem.title})\n`
+            }
+          } catch (error) {
+            console.error('Error checking time conflict:', error)
+          }
+        }
+      }
+
+      if (hasConflict) {
+        alert(`Time Conflict Detected!\n\n${conflictMessage}\nYou can still add this class, but please resolve conflicts before registration.`)
+      }
+    }
+
     setCart([...cart, { ...course, status: 'Added' }])
   }
 
@@ -231,8 +328,6 @@ function CourseRegistration() {
     setCart(cart.filter(course => course.id !== courseId))
   }
 
-  // Check if there are any time conflicts in the cart
-  const hasConflict = cart.some(course => course.status === 'Conflict')
 
   return (
     <div className="course-registration-page">
@@ -349,6 +444,10 @@ function CourseRegistration() {
                           <div className="detail-row">
                             <span className="detail-label">Location:</span>
                             <span className="detail-value">{course.lecLocation}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="detail-label">Instructor:</span>
+                            <span className="detail-value">{course.lecInstructor || 'TBA'}</span>
                           </div>
                         </div>
                       )}
@@ -472,10 +571,28 @@ function CourseRegistration() {
         <h2>My Course Cart</h2>
         <div className="cart-container">
           {/* Conflict Warning */}
-          {hasConflict && (
+          {cartConflicts.length > 0 && (
             <div className="conflict-warning">
-              <div className="warning-icon">ℹ</div>
-              <span>Time conflict: CSE101 and CSE114 overlap. Please resolve before submitting.</span>
+              <div className="warning-icon">⚠️</div>
+              <div className="conflict-details">
+                <span className="conflict-title">Time Conflicts Detected!</span>
+                <div className="conflict-list">
+                  {cartConflicts.map((conflict, index) => (
+                    <div key={index} className="conflict-item">
+                      • {conflict.item1.code} ({conflict.item1.title}) conflicts with {conflict.item2.code} ({conflict.item2.title})
+                    </div>
+                  ))}
+                </div>
+                <span className="conflict-message">Please resolve conflicts before registration.</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Loading indicator */}
+          {isCheckingConflicts && (
+            <div className="conflict-checking">
+              <div className="loading-spinner"></div>
+              <span>Checking for time conflicts...</span>
             </div>
           )}
           
@@ -486,7 +603,7 @@ function CourseRegistration() {
                 <div className="course-info">
                   <div className="course-code">{course.code}</div>
                   <div className="course-title">{course.title}</div>
-                  <div className="course-schedule">{course.schedule}</div>
+                  <div className="course-schedule">{combineSchedules(course)}</div>
                   <div className="course-instructor">{course.instructor}</div>
                 </div>
                 <span className={`status-tag ${course.status.toLowerCase()}`}>

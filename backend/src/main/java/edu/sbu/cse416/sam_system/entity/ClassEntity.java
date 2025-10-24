@@ -77,6 +77,10 @@ public class ClassEntity {
     @Column(name = "lec_location")
     private String lecLocation;
     
+    // Lecture instructor (for courses with LAB sections)
+    @Column(name = "lec_instructor")
+    private String lecInstructor;
+    
     // Prerequisites (e.g., "CSE 114")
     // Using TEXT type to support long prerequisite descriptions
     @Column(name = "prerequisites", columnDefinition = "TEXT")
@@ -259,6 +263,14 @@ public class ClassEntity {
     
     public void setLecLocation(String lecLocation) {
         this.lecLocation = lecLocation;
+    }
+    
+    public String getLecInstructor() {
+        return lecInstructor;
+    }
+    
+    public void setLecInstructor(String lecInstructor) {
+        this.lecInstructor = lecInstructor;
     }
     
     public String getPrerequisites() {
