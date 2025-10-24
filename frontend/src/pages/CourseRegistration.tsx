@@ -19,66 +19,18 @@ function CourseRegistration() {
   const [availableTerms, setAvailableTerms] = useState<any[]>([])
   const [selectedSemester, setSelectedSemester] = useState('')
   const [selectedYear, setSelectedYear] = useState<number | string>('')
-  const [cart, setCart] = useState([
-    {
-      id: 'CSE101',
-      code: 'CSE101',
-      title: 'Computer Science Principles',
-      schedule: 'Mon/Wed 11:00 AM',
-      instructor: 'Jalaa Hoblos',
-      status: 'Enrolled'
-    },
-    {
-      id: 'WRT101',
-      code: 'WRT101',
-      title: 'Introductory Writing Workshop',
-      schedule: 'Mon/Wed 9:30 AM',
-      instructor: 'Soni Adhikari',
-      status: 'Waitlisted'
-    },
-    {
-      id: 'CSE114',
-      code: 'CSE114',
-      title: 'Intro to Object-Oriented Prog',
-      schedule: 'Mon/Wed 11:00 AM',
-      instructor: 'Paul Fodor',
-      status: 'Conflict'
-    }
-  ])
+  const [cart, setCart] = useState<any[]>([])
+  const [userId] = useState(1) // 임시 사용자 ID
   
-  // Cart conflict tracking
-  const [cartConflicts, setCartConflicts] = useState<any[]>([])
-  const [isCheckingConflicts, setIsCheckingConflicts] = useState(false)
 
   /**
    * Fetch available terms and classes on component mount
    */
   useEffect(() => {
     fetchAvailableTerms()
+    loadCartFromDB()
   }, [])
   
-  /**
-   * Check for conflicts whenever cart changes
-   */
-  useEffect(() => {
-    const checkConflicts = async () => {
-      if (cart.length > 1) {
-        setIsCheckingConflicts(true)
-        try {
-          const conflicts = await checkCartConflicts()
-          setCartConflicts(conflicts)
-        } catch (error) {
-          console.error('Error checking cart conflicts:', error)
-        } finally {
-          setIsCheckingConflicts(false)
-        }
-      } else {
-        setCartConflicts([])
-      }
-    }
-    
-    checkConflicts()
-  }, [cart])
   
   /**
    * Fetch classes when term selection changes
@@ -134,6 +86,26 @@ function CourseRegistration() {
       // Finally by Section
       return a.section.localeCompare(b.section)
     })
+  }
+
+  /**
+   * Load cart items from database
+   */
+  const loadCartFromDB = async () => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/cart/items?userId=${userId}`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setCart(data.items)
+      } else {
+        console.error('Error loading cart:', data.message)
+        setCart([])
+      }
+    } catch (error) {
+      console.error('Error loading cart from DB:', error)
+      setCart([])
+    }
   }
 
   /**
@@ -256,45 +228,16 @@ function CourseRegistration() {
     return schedules.join(', ')
   }
 
-  /**
-   * Check for time conflicts within the cart
-   */
-  const checkCartConflicts = async () => {
-    const conflicts = []
-    
-    for (let i = 0; i < cart.length; i++) {
-      for (let j = i + 1; j < cart.length; j++) {
-        const schedule1 = combineSchedules(cart[i])
-        const schedule2 = combineSchedules(cart[j])
-        
-        if (schedule1 && schedule2) {
-          try {
-            const result = await checkTimeConflict(schedule1, schedule2)
-            if (result.hasConflict) {
-              conflicts.push({
-                item1: cart[i],
-                item2: cart[j]
-              })
-            }
-          } catch (error) {
-            console.error('Error checking time conflict:', error)
-          }
-        }
-      }
-    }
-    
-    return conflicts
-  }
 
   /**
    * Add a course to the cart with time conflict checking
    */
   const handleAddToCart = async (course: any) => {
-    // Check for time conflicts with existing cart items
+    // Check for time conflicts with existing cart items BEFORE adding
     const courseSchedule = combineSchedules(course)
+    let hasConflict = false
     
     if (courseSchedule && cart.length > 0) {
-      let hasConflict = false
       let conflictMessage = ''
 
       for (const cartItem of cart) {
@@ -318,14 +261,62 @@ function CourseRegistration() {
       }
     }
 
-    setCart([...cart, { ...course, status: 'Added' }])
+    // Add to cart regardless of conflicts
+    try {
+      const response = await fetch('http://localhost:8080/api/cart/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          classId: course.id
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Reload cart from database
+        await loadCartFromDB()
+        if (!hasConflict) {
+          alert('Class added to cart successfully!')
+        }
+      } else {
+        if (data.message.includes('already exists')) {
+          alert('This class is already in your cart!')
+        } else {
+          alert('Error adding class to cart: ' + data.message)
+        }
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error)
+      alert('Error adding class to cart. Please try again.')
+    }
   }
 
   /**
    * Remove a course from the cart
    */
-  const handleDropCourse = (courseId: string) => {
-    setCart(cart.filter(course => course.id !== courseId))
+  const handleDropCourse = async (courseId: string) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/cart/remove?userId=${userId}&classId=${courseId}`, {
+        method: 'DELETE'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Reload cart from database
+        await loadCartFromDB()
+        alert('Class removed from cart successfully!')
+      } else {
+        alert('Error removing class from cart: ' + data.message)
+      }
+    } catch (error) {
+      console.error('Error removing from cart:', error)
+      alert('Error removing class from cart. Please try again.')
+    }
   }
 
 
@@ -570,53 +561,36 @@ function CourseRegistration() {
       <div className="cart-section">
         <h2>My Course Cart</h2>
         <div className="cart-container">
-          {/* Conflict Warning */}
-          {cartConflicts.length > 0 && (
-            <div className="conflict-warning">
-              <div className="warning-icon">⚠️</div>
-              <div className="conflict-details">
-                <span className="conflict-title">Time Conflicts Detected!</span>
-                <div className="conflict-list">
-                  {cartConflicts.map((conflict, index) => (
-                    <div key={index} className="conflict-item">
-                      • {conflict.item1.code} ({conflict.item1.title}) conflicts with {conflict.item2.code} ({conflict.item2.title})
-                    </div>
-                  ))}
-                </div>
-                <span className="conflict-message">Please resolve conflicts before registration.</span>
-              </div>
-            </div>
-          )}
-          
-          {/* Loading indicator */}
-          {isCheckingConflicts && (
-            <div className="conflict-checking">
-              <div className="loading-spinner"></div>
-              <span>Checking for time conflicts...</span>
-            </div>
-          )}
           
           {/* Cart Courses */}
           <div className="cart-courses">
-            {cart.map((course) => (
-              <div key={course.id} className="cart-course-card">
-                <div className="course-info">
-                  <div className="course-code">{course.code}</div>
-                  <div className="course-title">{course.title}</div>
-                  <div className="course-schedule">{combineSchedules(course)}</div>
-                  <div className="course-instructor">{course.instructor}</div>
-                </div>
-                <span className={`status-tag ${course.status.toLowerCase()}`}>
-                  {course.status}
-                </span>
-                <button 
-                  className="drop-btn"
-                  onClick={() => handleDropCourse(course.id)}
-                >
-                  Drop
-                </button>
+            {cart.length === 0 ? (
+              <div className="empty-cart-message">
+                <div className="empty-cart-icon">🛒</div>
+                <h3>Your cart is empty</h3>
+                <p>Add classes to your cart to get started!</p>
               </div>
-            ))}
+            ) : (
+              cart.map((course) => (
+                <div key={course.id} className="cart-course-card">
+                  <div className="course-info">
+                    <div className="course-code">{course.code}</div>
+                    <div className="course-title">{course.title}</div>
+                    <div className="course-schedule">{combineSchedules(course)}</div>
+                    <div className="course-instructor">{course.instructor}</div>
+                  </div>
+                  <span className={`status-tag ${course.status.toLowerCase()}`}>
+                    {course.status}
+                  </span>
+                  <button 
+                    className="drop-btn"
+                    onClick={() => handleDropCourse(course.classId)}
+                  >
+                    Drop
+                  </button>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Submit Registration Button */}
