@@ -229,6 +229,9 @@ public class CartService {
                 return result;
             }
             
+            // Get already registered classes from UserClasses
+            List<UserClasses> alreadyRegisteredClasses = userClassesRepository.findByUserId(userId);
+            
             // Check for conflicts among cart items
             List<String> conflicts = new ArrayList<>();
             for (int i = 0; i < cartItems.size(); i++) {
@@ -237,8 +240,8 @@ public class CartService {
                     CartEntity item2 = cartItems.get(j);
                     
                     if (item1.getStatus().equals("Added") && item2.getStatus().equals("Added")) {
-                        String schedule1 = item1.getClassEntity().getSchedule();
-                        String schedule2 = item2.getClassEntity().getSchedule();
+                        String schedule1 = combineSchedules(item1.getClassEntity());
+                        String schedule2 = combineSchedules(item2.getClassEntity());
                         
                         if (schedule1 != null && schedule2 != null) {
                             boolean hasConflict = TimeConflictChecker.hasTimeConflict(schedule1, schedule2);
@@ -246,6 +249,34 @@ public class CartService {
                                 conflicts.add(String.format("Conflict between %s and %s", 
                                     item1.getClassEntity().getDepartment() + item1.getClassEntity().getCourseNum(),
                                     item2.getClassEntity().getDepartment() + item2.getClassEntity().getCourseNum()));
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Check for conflicts between cart items and already registered classes
+            for (CartEntity cartItem : cartItems) {
+                if (cartItem.getStatus().equals("Added")) {
+                    String cartSchedule = combineSchedules(cartItem.getClassEntity());
+                    
+                    if (cartSchedule != null) {
+                        for (UserClasses registeredClass : alreadyRegisteredClasses) {
+                            // Get the original class entity for the registered class
+                            ClassEntity registeredClassEntity = classRepository.findById(registeredClass.getClassId()).orElse(null);
+                            
+                            if (registeredClassEntity != null) {
+                                String registeredSchedule = combineSchedules(registeredClassEntity);
+                                
+                                if (registeredSchedule != null) {
+                                    boolean hasConflict = TimeConflictChecker.hasTimeConflict(cartSchedule, registeredSchedule);
+                                    if (hasConflict) {
+                                        conflicts.add(String.format("Conflict between cart item %s and already registered %s %s", 
+                                            cartItem.getClassEntity().getDepartment() + cartItem.getClassEntity().getCourseNum(),
+                                            registeredClassEntity.getDepartment(), 
+                                            registeredClassEntity.getCourseNum()));
+                                    }
+                                }
                             }
                         }
                     }

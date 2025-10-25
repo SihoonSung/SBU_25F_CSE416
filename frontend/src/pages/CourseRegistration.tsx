@@ -353,7 +353,7 @@ function CourseRegistration() {
         alert(`Registration successful! Registered for ${data.registeredCount} class(es).`)
       } else {
         if (data.conflicts && data.conflicts.length > 0) {
-          alert(`Registration failed due to time conflicts:\n${data.conflicts.join('\n')}`)
+          alert(`Registration failed due to time conflicts:\n${data.conflicts.join('\n')}\n\nPlease resolve conflicts before registering.`)
         } else if (data.duplicateClasses && data.duplicateClasses.length > 0) {
           alert(`Registration failed - these classes are already registered:\n${data.duplicateClasses.join('\n')}`)
         } else {
@@ -608,6 +608,19 @@ function CourseRegistration() {
       <div className="cart-section">
         <h2>My Course Cart</h2>
         <div className="cart-container">
+          
+          {/* Conflict Warning */}
+          {cart.some(item => item.status === 'Conflict') && (
+            <div className="conflict-warning">
+              <div className="conflict-icon">⚠️</div>
+              <div className="conflict-details">
+                <div className="conflict-title">Time Conflicts Detected</div>
+                <div className="conflict-message">
+                  Some classes in your cart have scheduling conflicts. Please resolve these before submitting registration.
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Cart Courses */}
           <div className="cart-courses">
