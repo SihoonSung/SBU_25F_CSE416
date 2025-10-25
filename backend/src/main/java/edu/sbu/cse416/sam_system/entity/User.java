@@ -109,14 +109,10 @@ public class User {
     @Column(name = "graduation", columnDefinition = "TEXT")
     private String graduation; // JSON: {semester: Fall, year: 2024}
     
-    @Column(name = "transfer_courses", columnDefinition = "LONGTEXT")
-    private String transferCourses; // JSON array of transfer course objects
-    
-    @Column(name = "classes", columnDefinition = "LONGTEXT")
-    private String classes; // JSON array of class objects
-    
-    @Column(name = "course_plan", columnDefinition = "LONGTEXT")
-    private String coursePlan; // JSON array of planned courses
+    // Note: transfer_courses, classes, and course_plan are now stored in separate tables
+    // - user_transfer_courses
+    // - user_classes  
+    // - user_course_plan
     
     // Instructor-specific fields
     @Column(name = "department")
@@ -370,29 +366,8 @@ public class User {
         this.plannedMinors = plannedMinors;
     }
     
-    public String getTransferCourses() {
-        return transferCourses;
-    }
-    
-    public void setTransferCourses(String transferCourses) {
-        this.transferCourses = transferCourses;
-    }
-    
-    public String getClasses() {
-        return classes;
-    }
-    
-    public void setClasses(String classes) {
-        this.classes = classes;
-    }
-    
-    public String getCoursePlan() {
-        return coursePlan;
-    }
-    
-    public void setCoursePlan(String coursePlan) {
-        this.coursePlan = coursePlan;
-    }
+    // Note: getter/setter methods for transfer_courses, classes, and course_plan 
+    // have been removed as these are now stored in separate tables
     
     // Advisor field getters and setters
     public String getLevel() {

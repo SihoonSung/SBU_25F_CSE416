@@ -174,4 +174,23 @@ public class CartController {
         
         return ResponseEntity.ok(response);
     }
+    
+    /**
+     * Submit registration for all cart items
+     * @param userId User ID
+     * @return Registration result with success status and details
+     */
+    @PostMapping("/submit-registration")
+    public ResponseEntity<Map<String, Object>> submitRegistration(@RequestParam Long userId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Map<String, Object> result = cartService.submitRegistration(userId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error submitting registration: " + e.getMessage());
+            return ResponseEntity.ok(response);
+        }
+    }
 }

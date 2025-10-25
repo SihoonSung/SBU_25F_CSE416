@@ -3,7 +3,13 @@ package edu.sbu.cse416.sam_system.controller;
 import edu.sbu.cse416.sam_system.dto.StudentProfileDto;
 import edu.sbu.cse416.sam_system.entity.User;
 import edu.sbu.cse416.sam_system.entity.UserRole;
+import edu.sbu.cse416.sam_system.entity.UserClasses;
+import edu.sbu.cse416.sam_system.entity.UserTransferCourses;
+import edu.sbu.cse416.sam_system.entity.UserCoursePlan;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
+import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
+import edu.sbu.cse416.sam_system.repository.UserTransferCoursesRepository;
+import edu.sbu.cse416.sam_system.repository.UserCoursePlanRepository;
 import edu.sbu.cse416.sam_system.service.UserService;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,10 +36,19 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final UserService userService;
+    private final UserClassesRepository userClassesRepository;
+    private final UserTransferCoursesRepository userTransferCoursesRepository;
+    private final UserCoursePlanRepository userCoursePlanRepository;
 
-    public UserController(UserRepository userRepository, UserService userService) {
+    public UserController(UserRepository userRepository, UserService userService,
+                         UserClassesRepository userClassesRepository,
+                         UserTransferCoursesRepository userTransferCoursesRepository,
+                         UserCoursePlanRepository userCoursePlanRepository) {
         this.userRepository = userRepository;
         this.userService = userService;
+        this.userClassesRepository = userClassesRepository;
+        this.userTransferCoursesRepository = userTransferCoursesRepository;
+        this.userCoursePlanRepository = userCoursePlanRepository;
     }
 
     /** Test endpoint to verify controller is loaded */
@@ -266,5 +281,76 @@ public class UserController {
         String googleId = principal.getName();
         var userOpt = userService.getUserByGoogleId(googleId);
         return userOpt.isPresent() && userOpt.get().isAdvisor();
+    }
+
+    // ===== New Normalized Table APIs =====
+
+    /** Get user's classes */
+    @GetMapping("/{userId}/classes")
+    public ResponseEntity<List<UserClasses>> getUserClasses(@PathVariable Long userId) {
+        try {
+            List<UserClasses> classes = userClassesRepository.findByUserId(userId);
+            return ResponseEntity.ok(classes);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /** Get user's transfer courses */
+    @GetMapping("/{userId}/transfer-courses")
+    public ResponseEntity<List<UserTransferCourses>> getUserTransferCourses(@PathVariable Long userId) {
+        try {
+            List<UserTransferCourses> transferCourses = userTransferCoursesRepository.findByUserId(userId);
+            return ResponseEntity.ok(transferCourses);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /** Get user's course plan */
+    @GetMapping("/{userId}/course-plan")
+    public ResponseEntity<List<UserCoursePlan>> getUserCoursePlan(@PathVariable Long userId) {
+        try {
+            List<UserCoursePlan> coursePlan = userCoursePlanRepository.findByUserId(userId);
+            return ResponseEntity.ok(coursePlan);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /** Get user's classes by semester and year */
+    @GetMapping("/{userId}/classes/{semester}/{year}")
+    public ResponseEntity<List<UserClasses>> getUserClassesBySemesterAndYear(
+            @PathVariable Long userId, 
+            @PathVariable String semester, @PathVariable Integer year) {
+        try {
+            List<UserClasses> classes = userClassesRepository.findByUserIdAndSemesterAndYear(userId, semester, year);
+            return ResponseEntity.ok(classes);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+
+    /** Get user's completed classes (with grades) */
+    @GetMapping("/{userId}/classes/completed")
+    public ResponseEntity<List<UserClasses>> getCompletedClasses(@PathVariable Long userId) {
+        try {
+            List<UserClasses> completedClasses = userClassesRepository.findCompletedClassesByUserId(userId);
+            return ResponseEntity.ok(completedClasses);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /** Get user's future classes (without grades) */
+    @GetMapping("/{userId}/classes/future")
+    public ResponseEntity<List<UserClasses>> getFutureClasses(@PathVariable Long userId) {
+        try {
+            List<UserClasses> futureClasses = userClassesRepository.findFutureClassesByUserId(userId);
+            return ResponseEntity.ok(futureClasses);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }

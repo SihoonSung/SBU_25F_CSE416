@@ -67,9 +67,14 @@ public class UserResponseDto {
             this.plannedMinors = parseJsonArray(user.getPlannedMinors());
             this.universityEntry = parseJsonObject(user.getUniversityEntry());
             this.graduation = parseJsonObject(user.getGraduation());
-            this.classes = parseJsonArrayOfObjects(user.getClasses());
-            this.transferCourses = parseJsonArrayOfObjects(user.getTransferCourses());
-            this.coursePlan = parseJsonArrayOfObjects(user.getCoursePlan());
+            // Note: classes, transferCourses, and coursePlan are now stored in separate tables
+            // These fields will be populated separately via API calls to:
+            // - /api/users/{userId}/classes
+            // - /api/users/{userId}/transfer-courses  
+            // - /api/users/{userId}/course-plan
+            this.classes = new ArrayList<>();
+            this.transferCourses = new ArrayList<>();
+            this.coursePlan = new ArrayList<>();
             this.aoi = user.getAoi();
             this.college = user.getCollege();
             this.directAdmit = user.getDirectAdmit();

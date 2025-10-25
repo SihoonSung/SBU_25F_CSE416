@@ -108,6 +108,7 @@ function CourseRegistration() {
     }
   }
 
+
   /**
    * Fetch available semester/year combinations from backend
    */
@@ -311,11 +312,57 @@ function CourseRegistration() {
         await loadCartFromDB()
         alert('Class removed from cart successfully!')
       } else {
-        alert('Error removing class from cart: ' + data.message)
+        alert('❌ Error removing class from cart: ' + data.message)
       }
     } catch (error) {
       console.error('Error removing from cart:', error)
-      alert('Error removing class from cart. Please try again.')
+      alert('❌ Error removing class from cart. Please try again.')
+    }
+  }
+
+  /**
+   * Handle submitting registration for all cart items
+   */
+  const handleSubmitRegistration = async () => {
+    if (cart.length === 0) {
+      alert('Your cart is empty. Add classes to register.')
+      return
+    }
+
+    // Check if there are any items with conflicts
+    const hasConflicts = cart.some(item => item.status === 'Conflict')
+    if (hasConflicts) {
+      alert('Cannot register classes with time conflicts. Please resolve conflicts first.')
+      return
+    }
+
+    // Confirm registration
+    const confirmed = window.confirm(`Are you sure you want to register for ${cart.length} class(es)?`)
+    if (!confirmed) return
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/cart/submit-registration?userId=${userId}`, {
+        method: 'POST'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Reload cart from database to show updated statuses
+        await loadCartFromDB()
+        alert(`Registration successful! Registered for ${data.registeredCount} class(es).`)
+      } else {
+        if (data.conflicts && data.conflicts.length > 0) {
+          alert(`Registration failed due to time conflicts:\n${data.conflicts.join('\n')}`)
+        } else if (data.duplicateClasses && data.duplicateClasses.length > 0) {
+          alert(`Registration failed - these classes are already registered:\n${data.duplicateClasses.join('\n')}`)
+        } else {
+          alert('Registration failed: ' + data.message)
+        }
+      }
+    } catch (error) {
+      console.error('Error submitting registration:', error)
+      alert('Error submitting registration. Please try again.')
     }
   }
 
@@ -594,11 +641,16 @@ function CourseRegistration() {
           </div>
 
           {/* Submit Registration Button */}
-          <button className="submit-registration-btn">
+          <button 
+            className="submit-registration-btn"
+            onClick={handleSubmitRegistration}
+            disabled={cart.length === 0}
+          >
             Submit Registration
           </button>
         </div>
       </div>
+
     </div>
   )
 }

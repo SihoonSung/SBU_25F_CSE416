@@ -2,7 +2,13 @@ package edu.sbu.cse416.sam_system.service;
 
 import edu.sbu.cse416.sam_system.entity.User;
 import edu.sbu.cse416.sam_system.entity.UserRole;
+import edu.sbu.cse416.sam_system.entity.UserClasses;
+import edu.sbu.cse416.sam_system.entity.UserTransferCourses;
+import edu.sbu.cse416.sam_system.entity.UserCoursePlan;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
+import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
+import edu.sbu.cse416.sam_system.repository.UserTransferCoursesRepository;
+import edu.sbu.cse416.sam_system.repository.UserCoursePlanRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
@@ -25,6 +31,15 @@ public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private UserClassesRepository userClassesRepository;
+    
+    @Autowired
+    private UserTransferCoursesRepository userTransferCoursesRepository;
+    
+    @Autowired
+    private UserCoursePlanRepository userCoursePlanRepository;
 
     /** Find or create user after Google OAuth2 login */
     @Transactional
@@ -288,7 +303,7 @@ public class UserService {
                 for (Map<String, Object> userData : usersData) {
                     User user = createUserFromYamlData(userData);
                     if (user != null) {
-                        User saved = processUserForImport(user);
+                        User saved = processUserForImport(user, userData);
                         if (saved != null) importedUsers.add(saved);
                     }
                 }
@@ -309,7 +324,7 @@ public class UserService {
             for (Map<String, Object> userData : usersData) {
                 User user = createUserFromSBUYamlData(userData, role);
                 if (user != null) {
-                    User saved = processUserForImport(user);
+                    User saved = processUserForImport(user, userData);
                     if (saved != null) importedUsers.add(saved);
                 }
             }
@@ -349,7 +364,7 @@ public class UserService {
     }
 
     /** Normalize email + check for duplicates before saving */
-    private User processUserForImport(User user) {
+    private User processUserForImport(User user, Map<String, Object> userData) {
         if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
         
         // Check for existing user by SBU ID (primary identifier)
@@ -375,7 +390,133 @@ public class UserService {
             return null;
         }
         
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        
+        // Process related data after user is saved
+        processUserRelatedData(savedUser, userData);
+        
+        return savedUser;
+    }
+
+    /** Process related data (classes, transfer_courses, course_plan) into separate tables */
+    private void processUserRelatedData(User user, Map<String, Object> userData) {
+        try {
+            System.out.println("Processing related data for user: " + user.getSbuId());
+            System.out.println("Available keys in userData: " + userData.keySet());
+            
+            // Process classes
+            if (userData.containsKey("classes")) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> classes = (List<Map<String, Object>>) userData.get("classes");
+                System.out.println("Found " + classes.size() + " classes to process");
+                
+                for (Map<String, Object> classData : classes) {
+                    System.out.println("Processing class: " + classData);
+                    UserClasses userClass = new UserClasses();
+                    userClass.setUser(user);
+                    userClass.setClassId(getLongValue(classData.get("class_id")));
+                    userClass.setDepartment(getStringValue(classData.get("department")));
+                    userClass.setCourseNum(getIntegerValue(classData.get("course_num")));
+                    userClass.setSection(getStringValue(classData.get("section")));
+                    userClass.setSemester(getStringValue(classData.get("semester")));
+                    userClass.setYear(getIntegerValue(classData.get("year")));
+                    userClass.setCredits(getIntegerValue(classData.get("credits")));
+                    userClass.setGpnc(getStringValue(classData.get("GPNC")));
+                    userClass.setGrade(getStringValue(classData.get("grade")));
+                    
+                    UserClasses saved = userClassesRepository.save(userClass);
+                    System.out.println("Saved UserClass with ID: " + saved.getId());
+                }
+            } else {
+                System.out.println("No 'classes' key found in userData");
+            }
+            
+            // Process transfer_courses
+            if (userData.containsKey("transfer_courses")) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> transferCourses = (List<Map<String, Object>>) userData.get("transfer_courses");
+                System.out.println("Found " + transferCourses.size() + " transfer courses to process");
+                
+                for (Map<String, Object> transferData : transferCourses) {
+                    System.out.println("Processing transfer course: " + transferData);
+                    UserTransferCourses userTransfer = new UserTransferCourses();
+                    userTransfer.setUser(user);
+                    userTransfer.setClassName(getStringValue(transferData.get("class")));
+                    userTransfer.setUniversity(getStringValue(transferData.get("university")));
+                    userTransfer.setCredits(getIntegerValue(transferData.get("credits")));
+                    userTransfer.setDepartment(getStringValue(transferData.get("department")));
+                    userTransfer.setCourseNum(getIntegerValue(transferData.get("course_num")));
+                    userTransfer.setGrade(getStringValue(transferData.get("grade")));
+                    
+                    UserTransferCourses saved = userTransferCoursesRepository.save(userTransfer);
+                    System.out.println("Saved UserTransferCourse with ID: " + saved.getId());
+                }
+            } else {
+                System.out.println("No 'transfer_courses' key found in userData");
+            }
+            
+            // Process course_plan
+            if (userData.containsKey("course_plan")) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> coursePlan = (List<Map<String, Object>>) userData.get("course_plan");
+                System.out.println("Found " + coursePlan.size() + " course plan items to process");
+                
+                for (Map<String, Object> planData : coursePlan) {
+                    System.out.println("Processing course plan: " + planData);
+                    UserCoursePlan userPlan = new UserCoursePlan();
+                    userPlan.setUser(user);
+                    userPlan.setDepartment(getStringValue(planData.get("department")));
+                    userPlan.setCourseNum(getIntegerValue(planData.get("course_num")));
+                    userPlan.setSemester(getStringValue(planData.get("semester")));
+                    userPlan.setYear(getIntegerValue(planData.get("year")));
+                    userPlan.setCredits(getIntegerValue(planData.get("credits")));
+                    
+                    UserCoursePlan saved = userCoursePlanRepository.save(userPlan);
+                    System.out.println("Saved UserCoursePlan with ID: " + saved.getId());
+                }
+            } else {
+                System.out.println("No 'course_plan' key found in userData");
+            }
+        } catch (Exception e) {
+            System.err.println("Error processing related data for user " + user.getSbuId() + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /** Helper method to safely convert Object to Long */
+    private Long getLongValue(Object value) {
+        if (value == null) return null;
+        if (value instanceof Long) return (Long) value;
+        if (value instanceof Integer) return ((Integer) value).longValue();
+        if (value instanceof String) {
+            try {
+                return Long.parseLong((String) value);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+    
+    /** Helper method to safely convert Object to Integer */
+    private Integer getIntegerValue(Object value) {
+        if (value == null) return null;
+        if (value instanceof Integer) return (Integer) value;
+        if (value instanceof Long) return ((Long) value).intValue();
+        if (value instanceof String) {
+            try {
+                return Integer.parseInt((String) value);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+    
+    /** Helper method to safely convert Object to String */
+    private String getStringValue(Object value) {
+        if (value == null) return null;
+        return value.toString();
     }
 
     private User createUserFromSBUYamlData(Map<String, Object> userData, UserRole role) {
@@ -471,17 +612,8 @@ public class UserService {
             user.setGraduation(convertToJson(userData.get("graduation")));
         }
         
-        if (userData.containsKey("transfer_courses")) {
-            user.setTransferCourses(convertToJson(userData.get("transfer_courses")));
-        }
-        
-        if (userData.containsKey("classes")) {
-            user.setClasses(convertToJson(userData.get("classes")));
-        }
-        
-        if (userData.containsKey("course_plan")) {
-            user.setCoursePlan(convertToJson(userData.get("course_plan")));
-        }
+        // Note: transfer_courses, classes, and course_plan are now processed 
+        // in processUserRelatedData() method after user is saved
         
         if (userData.containsKey("AOI")) {
             user.setAoi((String) userData.get("AOI"));
@@ -613,15 +745,11 @@ public class UserService {
         if (user.getGraduation() != null) {
             studentData.put("graduation", parseJson(user.getGraduation()));
         }
-        if (user.getTransferCourses() != null) {
-            studentData.put("transfer_courses", parseJson(user.getTransferCourses()));
-        }
-        if (user.getClasses() != null) {
-            studentData.put("classes", parseJson(user.getClasses()));
-        }
-        if (user.getCoursePlan() != null) {
-            studentData.put("course_plan", parseJson(user.getCoursePlan()));
-        }
+        // Note: transfer_courses, classes, and course_plan are now stored in separate tables
+        // Use the new API endpoints to retrieve this data:
+        // - /api/users/{userId}/transfer-courses
+        // - /api/users/{userId}/classes  
+        // - /api/users/{userId}/course-plan
         
         return studentData;
     }
