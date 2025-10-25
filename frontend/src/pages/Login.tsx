@@ -14,6 +14,7 @@ function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const googleUrl = `${backendBase}/oauth2/authorization/google`
   
@@ -21,9 +22,16 @@ function Login() {
   useEffect(() => {
     const success = searchParams.get('success')
     const error = searchParams.get('error')
+    const message = searchParams.get('message')
+    
+    if (error === 'user_not_found') {
+      setErrorMessage(message || 'Your account is not registered in the system. Please contact administrator.')
+      return
+    }
     
     if (error) {
       console.error('OAuth error:', error)
+      setErrorMessage('Login failed. Please try again.')
       return
     }
     
@@ -44,6 +52,26 @@ function Login() {
         </div>
         
         <div className="login-form">
+          {/* Error Message Display */}
+          {errorMessage && (
+            <div className="error-message">
+              <div className="error-icon">⚠️</div>
+              <div className="error-content">
+                <h3>Access Denied</h3>
+                <p>{errorMessage}</p>
+                <button 
+                  className="retry-button" 
+                  onClick={() => {
+                    setErrorMessage('')
+                    window.location.href = '/login'
+                  }}
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          )}
+          
           {isLoading ? (
             <div className="loading-container">
               <div className="loading-spinner"></div>

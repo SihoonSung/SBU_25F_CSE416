@@ -38,16 +38,29 @@ public class OAuth2LoginSuccessHandler
 
         OAuth2User o2 = (OAuth2User) authentication.getPrincipal();
 
-        // 1) Create or update user in database
-        User saved = userService.findOrCreateUserFromOAuth2(o2);
+        try {
+            // 1) Create or update user in database
+            User saved = userService.findOrCreateUserFromOAuth2(o2);
 
-        // 2) Redirect to frontend
-        String redirect = UriComponentsBuilder
-                .fromHttpUrl("http://localhost:5173/home")
-                .queryParam("success", "true")
-                .build()
-                .toUriString();
+            // 2) Redirect to frontend on success
+            String redirect = UriComponentsBuilder
+                    .fromHttpUrl("http://localhost:5173/home")
+                    .queryParam("success", "true")
+                    .build()
+                    .toUriString();
 
-        response.sendRedirect(redirect);
+            response.sendRedirect(redirect);
+            
+        } catch (RuntimeException e) {
+            // 3) Handle user not found - redirect to login with error message
+            String redirect = UriComponentsBuilder
+                    .fromHttpUrl("http://localhost:5173/login")
+                    .queryParam("error", "user_not_found")
+                    .queryParam("message", "Your account is not registered in the system. Please contact administrator.")
+                    .build()
+                    .toUriString();
+
+            response.sendRedirect(redirect);
+        }
     }
 }

@@ -6,6 +6,58 @@
   background: linear-gradient(135deg, #e6eefc, #f8f9ff);
 }
 
+/* Error Message Styles */
+.error-message {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.error-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.error-content {
+  flex: 1;
+  text-align: left;
+}
+
+.error-content h3 {
+  color: #dc2626;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.error-content p {
+  color: #7f1d1d;
+  font-size: 14px;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.retry-button {
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.retry-button:hover {
+  background: #b91c1c;
+}
+
 .login-card {
   width: 100%;
   max-width: 420px;
