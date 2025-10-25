@@ -6,6 +6,18 @@
 # 2025-10-13 note that 'department' field in entries for classes should have been named 'subject'
 # 2025-10-13 added 'degrees' field for students
 # 2025-10-03 replaced "department" with "subject" in description of academic_unit
+# sample user data file
+# CSE416, Software Engineering, Scott D. Stoller
+
+# change log:
+# 2025-10-24 changed type of GPNC field from Boolean to string, to allow specifying a grade threshold.
+# 2025-10-16 changed type of academic_advisor.academic_unit from a singleton to a list.
+# 2025-10-15 changed CSE 220 from Spring 2025 to Spring 2026.
+# 2025-10-15 changed section numbers to match the strings in class schedules, e.g., L01 instead of 1.
+# 2025-10-14 added fields related to planned majors and minor for students
+# 2025-10-13 note that 'department' field in entries for classes should have been named 'subject'
+# 2025-10-13 added 'degrees' field for students
+# 2025-10-03 replaced "department" with "subject" in description of academic_unit
 # 2025-09-14 added GPNC field to entries in student class schedules
 
 registrars:
@@ -13,18 +25,10 @@ registrars:
   first_name: Rob
   last_name: Rogers
   email: rob.rogers@stonybrook.edu
-
 - SBU_ID: 100654321
   first_name: Ralph
   last_name: Randall
   email: ralph.randall@stonybrook.edu
-
-- SBU_ID: 114665643
-  first_name: Minseo
-  last_name: Kim
-  email: minseo.kim@stonybrook.edu
-
-
 
 academic_advisors:
 - SBU_ID: 100765431
@@ -32,13 +36,13 @@ academic_advisors:
   last_name: Alda
   email: alan.alda@stonybrook.edu
   level: university # valid values: university, college, department
-  academic_unit: SBU # acronym of a college or school (e.g., CAS, SoCJ) or subject (e.g., CSE), or SBU for university-level advisors
+  academic_unit: SBU # list of acronyms of colleges/schools (e.g., [CAS]) or subjects (e.g., [CSE, ISE]), or [SBU] for university-level advisors
 - SBU_ID: 100765430
   first_name: Kevin
   last_name: Kamper
   email: kevin.kamper@stonybrook.edu
   level: department
-  academic_unit: CSE
+  academic_unit: [CSE,ISE]
 
 instructors:
 - SBU_ID: 100987654
@@ -63,7 +67,7 @@ students:
   degrees: [BS,BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
   major_requirement_versions: [{semester: Fall, year: 2020}, {semester: Fall, year: 2021}] # the degree requirements version the student is following for each major.  entry i in this list corresponds to entry i in the majors list.
   minors: [] # list of minors, identified by 3-letter codes
-  minor_requirement_versions: []   
+  minor_requirement_versions: []
   planned_majors: [] # planned additional majors that are not yet declared.
   planned_major_requirement_versions: [] # degree requirements version for each planned major
   planned_degrees: [] # degree types corresponding to planned_majors
@@ -75,12 +79,12 @@ students:
     - {class: CSE101, university: SCCC, credits: 3, department: CSE, course_num: 101, grade: A}
     - {class: CSE999, university: SCCC, credits: 3, department: null, course_num: null, grade: null}
   classes:  # list of classes the student took, is taking, or is registered for in a future semester.
-    # GPNC is a boolean flag indicating whether GPMC option was selected.
-    - {class_id: 12345, department: CSE, course_num: 101, section: 2, semester: Fall, year: 2020, credits: 3, GPNC: false, grade: A}
-    - {class_id: 23456, department: AMS, course_num: 151, section: 1, semester: Spring, year: 2021, credits: 3, GPNC: false, grade: A-}
-    - {class_id: 34567, department: CSE, course_num: 214, section: 2, semester: SummerI, year: 2020, credits: 3, GPNC: true, grade: P}
-    - {class_id: 45678, department: AMS, course_num: 261, section: 1, semester: Fall, year: 2025, credits: 3, GPNC: false, grade: null}
-    - {class_id: 56789, department: CSE, course_num: 220, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: null}
+    # GPNC is the selected grade threshold if GPMC option was selected, otherwise null.
+    - {class_id: 12345, department: CSE, course_num: 101, section: 01, semester: Fall, year: 2020, credits: 3, GPNC: null, grade: A}
+    - {class_id: 23456, department: AMS, course_num: 151, section: 01, semester: Spring, year: 2021, credits: 3, GPNC: null, grade: A-}
+    - {class_id: 34567, department: CSE, course_num: 214, section: 02, semester: SummerI, year: 2020, credits: 4, GPNC: B, grade: P}
+    - {class_id: 45678, department: AMS, course_num: 261, section: 01, semester: Fall, year: 2025, credits: 3, GPNC: null, grade: null}
+    - {class_id: 56789, department: CSE, course_num: 220, section: R01, semester: Spring, year: 2026, credits: 4, GPNC: null, grade: null}
   course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
     - {department: CSE, course_num: 216, semester: Fall, year: 2026, credits: 3}
     - {department: CSE, course_num: 320, semester: Spring, year: 2027, credits: 3}
