@@ -80,4 +80,14 @@ public interface CartRepository extends JpaRepository<CartEntity, Long> {
     @Transactional
     @Query("UPDATE CartEntity c SET c.status = :status WHERE c.userId = :userId AND c.classEntity.id = :classId")
     void updateStatusByUserIdAndClassId(@Param("userId") Long userId, @Param("classId") Long classId, @Param("status") String status);
+    
+    /**
+     * Delete cart items for classes in specific semester and year
+     * @param semester Semester (e.g., "Fall", "Spring")
+     * @param year Year (e.g., 2025)
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM CartEntity c WHERE c.classEntity.semester = :semester AND c.classEntity.year = :year")
+    void deleteBySemesterAndYear(@Param("semester") String semester, @Param("year") Integer year);
 }

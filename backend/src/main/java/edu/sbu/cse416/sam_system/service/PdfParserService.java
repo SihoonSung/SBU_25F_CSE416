@@ -20,6 +20,7 @@ package edu.sbu.cse416.sam_system.service;
 
 import edu.sbu.cse416.sam_system.entity.ClassEntity;
 import edu.sbu.cse416.sam_system.repository.ClassRepository;
+import edu.sbu.cse416.sam_system.repository.CartRepository;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,9 @@ public class PdfParserService {
     @Autowired
     private ClassRepository classRepository;
     
+    @Autowired
+    private CartRepository cartRepository;
+    
     /**
      * Parse uploaded PDF and import classes to database
      * Deletes existing classes for the same semester/year before importing new ones.
@@ -58,6 +62,10 @@ public class PdfParserService {
     @org.springframework.transaction.annotation.Transactional
     public int parsePdfAndImportClasses(MultipartFile file, Set<String> subjects, 
                                         String semester, Integer year) throws IOException {
+        // Delete existing cart items first (to avoid foreign key constraint issues)
+        // Delete only cart items for the specific semester/year being replaced
+        cartRepository.deleteBySemesterAndYear(semester, year);
+        
         // Delete existing classes for this semester/year (bulk delete)
         classRepository.deleteBySemesterAndYear(semester, year);
         
