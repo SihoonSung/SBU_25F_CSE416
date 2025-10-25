@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import './App.css'
 import NavigationBar from './components/NavigationBar'
 import Dashboard from './pages/Dashboard'
@@ -17,10 +18,23 @@ import { isAuthenticated } from './utils/auth'
 
 
 function App() {
-
-  // Created Router path for each page
+  const [isAuth, setIsAuth] = useState<boolean | null>(null)
   const location = useLocation()
   const isLoginRoute = location.pathname === '/login'
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      const authenticated = await isAuthenticated()
+      setIsAuth(authenticated)
+    }
+    checkAuth()
+  }, [])
+
+  // Show loading while checking auth
+  if (isAuth === null) {
+    return <div>Loading...</div>
+  }
 
   return (
     <div>
@@ -28,8 +42,8 @@ function App() {
       <main className="main-content">
         <Routes>
           <Route path="/login" element={<Login/>} />
-          <Route path="/" element={isAuthenticated() ? <Dashboard/> : <Navigate to="/login" replace />} />
-          <Route path="/home" element={isAuthenticated() ? <Dashboard/> : <Navigate to="/login" replace />} />
+          <Route path="/" element={isAuth ? <Dashboard/> : <Navigate to="/login" replace />} />
+          <Route path="/home" element={isAuth ? <Dashboard/> : <Navigate to="/login" replace />} />
           <Route path="/course-search" element={<CourseSearch/>} />
           <Route path="/course-registration" element={<CourseRegistration/>} />
           <Route path="/registration" element={<CourseRegistration/>} />
