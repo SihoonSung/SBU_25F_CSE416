@@ -1,0 +1,52 @@
+effective_term: "Fall 2025"
+
+degree_requirements:
+  - subject_code: "CSE"
+    degree_type: "BS"
+    total_credits_required: 120
+    is_restricted: true
+    gpa_requirement: 2.0
+    admission_requirements:
+      - "CSE 114"
+      - "CSE 214"
+      - "CSE 215"
+      - "CSE 216"
+      - "CSE 220"
+    course_requirements:
+      required_courses:
+        - "CSE 114"
+        - "CSE 214"
+        - "CSE 215"
+        - "CSE 216"
+        - "CSE 220"
+        - "CSE 303"
+        - "CSE 310"
+        - "CSE 316"
+        - "CSE 320"
+        - "CSE 373"
+        - "CSE 416"
+      elective_courses:
+        credits_required: 12
+        courses:
+          - "CSE 300+"
+          - "CSE 400+"
+    sbc_requirements:
+      - "ARTS"
+      - "GLO"
+      - "HUM"
+      - "LANG"
+      - "QPS"
+      - "SBS"
+      - "SNW"
+      - "TECH"
+      - "USA"
+      - "WRT"
+      - "EXP+"
+      - "HFA+"
+      - "SBS+"
+      - "STEM+"
+      - "CER"
+      - "DIV"
+      - "ESI"
+      - "SPK"
+      - "WRTD"

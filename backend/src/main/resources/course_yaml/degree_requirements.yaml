@@ -139,7 +139,7 @@ degree_requirements:
       - "ESI"
       - "SPK"
       - "WRTD"
-    
+
   - subject_code: "AMS"
     degree_type: "BS"
     total_credits_required: 120
@@ -193,99 +193,104 @@ degree_requirements:
       - "POL 101"
     course_requirements:
       required_courses:
-        - "POL 101"  # World Politics (3 credits)
-        - "POL 102"  # Introduction to American Government (3 credits)
-        - "POL 103"  # Introduction to Comparative Politics (3 credits)
+        - "POL 101"
+        - "POL 102"
+        - "POL 103"
       concentration_requirements:
         credits_required: 12
         concentrations:
           comparative_politics_international_relations:
             courses:
-              - "POL 214"  # Modern Latin America
-              - "POL 216"  # History of U.S.-Latin American Relations
-              - "POL 302"  # Politics of Latin America
-              - "POL 303"  # Gender and Politics in Global Perspective
-              - "POL 304"  # Comparative Political Institutions
-              - "POL 305"  # Government and Politics of the United Kingdom
-              - "POL 308"  # Women Islam and Political Change in Africa
-              - "POL 309"  # Politics in the European Union
-              - "POL 310"  # Immigration and Refugee Politics
-              - "POL 311"  # Introduction to International Law
-              - "POL 313"  # Problems of International Relations
-              - "POL 334"  # Modern Terrorism
-              - "POL 336"  # U.S. Foreign Policy
-              - "POL 337"  # The Politics of Africa
-              - "POL 338"  # Contemporary India: History, Politics, and Diplomacy
-              - "POL 339"  # Contemporary China: History, Politics, and Diplomacy
-              - "POL 350"  # Contemporary European Political Theory
-              - "POL 365"  # Economy and Democracy
-              - "POL 371"  # Politics of Climate Change
-              - "POL 374"  # Global Issues in the United Nations
-              - "POL 380"  # Government and Politics of the Middle East
-              - "PHI 367"  # Philosophy of War and Peace
-              - "POL 390"  # Topics in Political Science
-              - "POL 401"  # Seminar in Advanced Topics
+              - "POL 214"
+              - "POL 216"
+              - "POL 302"
+              - "POL 303"
+              - "POL 304"
+              - "POL 305"
+              - "POL 308"
+              - "POL 309"
+              - "POL 310"
+              - "POL 311"
+              - "POL 313"
+              - "POL 334"
+              - "POL 336"
+              - "POL 337"
+              - "POL 338"
+              - "POL 339"
+              - "POL 350"
+              - "POL 365"
+              - "POL 371"
+              - "POL 374"
+              - "POL 380"
+              - "PHI 367"
+              - "POL 390"
+              - "POL 401"
           american_government_law_public_policy:
             courses:
-              - "POL 317"  # American Election Campaigns
-              - "POL 318"  # Voters and Elections
-              - "POL 319"  # Business Law
-              - "POL 320"  # Constitutional Law and Politics: United States
-              - "POL 322"  # The Presidency in the American Political System
-              - "POL 323"  # U.S. Congress
-              - "POL 324"  # American Political Parties and Pressure Groups
-              - "POL 325"  # Civil Liberties and Civil Rights
-              - "POL 327"  # Urban Politics
-              - "POL 328"  # Criminal Law
-              - "POL 330"  # Gender Issues in the Law
-              - "POL 332"  # Politics of Criminal Due Process
-              - "POL 333"  # Environmental Law
-              - "POL 336"  # U.S. Foreign Policy
-              - "POL 344"  # American Political Ideology and Public Opinion
-              - "POL 347"  # Women and Politics
-              - "POL 349"  # Social Psychology and Law
-              - "POL 350"  # Contemporary European Political Theory
-              - "POL 351"  # Social Surveys in Contemporary Society
-              - "POL 352"  # Current Political Events
-              - "POL 353"  # Contemporary Race Relations in American Politics
-              - "POL 359"  # Public Policy Analysis
-              - "POL 365"  # Economy and Democracy
-              - "POL 366"  # Press & the Presidency
-              - "POL 367"  # Mass Media in American Politics
-              - "POL 368"  # Social Networks and Politics
-              - "POL 369"  # Introduction to Political Informatics
-              - "POL 371"  # Politics of Climate Change
-              - "PHI 277"  # Political Philosophy
-              - "PHI 375"  # Philosophy of Law
-              - "PHI 377"  # Contemporary Political Philosophy
-              - "POL 390"  # Topics in Political Science
-              - "POL 401"  # Seminar in Advanced Topics
+              - "POL 317"
+              - "POL 318"
+              - "POL 319"
+              - "POL 320"
+              - "POL 322"
+              - "POL 323"
+              - "POL 324"
+              - "POL 325"
+              - "POL 327"
+              - "POL 328"
+              - "POL 330"
+              - "POL 332"
+              - "POL 333"
+              - "POL 336"
+              - "POL 344"
+              - "POL 347"
+              - "POL 349"
+              - "POL 350"
+              - "POL 351"
+              - "POL 352"
+              - "POL 353"
+              - "POL 359"
+              - "POL 365"
+              - "POL 366"
+              - "POL 367"
+              - "POL 368"
+              - "POL 369"
+              - "POL 371"
+              - "PHI 277"
+              - "PHI 375"
+              - "PHI 377"
+              - "POL 390"
+              - "POL 401"
           political_behavior_psychology:
             courses:
-              - "POL 270"  # Experiments in Political Science
-              - "POL 303"  # Gender and Politics in Global Perspective
-              - "POL 317"  # American Election Campaigns
-              - "POL 318"  # Voters and Elections
-              - "POL 323"  # U.S. Congress
-              - "POL 344"  # American Political Ideology and Public Opinion
-              - "POL 346"  # Political Psychology
-              - "POL 347"  # Women and Politics
-              - "POL 348"  # Political Beliefs and Judgments
-              - "POL 349"  # Social Psychology and Law
-              - "POL 350"  # Contemporary European Political Theory
-              - "POL 351"  # Social Surveys in Contemporary Society
-              - "POL 352"  # Current Political Events
-              - "POL 353"  # Contemporary Race Relations in American Politics
-              - "POL 367"  # Mass Media in American Politics
-              - "POL 368"  # Social Networks and Politics
-              - "POL 369"  # Introduction to Political Informatics
-              - "POL 371"  # Politics of Climate Change
-              - "POL 373"  # The Biology of Politics
-              - "POL 375"  # The Political Animal
-              - "PHI 379"  
-              - "POL 390" 
-              - "POL 401" 
-        
+              - "POL 270"
+              - "POL 303"
+              - "POL 317"
+              - "POL 318"
+              - "POL 323"
+              - "POL 344"
+              - "POL 346"
+              - "POL 347"
+              - "POL 348"
+              - "POL 349"
+              - "POL 350"
+              - "POL 351"
+              - "POL 352"
+              - "POL 353"
+              - "POL 367"
+              - "POL 368"
+              - "POL 369"
+              - "POL 371"
+              - "POL 373"
+              - "POL 375"
+              - "PHI 379"
+              - "POL 390"
+              - "POL 401"
+      elective_courses:
+        credits_required: 12
+        courses:
+          - "POL 200+"
+          - "POL 300+"
+          - "POL 400+"
     sbc_requirements:
       - "ARTS"
       - "GLO"
@@ -307,7 +312,7 @@ degree_requirements:
       - "ESI"
       - "SPK"
       - "WRTD"
-    
+
   - subject_code: "ECO"
     degree_type: "BA"
     total_credits_required: 121
@@ -326,11 +331,12 @@ degree_requirements:
         - "ECO 321"
       mathematics_requirements:
         credits_required: 3
-        - "MAT 125"
-        - "MAT 130 + MAT 125"
-        - "AMS 151"
-        - "Math placement level 6+"
-        - "Higher level calculus"
+        options:
+          - "MAT 125"
+          - "MAT 130 + MAT 125"
+          - "AMS 151"
+          - "Math placement level 6+"
+          - "Higher level calculus"
       elective_courses:
         credits_required: 15
         courses:
@@ -348,7 +354,6 @@ degree_requirements:
       - "TECH"
       - "USA"
       - "WRT"
-      - "STAS"
       - "EXP+"
       - "HFA+"
       - "SBS+"

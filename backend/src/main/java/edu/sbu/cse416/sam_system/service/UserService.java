@@ -90,16 +90,9 @@ public class UserService {
         }
 
         // 3) Create new user (default STUDENT, active)
-        User nu = new User();
-        nu.setGoogleId(googleId);
-        nu.setEmail(email);
-        nu.setFirstName(firstName);
-        nu.setLastName(lastName);
-        nu.setProfilePictureUrl(picture);
-        nu.setRole(UserRole.STUDENT);
-        nu.setIsActive(true);
-        nu.updateLastLogin();
-        return userRepository.save(nu);
+        // Note: This should rarely happen as users should be imported first
+        // For now, we'll throw an exception to prevent unauthorized account creation
+        throw new IllegalStateException("User not found in system. Please contact administrator to import user data first.");
     }
 
     // ===== Query methods =====
