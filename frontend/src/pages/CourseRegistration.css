@@ -731,3 +731,13 @@
   100% { transform: rotate(360deg); }
 }
 
+.status-tag.antirequisites {
+  background-color: #fecaca;
+  color: #dc2626;
+}
+
+.status-tag.corequisites {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+

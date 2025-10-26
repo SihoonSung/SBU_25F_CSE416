@@ -45,6 +45,9 @@ public class CartService {
     @Autowired
     private UserClassesRepository userClassesRepository;
     
+    @Autowired
+    private PrerequisitesValidationService prerequisitesValidationService;
+    
     /**
      * Add a class to user's cart
      * @param userId User ID
@@ -63,8 +66,43 @@ public class CartService {
             return null; // Class not found
         }
         
-        // Create cart entity with "Added" status
-        CartEntity cartEntity = new CartEntity(userId, classEntity, "Added");
+        // Check prerequisites
+        String prerequisites = classEntity.getPrerequisites();
+        String status = "Added";
+        
+        if (prerequisites != null && !prerequisites.trim().isEmpty() && !prerequisites.trim().equalsIgnoreCase("None")) {
+            boolean prerequisitesMet = prerequisitesValidationService.validatePrerequisites(userId, prerequisites);
+            if (!prerequisitesMet) {
+                status = "Prerequisites";
+                System.out.println("    [CART] Prerequisites not met for class " + classEntity.getDepartment() + " " + classEntity.getCourseNum());
+            }
+        }
+        
+        // Check antirequisites
+        String antirequisites = classEntity.getAntirequisites();
+        if (antirequisites != null && !antirequisites.trim().isEmpty()) {
+            boolean antirequisitesOk = prerequisitesValidationService.validateAntirequisites(userId, antirequisites);
+            if (!antirequisitesOk) {
+                status = "Antirequisites";
+                System.out.println("    [CART] Antirequisites conflict for class " + classEntity.getDepartment() + " " + classEntity.getCourseNum());
+            }
+        }
+        
+        // Check corequisites
+        String corequisites = classEntity.getCorequisites();
+        if (corequisites != null && !corequisites.trim().isEmpty() && !corequisites.trim().equalsIgnoreCase("None")) {
+            // For now, use current semester/year from the class entity
+            String currentSemester = classEntity.getSemester();
+            Integer currentYear = classEntity.getYear();
+            boolean corequisitesOk = prerequisitesValidationService.validateCorequisites(userId, corequisites, prerequisites, currentSemester, currentYear);
+            if (!corequisitesOk) {
+                status = "Corequisites";
+                System.out.println("    [CART] Corequisites not met for class " + classEntity.getDepartment() + " " + classEntity.getCourseNum());
+            }
+        }
+        
+        // Create cart entity with appropriate status
+        CartEntity cartEntity = new CartEntity(userId, classEntity, status);
         cartEntity = cartRepository.save(cartEntity);
         
         // Check for conflicts and update status
@@ -232,6 +270,73 @@ public class CartService {
             // Get already registered classes from UserClasses
             List<UserClasses> alreadyRegisteredClasses = userClassesRepository.findByUserId(userId);
             
+            // Check prerequisites, antirequisites, and corequisites for all cart items
+            List<String> prerequisiteErrors = new ArrayList<>();
+            List<String> antirequisiteErrors = new ArrayList<>();
+            List<String> corequisiteErrors = new ArrayList<>();
+            
+            for (CartEntity cartItem : cartItems) {
+                if (cartItem.getStatus().equals("Added")) {
+                    // Check prerequisites
+                    String prerequisites = cartItem.getClassEntity().getPrerequisites();
+                    if (prerequisites != null && !prerequisites.trim().isEmpty() && !prerequisites.trim().equalsIgnoreCase("None")) {
+                        boolean prerequisitesMet = prerequisitesValidationService.validatePrerequisites(userId, prerequisites);
+                        if (!prerequisitesMet) {
+                            prerequisiteErrors.add(String.format("Prerequisites not met for %s %s: %s", 
+                                cartItem.getClassEntity().getDepartment(), 
+                                cartItem.getClassEntity().getCourseNum(),
+                                prerequisites));
+                        }
+                    }
+                    
+                    // Check antirequisites
+                    String antirequisites = cartItem.getClassEntity().getAntirequisites();
+                    if (antirequisites != null && !antirequisites.trim().isEmpty()) {
+                        boolean antirequisitesOk = prerequisitesValidationService.validateAntirequisites(userId, antirequisites);
+                        if (!antirequisitesOk) {
+                            antirequisiteErrors.add(String.format("Antirequisites conflict for %s %s: %s", 
+                                cartItem.getClassEntity().getDepartment(), 
+                                cartItem.getClassEntity().getCourseNum(),
+                                antirequisites));
+                        }
+                    }
+                    
+                    // Check corequisites
+                    String corequisites = cartItem.getClassEntity().getCorequisites();
+                    if (corequisites != null && !corequisites.trim().isEmpty() && !corequisites.trim().equalsIgnoreCase("None")) {
+                        String currentSemester = cartItem.getClassEntity().getSemester();
+                        Integer currentYear = cartItem.getClassEntity().getYear();
+                        boolean corequisitesOk = prerequisitesValidationService.validateCorequisites(userId, corequisites, prerequisites, currentSemester, currentYear);
+                        if (!corequisitesOk) {
+                            String corequisiteMessage = generateCorequisiteErrorMessage(cartItem.getClassEntity().getDepartment(), 
+                                cartItem.getClassEntity().getCourseNum(), corequisites);
+                            corequisiteErrors.add(corequisiteMessage);
+                        }
+                    }
+                }
+            }
+            
+            // If there are prerequisite errors, return them
+            if (!prerequisiteErrors.isEmpty()) {
+                result.put("success", false);
+                result.put("prerequisiteErrors", prerequisiteErrors);
+                return result;
+            }
+            
+            // If there are antirequisite errors, return them
+            if (!antirequisiteErrors.isEmpty()) {
+                result.put("success", false);
+                result.put("antirequisiteErrors", antirequisiteErrors);
+                return result;
+            }
+            
+            // If there are corequisite errors, return them
+            if (!corequisiteErrors.isEmpty()) {
+                result.put("success", false);
+                result.put("corequisiteErrors", corequisiteErrors);
+                return result;
+            }
+            
             // Check for conflicts among cart items
             List<String> conflicts = new ArrayList<>();
             for (int i = 0; i < cartItems.size(); i++) {
@@ -366,5 +471,49 @@ public class CartService {
         }
         
         return result;
+    }
+    
+    /**
+     * Generate detailed corequisite error message with specific course recommendations
+     */
+    private String generateCorequisiteErrorMessage(String department, Integer courseNum, String corequisites) {
+        StringBuilder message = new StringBuilder();
+        message.append(String.format("Corequisites not met for %s %s: %s\n", department, courseNum, corequisites));
+        message.append("Please register for one of the following courses first:\n");
+        
+        // Parse corequisites to extract specific course recommendations
+        String[] corequisiteGroups = corequisites.split(";");
+        for (String group : corequisiteGroups) {
+            group = group.trim();
+            if (group.isEmpty()) continue;
+            
+            // Check for range patterns like "MUS 161 through 187"
+            if (group.toLowerCase().contains("through")) {
+                // Extract range and suggest specific courses
+                String[] parts = group.split("\\s+through\\s+");
+                if (parts.length == 2) {
+                    String[] firstPart = parts[0].trim().split("\\s+");
+                    if (firstPart.length >= 2) {
+                        String dept = firstPart[firstPart.length - 2];
+                        int startCourse = Integer.parseInt(firstPart[firstPart.length - 1]);
+                        int endCourse = Integer.parseInt(parts[1].trim());
+                        
+                        message.append(String.format("- Any %s course from %s %d to %s %d\n", 
+                            dept, dept, startCourse, dept, endCourse));
+                    }
+                }
+            } else {
+                // Extract individual course codes
+                java.util.regex.Pattern coursePattern = java.util.regex.Pattern.compile("\\b([A-Z]{2,4})\\s+(\\d{3,4})\\b");
+                java.util.regex.Matcher matcher = coursePattern.matcher(group);
+                while (matcher.find()) {
+                    String courseDept = matcher.group(1);
+                    String courseNumber = matcher.group(2);
+                    message.append(String.format("- %s %s\n", courseDept, courseNumber));
+                }
+            }
+        }
+        
+        return message.toString().trim();
     }
 }

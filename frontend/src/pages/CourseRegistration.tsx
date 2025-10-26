@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import './CourseRegistration.css'
 import { checkTimeConflict } from '../utils/timeConflict'
+import { getCurrentUser } from '../utils/auth'
 
 /*
  * Course Registration Page Component
@@ -20,16 +21,36 @@ function CourseRegistration() {
   const [selectedSemester, setSelectedSemester] = useState('')
   const [selectedYear, setSelectedYear] = useState<number | string>('')
   const [cart, setCart] = useState<any[]>([])
-  const [userId] = useState(1) // 임시 사용자 ID
+  const [userId, setUserId] = useState<number | null>(null)
   
 
   /**
    * Fetch available terms and classes on component mount
    */
   useEffect(() => {
+    const initializeUser = async () => {
+      try {
+        const userData = await getCurrentUser()
+        if (userData.user?.userId) {
+          setUserId(userData.user.userId)
+        }
+      } catch (error) {
+        console.error('Failed to get current user:', error)
+      }
+    }
+    
+    initializeUser()
     fetchAvailableTerms()
-    loadCartFromDB()
   }, [])
+
+  /**
+   * Load cart when userId is available
+   */
+  useEffect(() => {
+    if (userId) {
+      loadCartFromDB()
+    }
+  }, [userId])
   
   
   /**
@@ -92,6 +113,11 @@ function CourseRegistration() {
    * Load cart items from database
    */
   const loadCartFromDB = async () => {
+    if (!userId) {
+      console.log('User ID not available yet')
+      return
+    }
+    
     try {
       const response = await fetch(`http://localhost:8080/api/cart/items?userId=${userId}`)
       const data = await response.json()
@@ -234,6 +260,11 @@ function CourseRegistration() {
    * Add a course to the cart with time conflict checking
    */
   const handleAddToCart = async (course: any) => {
+    if (!userId) {
+      alert('Please wait for user authentication to complete.')
+      return
+    }
+    
     // Check for time conflicts with existing cart items BEFORE adding
     const courseSchedule = combineSchedules(course)
     let hasConflict = false
@@ -300,6 +331,11 @@ function CourseRegistration() {
    * Remove a course from the cart
    */
   const handleDropCourse = async (courseId: string) => {
+    if (!userId) {
+      alert('Please wait for user authentication to complete.')
+      return
+    }
+    
     try {
       const response = await fetch(`http://localhost:8080/api/cart/remove?userId=${userId}&classId=${courseId}`, {
         method: 'DELETE'
@@ -324,6 +360,11 @@ function CourseRegistration() {
    * Handle submitting registration for all cart items
    */
   const handleSubmitRegistration = async () => {
+    if (!userId) {
+      alert('Please wait for user authentication to complete.')
+      return
+    }
+    
     if (cart.length === 0) {
       alert('Your cart is empty. Add classes to register.')
       return
@@ -356,6 +397,12 @@ function CourseRegistration() {
           alert(`Registration failed due to time conflicts:\n${data.conflicts.join('\n')}\n\nPlease resolve conflicts before registering.`)
         } else if (data.duplicateClasses && data.duplicateClasses.length > 0) {
           alert(`Registration failed - these classes are already registered:\n${data.duplicateClasses.join('\n')}`)
+        } else if (data.prerequisiteErrors && data.prerequisiteErrors.length > 0) {
+          alert(`Registration failed - prerequisites not met:\n${data.prerequisiteErrors.join('\n')}`)
+        } else if (data.antirequisiteErrors && data.antirequisiteErrors.length > 0) {
+          alert(`Registration failed - antirequisites conflict:\n${data.antirequisiteErrors.join('\n')}`)
+        } else if (data.corequisiteErrors && data.corequisiteErrors.length > 0) {
+          alert(`Registration failed - corequisites not met:\n${data.corequisiteErrors.join('\n')}`)
         } else {
           alert('Registration failed: ' + data.message)
         }
@@ -366,6 +413,18 @@ function CourseRegistration() {
     }
   }
 
+
+  // Show loading state if userId is not available yet
+  if (!userId) {
+    return (
+      <div className="course-registration-page">
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <h2>Loading...</h2>
+          <p>Please wait while we authenticate your session.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="course-registration-page">

@@ -313,54 +313,64 @@ public class PdfParserService {
                     
                     String fullLine = fullText.toString();
                     
-                    // Simple approach: split by semicolon and process each part
-                    String[] parts = fullLine.split(";");
+                    // Advanced parsing: handle complex prerequisites patterns
                     StringBuilder prereqBuilder = new StringBuilder();
                     StringBuilder coreqBuilder = new StringBuilder();
                     StringBuilder antireqBuilder = new StringBuilder();
                     
-                    for (String part : parts) {
-                        part = part.trim();
+                    // First, check for "Pre- or corequisite" pattern (highest priority)
+                    Pattern preOrCoreqPattern = Pattern.compile("Pre-\\s*or\\s*corequisite\\s*:\\s*([^;]+?)(?=\\s*;|$)", Pattern.CASE_INSENSITIVE);
+                    Matcher preOrCoreqMatcher = preOrCoreqPattern.matcher(fullLine);
+                    
+                    if (preOrCoreqMatcher.find()) {
+                        String content = preOrCoreqMatcher.group(1).trim();
+                        System.out.println("    [FOUND] Pre- or corequisite: " + content);
                         
-                        // Handle "Pre- or Corequisite: ..."
-                        if (part.startsWith("Pre- or Corequisite:")) {
-                            String content = part.substring("Pre- or Corequisite:".length()).trim();
-                            
-                            // Add to prerequisites
-                            if (prereqBuilder.length() > 0) prereqBuilder.append(", or ");
-                            prereqBuilder.append(content);
-                            
-                            // Add to corequisites
-                            coreqBuilder.append(content);
-                        }
-                        // Handle regular "Prerequisite: ..." (may contain "or Corequisite:")
-                        else if (part.startsWith("Prerequisite:") || part.startsWith("Prerequisites:")) {
-                            String content = part.startsWith("Prerequisite:") 
-                                ? part.substring("Prerequisite:".length()).trim()
-                                : part.substring("Prerequisites:".length()).trim();
-                            
-                            // Just add the whole content to prerequisites (including "or Corequisite: X")
-                            if (prereqBuilder.length() > 0) prereqBuilder.append("; ");
-                            prereqBuilder.append(content);
-                        }
-                        // Handle regular "Corequisite: ..."
-                        else if (part.startsWith("Corequisite:") || part.startsWith("Corequisites:")) {
-                            String content = part.startsWith("Corequisite:") 
-                                ? part.substring("Corequisite:".length()).trim()
-                                : part.substring("Corequisites:".length()).trim();
-                            
-                            if (coreqBuilder.length() > 0) coreqBuilder.append("; ");
-                            coreqBuilder.append(content);
-                        }
-                        // Handle "Antirequisite: ..."
-                        else if (part.startsWith("Antirequisite:") || part.startsWith("Anti-requisite:")) {
-                            String content = part.startsWith("Antirequisite:") 
-                                ? part.substring("Antirequisite:".length()).trim()
-                                : part.substring("Anti-requisite:".length()).trim();
-                            
-                            if (antireqBuilder.length() > 0) antireqBuilder.append("; ");
-                            antireqBuilder.append(content);
-                        }
+                        // Add to both prerequisites and corequisites
+                        if (prereqBuilder.length() > 0) prereqBuilder.append("; ");
+                        prereqBuilder.append(content);
+                        
+                        if (coreqBuilder.length() > 0) coreqBuilder.append("; ");
+                        coreqBuilder.append(content);
+                    }
+                    
+                    // Then check for separate "Prerequisite:" and "Corequisite:" patterns
+                    // Match everything after "Prerequisites:" until "Corequisite", "Anti-requisite", "Advisory" or end of line
+                    Pattern prereqPattern = Pattern.compile("Prerequisite(?:s)?\\s*:\\s*(.+?)(?=\\s*Corequisite|Anti-requisite|Advisory|$)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+                    Matcher prereqMatcher = prereqPattern.matcher(fullLine);
+                    
+                    if (prereqMatcher.find()) {
+                        String content = prereqMatcher.group(1).trim();
+                        // Clean up any "Pre- or" text that might be in the content
+                        content = content.replaceAll("Pre-\\s*or\\s*", "").trim();
+                        System.out.println("    [FOUND] Prerequisites: " + content);
+                        
+                        if (prereqBuilder.length() > 0) prereqBuilder.append("; ");
+                        prereqBuilder.append(content);
+                    }
+                    
+                    // Handle "Corequisite:" pattern
+                    Pattern coreqPattern = Pattern.compile("Corequisite(?:s)?\\s*:\\s*([^;]+?)(?=\\s*;|Advisory|$)", Pattern.CASE_INSENSITIVE);
+                    Matcher coreqMatcher = coreqPattern.matcher(fullLine);
+                    
+                    if (coreqMatcher.find()) {
+                        String content = coreqMatcher.group(1).trim();
+                        System.out.println("    [FOUND] Corequisites: " + content);
+                        
+                        if (coreqBuilder.length() > 0) coreqBuilder.append("; ");
+                        coreqBuilder.append(content);
+                    }
+                    
+                    // Handle "Antirequisite:" pattern
+                    Pattern antireqPattern = Pattern.compile("Anti(?:-)?requisite(?:s)?\\s*:\\s*(.+?)(?=\\s*;|Advisory|$)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+                    Matcher antireqMatcher = antireqPattern.matcher(fullLine);
+                    
+                    if (antireqMatcher.find()) {
+                        String content = antireqMatcher.group(1).trim();
+                        System.out.println("    [FOUND] Antirequisites: " + content);
+                        
+                        if (antireqBuilder.length() > 0) antireqBuilder.append("; ");
+                        antireqBuilder.append(content);
                     }
                     
                     // Update current values
