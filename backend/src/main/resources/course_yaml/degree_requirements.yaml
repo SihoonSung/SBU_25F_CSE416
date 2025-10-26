@@ -146,8 +146,8 @@ degree_requirements:
     is_restricted: false
     gpa_requirement: 2.0
     admission_requirements:
-      - "AMS 151"
-      - "AMS 161"
+      - "AMS 21O"
+      - "AMS 261"
     course_requirements:
       required_courses:
         - "AMS 151"

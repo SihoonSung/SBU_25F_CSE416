@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Service class for managing degree requirements.
+ * TP : Used cursor to implement Service class for managing degree requirements.
  * Handles YAML import, CRUD operations, and requirement validation.
  * 
  * Note: Degree requirements management system was implemented 
@@ -41,8 +41,9 @@ public class DegreeRequirementService {
                 throw new IllegalArgumentException("File is empty or null");
             }
             
-            if (!file.getOriginalFilename().toLowerCase().endsWith(".yaml") && 
-                !file.getOriginalFilename().toLowerCase().endsWith(".yml")) {
+            String filename = file.getOriginalFilename();
+            if (filename == null || (!filename.toLowerCase().endsWith(".yaml") && 
+                !filename.toLowerCase().endsWith(".yml"))) {
                 throw new IllegalArgumentException("File must be a YAML file (.yaml or .yml)");
             }
             

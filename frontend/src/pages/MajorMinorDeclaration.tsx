@@ -50,44 +50,81 @@ const MajorMinorDeclaration: React.FC = () => {
   const [effectiveTerm, setEffectiveTerm] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Available subjects and terms
-  const availableSubjects = ['CSE', 'BIO', 'PSY', 'MAT', 'PHY', 'CHE', 'ENG', 'HIS', 'POL', 'SOC'];
-  const availableTerms = ['Fall 2025', 'Spring 2026', 'Fall 2026', 'Spring 2027'];
+  // Available terms and subjects based on academic calendar
+  const getAvailableTerms = () => {
+    const currentDate = new Date();
+    const allTerms = [
+      { value: 'FALL 2025', label: 'Fall 2025 (Mar 31 - Aug 29, 2025)', start: '2025-03-31', end: '2025-08-29' },
+      { value: 'SPRING 2026', label: 'Spring 2026 (Oct 25, 2025 - Jan 30, 2026)', start: '2025-10-25', end: '2026-01-30' }
+    ];
+    
+    return allTerms.filter(term => {
+      const startDate = new Date(term.start);
+      const endDate = new Date(term.end);
+      endDate.setHours(23, 59, 59, 999);
+      
+      return currentDate >= startDate && currentDate <= endDate;
+    });
+  };
+  const availableSubjects = ['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL'];
 
   useEffect(() => {
-    fetchDegreeRequirements();
-    fetchMyDeclarations();
+    fetchData();
   }, []);
 
-  const fetchDegreeRequirements = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch('/api/degree-requirements');
-      const data = await response.json();
+      setLoading(true);
+      console.log('Starting to fetch data...');
       
-      if (data.success) {
-        setDegreeRequirements(data.requirements);
-      } else {
-        setError('Failed to fetch degree requirements');
+      // Fetch degree requirements
+      try {
+        const requirementsResponse = await fetch('/api/declarations/degree-requirements', {
+          credentials: 'include',
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        if (requirementsResponse.ok) {
+          const requirementsData = await requirementsResponse.json();
+          if (requirementsData.success) {
+            setDegreeRequirements(requirementsData.requirements || []);
+            console.log('Degree requirements loaded:', requirementsData.requirements?.length || 0);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch degree requirements:', err);
       }
-    } catch (err) {
-      setError('Error fetching degree requirements');
-      console.error('Error:', err);
-    }
-  };
-
-  const fetchMyDeclarations = async () => {
-    try {
-      const response = await fetch('/api/declarations/my-declarations');
-      const data = await response.json();
       
-      if (data.success) {
-        setMyDeclarations(data.declarations);
-      } else {
-        setError('Failed to fetch declarations');
+      // Fetch my declarations
+      try {
+        const declarationsResponse = await fetch('/api/major-minor-declarations/my-declarations', {
+          credentials: 'include',
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        if (declarationsResponse.ok) {
+          const declarationsData = await declarationsResponse.json();
+          if (declarationsData.success) {
+            setMyDeclarations(declarationsData.declarations || []);
+            console.log('My declarations loaded:', declarationsData.declarations?.length || 0);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch my declarations:', err);
       }
+      
+      console.log('Data fetch completed');
     } catch (err) {
-      setError('Error fetching declarations');
-      console.error('Error:', err);
+      console.error('Error fetching data:', err);
+      setError('Failed to load data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -95,21 +132,38 @@ const MajorMinorDeclaration: React.FC = () => {
 
   const handleSubmitDeclaration = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!selectedSubject || !effectiveTerm) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+
+    // Check if current date is within the declaration period
+    const currentDate = new Date();
+    const isWithinDeclarationPeriod = checkDeclarationPeriod(effectiveTerm, currentDate);
+    
+    if (!isWithinDeclarationPeriod) {
+      setError('Declaration period has ended. Please check the academic calendar for available terms.');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
+    setSuccess(null);
 
     try {
-      const response = await fetch('/api/declarations/submit', {
+      const response = await fetch('/api/major-minor-declarations/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           subjectCode: selectedSubject,
           degreeType: selectedDegreeType,
           declarationType: selectedDeclarationType,
-          effectiveTerm: effectiveTerm,
-        }),
+          effectiveTerm: effectiveTerm
+        })
       });
 
       const data = await response.json();
@@ -117,14 +171,22 @@ const MajorMinorDeclaration: React.FC = () => {
       if (data.success) {
         setSuccess('Declaration submitted successfully!');
         setShowDeclarationForm(false);
-        fetchMyDeclarations(); // Refresh declarations
-        resetForm();
+        
+        // Reset form
+        setSelectedSubject('');
+        setSelectedDegreeType('BA');
+        setSelectedDeclarationType('MAJOR');
+        setEffectiveTerm('');
+        
+        // Refresh data
+        fetchData();
       } else {
-        setError(data.error || 'Failed to submit declaration');
+        setError(data.error || 'Failed to submit declaration. Please try again.');
       }
+      
     } catch (err) {
-      setError('Error submitting declaration');
-      console.error('Error:', err);
+      console.error('Error submitting declaration:', err);
+      setError('Failed to submit declaration. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -136,29 +198,78 @@ const MajorMinorDeclaration: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`/api/declarations/${declarationId}/withdraw`, {
+      const response = await fetch(`/api/major-minor-declarations/${declarationId}/withdraw`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
       });
 
       const data = await response.json();
 
       if (data.success) {
         setSuccess('Declaration withdrawn successfully!');
-        fetchMyDeclarations(); // Refresh declarations
+        // Refresh data
+        fetchData();
       } else {
-        setError(data.error || 'Failed to withdraw declaration');
+        setError(data.error || 'Failed to withdraw declaration. Please try again.');
       }
+      
     } catch (err) {
-      setError('Error withdrawing declaration');
-      console.error('Error:', err);
+      console.error('Error withdrawing declaration:', err);
+      setError('Failed to withdraw declaration. Please try again.');
     }
   };
 
-  const resetForm = () => {
-    setSelectedSubject('');
-    setSelectedDegreeType('BA');
-    setSelectedDeclarationType('MAJOR');
-    setEffectiveTerm('');
+  const getAvailableDegreeTypes = (subject: string): ('BA' | 'BS' | 'MINOR')[] => {
+    // Based on degree_requirements.yaml data
+    const subjectDegreeMap: Record<string, ('BA' | 'BS' | 'MINOR')[]> = {
+      'CSE': ['BS'],
+      'PSY': ['BA'],
+      'BIO': ['BA'],
+      'AMS': ['BS'],
+      'POL': ['BA'],
+      'ECO': ['BA']
+    };
+    
+    return subjectDegreeMap[subject] || [];
+  };
+
+  const checkDeclarationPeriod = (term: string, currentDate: Date): boolean => {
+    // Declaration periods based on academic calendar
+    const declarationPeriods: Record<string, { start: string, end: string }> = {
+      'FALL 2025': {
+        start: '2025-03-31',
+        end: '2025-08-29'
+      },
+      // NEED TO CHAGE THIS TO 2025 10 27 LATER
+      'SPRING 2026': {
+        start: '2025-10-25',
+        end: '2026-01-30'
+      }
+    };
+
+    const period = declarationPeriods[term];
+    if (!period) {
+      return false;
+    }
+
+    const startDate = new Date(period.start);
+    const endDate = new Date(period.end);
+    
+    // Set time to end of day for end date
+    endDate.setHours(23, 59, 59, 999);
+    
+    console.log('Checking declaration period:', {
+      term,
+      currentDate: currentDate.toISOString().split('T')[0],
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+      isWithinPeriod: currentDate >= startDate && currentDate <= endDate
+    });
+
+    return currentDate >= startDate && currentDate <= endDate;
   };
 
   const getStatusColor = (status: string) => {
@@ -167,29 +278,18 @@ const MajorMinorDeclaration: React.FC = () => {
       case 'PENDING': return 'status-pending';
       case 'REJECTED': return 'status-rejected';
       case 'WITHDRAWN': return 'status-withdrawn';
-      default: return 'status-unknown';
+      default: return 'status-pending';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
       case 'APPROVED': return 'Approved';
-      case 'PENDING': return 'Pending Approval';
+      case 'PENDING': return 'Pending';
       case 'REJECTED': return 'Rejected';
       case 'WITHDRAWN': return 'Withdrawn';
       default: return 'Unknown';
     }
-  };
-
-  const getAvailableDegreeTypes = (subjectCode: string) => {
-    const requirements = degreeRequirements.filter(req => req.subjectCode === subjectCode);
-    return requirements.map(req => req.degreeType);
-  };
-
-  const getRequirementInfo = (subjectCode: string, degreeType: string) => {
-    return degreeRequirements.find(req => 
-      req.subjectCode === subjectCode && req.degreeType === degreeType
-    );
   };
 
   const getCurrentDeclarationsCount = (declarationType: 'MAJOR' | 'MINOR') => {
@@ -205,6 +305,10 @@ const MajorMinorDeclaration: React.FC = () => {
     return currentCount < maxAllowed;
   };
 
+  // Check if user has reached maximum majors
+  const hasReachedMaxMajors = !canDeclareMore('MAJOR');
+  const hasReachedMaxMinors = !canDeclareMore('MINOR');
+
   if (loading) {
     return (
       <div className="major-minor-declaration">
@@ -216,155 +320,188 @@ const MajorMinorDeclaration: React.FC = () => {
   return (
     <div className="major-minor-declaration">
       <div className="page-header">
-        <h1>Important Alerts and Request Override</h1>
+        <h1>Major/Minor Declaration</h1>
       </div>
 
-      {/* Alerts Section */}
-      <div className="alerts-section">
-        <div className="alerts-grid">
-          <div className="alert alert-error">
-            <div className="alert-icon">i</div>
-            <div className="alert-content">
-              <div className="alert-text">
-                Maximum Majors Reached: You have reached the maximum limit of 2 majors. Please withdraw an existing major before declaring a new one.
+      {/* Policy Information */}
+      <div className="policy-section">
+        <h2>Declaration Policies</h2>
+        <div className="policy-content">
+          <p>
+            Students can declare up to 2 majors and 3 minors, consistent with the policies in the Undergraduate Bulletin, 
+            especially the Selecting an Academic Program section. Requests to declare a major or minor effective in a 
+            particular term can be submitted between the dates specified in the university's academic calendars and 
+            require approval from a department-level academic advisor.
+          </p>
+          <p>
+            <strong>Declaration Periods:</strong><br/>
+            • <strong>Fall 2025:</strong> March 31 - August 29, 2025<br/>
+            • <strong>Spring 2026:</strong> October 27, 2025 - January 30, 2026
+          </p>
+          <p>
+            Restricted majors and minors (such as CSE) have course requirements or GPA requirements for admission; 
+            department-level academic advisors can waive these requirements. Requests to transfer into CEAS (where all 
+            majors are restricted), by declaring an AOI or a major in CEAS without currently being an AOI or a major 
+            in CEAS, requires approval of a CEAS academic advisor.
+          </p>
+        </div>
+      </div>
+
+      {/* Alerts Section - Only show when user has reached limits */}
+      {(hasReachedMaxMajors || hasReachedMaxMinors) && (
+        <div className="alerts-section">
+          <div className="alerts-grid">
+            {hasReachedMaxMajors && (
+              <div className="alert alert-error">
+                <div className="alert-icon">i</div>
+                <div className="alert-content">
+                  <div className="alert-text">
+                    Maximum Majors Reached: You have reached the maximum limit of 2 majors. Please withdraw an existing major before declaring a new one.
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+            
+            {hasReachedMaxMinors && (
+              <div className="alert alert-warning">
+                <div className="alert-icon">i</div>
+                <div className="alert-content">
+                  <div className="alert-text">
+                    Maximum Minors Reached: You have reached the maximum limit of 3 minors. Please withdraw an existing minor before declaring a new one.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          
+        </div>
+      )}
+
+      {/* Error and Success Messages */}
+      {error && (
+        <div className="alert alert-error">
+          <div className="alert-content">
+            <div className="alert-text">{error}</div>
+          </div>
+        </div>
+      )}
+
+      {success && (
+        <div className="alert alert-success">
+          <div className="alert-content">
+            <div className="alert-text">{success}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Declaration Form */}
+      <div className="declaration-form-section">
+        <div className="section-header">
+          <h2>Submit New Declaration</h2>
+          <button 
+            className="toggle-form-button"
+            onClick={() => setShowDeclarationForm(!showDeclarationForm)}
+          >
+            {showDeclarationForm ? 'Cancel' : 'New Declaration'}
+          </button>
+        </div>
+
+        {/* Show message if no terms are available */}
+        {getAvailableTerms().length === 0 && (
           <div className="alert alert-warning">
-            <div className="alert-icon">i</div>
             <div className="alert-content">
               <div className="alert-text">
-                Class Closed: CSE416 class closed. Please resolve before submitting.
+                <strong>No declaration periods are currently open.</strong> Please check the academic calendar for upcoming declaration periods.
               </div>
             </div>
           </div>
-          
-          <div className="alert alert-error">
-            <div className="alert-icon">i</div>
-            <div className="alert-content">
-              <div className="alert-text">
-                Prerequisite: AMS161 need C or higher in AMS 151 or MAT 131, or level 7 on the mathematics placement examination. Please resolve before submitting.
+        )}
+
+        {showDeclarationForm && (
+          <form onSubmit={handleSubmitDeclaration} className="declaration-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label>Term:</label>
+                <select
+                  value={effectiveTerm}
+                  onChange={(e) => setEffectiveTerm(e.target.value)}
+                  required
+                >
+                  <option value="">Select Term</option>
+                  {getAvailableTerms().map(term => (
+                    <option key={term.value} value={term.value}>{term.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label>Subject:</label>
+                <select
+                  value={selectedSubject}
+                  onChange={(e) => {
+                    setSelectedSubject(e.target.value);
+                    // Set the first available degree type for the selected subject
+                    const availableTypes = getAvailableDegreeTypes(e.target.value);
+                    if (availableTypes.length > 0) {
+                      setSelectedDegreeType(availableTypes[0]);
+                    }
+                  }}
+                  required
+                >
+                  <option value="">Select Subject</option>
+                  {availableSubjects.map(subject => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Request Override Form */}
-      <div className="request-override-section">
-        <div className="student-info">
-          <p><strong>Student:</strong> Sihoon Sung (SBU ID 113949353)</p>
-        </div>
-
-        <form onSubmit={handleSubmitDeclaration} className="override-form">
-          <div className="form-row">
-            <div className="form-group">
-              <label>Term:</label>
-              <select
-                value={effectiveTerm}
-                onChange={(e) => setEffectiveTerm(e.target.value)}
-                required
-              >
-                <option value="">Select Term</option>
-                {availableTerms.map(term => (
-                  <option key={term} value={term}>{term}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label>Sections:</label>
-              <select
-                value={selectedSubject}
-                onChange={(e) => {
-                  setSelectedSubject(e.target.value);
-                  setSelectedDegreeType('BA');
-                }}
-                required
-              >
-                <option value="">Select Subject</option>
-                {availableSubjects.map(subject => (
-                  <option key={subject} value={subject}>{subject} - 01</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Instructor:</label>
-              <input type="text" value="William Bernhard" readOnly />
-            </div>
-            
-            <div className="form-group">
-              <label>Advisor:</label>
-              <input type="text" value="Yujeong Choi" readOnly />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Override Type:</label>
-            <select
-              value={selectedDeclarationType}
-              onChange={(e) => setSelectedDeclarationType(e.target.value as 'MAJOR' | 'MINOR')}
-              required
-            >
-              <option value="MAJOR" disabled={!canDeclareMore('MAJOR')}>
-                Major {!canDeclareMore('MAJOR') ? '(Maximum reached)' : ''}
-              </option>
-              <option value="MINOR" disabled={!canDeclareMore('MINOR')}>
-                Minor {!canDeclareMore('MINOR') ? '(Maximum reached)' : ''}
-              </option>
-            </select>
-          </div>
-
-          {selectedSubject && (
-            <div className="form-group">
-              <label>Degree Type:</label>
-              <select
-                value={selectedDegreeType}
-                onChange={(e) => setSelectedDegreeType(e.target.value as 'BA' | 'BS' | 'MINOR')}
-                required
-              >
-                {getAvailableDegreeTypes(selectedSubject).map(degreeType => (
-                  <option key={degreeType} value={degreeType}>
-                    {degreeType === 'MINOR' ? 'Minor' : degreeType}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Declaration Type:</label>
+                <select
+                  value={selectedDeclarationType}
+                  onChange={(e) => setSelectedDeclarationType(e.target.value as 'MAJOR' | 'MINOR')}
+                  required
+                >
+                  <option value="MAJOR" disabled={!canDeclareMore('MAJOR')}>
+                    Major {!canDeclareMore('MAJOR') ? '(Maximum reached)' : ''}
                   </option>
-                ))}
-              </select>
+                  <option value="MINOR" disabled={!canDeclareMore('MINOR')}>
+                    Minor {!canDeclareMore('MINOR') ? '(Maximum reached)' : ''}
+                  </option>
+                </select>
+              </div>
+
+              {selectedSubject && (
+                <div className="form-group">
+                  <label>Degree Type:</label>
+                  <select
+                    value={selectedDegreeType}
+                    onChange={(e) => setSelectedDegreeType(e.target.value as 'BA' | 'BS' | 'MINOR')}
+                    required
+                  >
+                    {getAvailableDegreeTypes(selectedSubject).map(degreeType => (
+                      <option key={degreeType} value={degreeType}>
+                        {degreeType === 'MINOR' ? 'Minor' : degreeType}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
-          )}
 
-          <div className="form-group">
-            <label>Justification:</label>
-            <textarea
-              placeholder="Please provide a detailed justification for your major/minor declaration request..."
-              rows={4}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Supporting Files (optional):</label>
-            <div className="file-upload">
-              <input type="file" accept=".pdf" />
-              <span>Upload supporting file (PDF only)</span>
+            <div className="form-actions">
+              <button 
+                type="submit" 
+                className="submit-button"
+                disabled={submitting || (!canDeclareMore('MAJOR') && !canDeclareMore('MINOR'))}
+              >
+                {submitting ? 'Submitting...' : 'Submit Declaration'}
+              </button>
             </div>
-          </div>
-
-          <div className="form-actions">
-            <button 
-              type="submit" 
-              className="submit-request-button"
-              disabled={submitting || (!canDeclareMore('MAJOR') && !canDeclareMore('MINOR'))}
-            >
-              {submitting ? 'Submitting...' : 'Submit Request'}
-            </button>
-          </div>
-        </form>
+          </form>
+        )}
       </div>
-
 
       {/* My Declarations */}
       <div className="my-declarations-section">

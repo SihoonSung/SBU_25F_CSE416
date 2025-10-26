@@ -55,8 +55,13 @@ function Dashboard() {
         const meRes = await fetch(`${backendBase}/api/auth/me`, {
           method: 'GET',
           credentials: 'include', // Important
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          },
           mode: 'cors',
+          cache: 'no-cache'
         })
 
         if (meRes.ok) {

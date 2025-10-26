@@ -24,7 +24,12 @@ export async function getCurrentUser(): Promise<{
 }> {
   const res = await fetch(`${BACKEND_BASE}/api/auth/me`, {
     method: 'GET',
-    credentials: 'include', 
+    credentials: 'include',
+    cache: 'no-cache',
+    headers: {
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    }
   });
 
   if (!res.ok) {

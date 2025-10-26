@@ -86,13 +86,34 @@ public class AuthController {
         }
 
         String googleId = principal.getSubject();
+        
+        // Debug: Log OAuth2 principal information
+        System.out.println("DEBUG: OAuth2 Principal Subject: " + googleId);
+        System.out.println("DEBUG: OAuth2 Principal Name: " + principal.getName());
+        System.out.println("DEBUG: OAuth2 Principal Attributes: " + principal.getAttributes());
+        
         Optional<User> userOpt = userService.getUserByGoogleId(googleId);
 
         if (userOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
+            // Debug: Try to find user by email as fallback
+            String email = principal.getAttribute("email");
+            System.out.println("DEBUG: User not found by Google ID, trying email: " + email);
+            
+            if (email != null) {
+                userOpt = userService.getUserByEmail(email);
+                if (userOpt.isPresent()) {
+                    System.out.println("DEBUG: Found user by email: " + userOpt.get().getFirstName() + " " + userOpt.get().getLastName());
+                }
+            }
+            
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
+            }
         }
 
         User user = userOpt.get();
+        System.out.println("DEBUG: Returning user: " + user.getFirstName() + " " + user.getLastName() + " (SBU ID: " + user.getSbuId() + ")");
+        
         Map<String, Object> userData = new HashMap<>();
         userData.put("userId", user.getUserId());
         userData.put("email", user.getEmail());
@@ -109,6 +130,7 @@ public class AuthController {
         userData.put("department", user.getDepartment());
         userData.put("officeLocation", user.getOfficeLocation());
         userData.put("officeHours", user.getOfficeHours());
+        userData.put("sbuId", user.getSbuId()); // Add SBU ID for debugging
 
         return ResponseEntity.ok(Map.of("user", userData));
     }

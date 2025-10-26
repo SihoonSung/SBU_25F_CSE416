@@ -1,9 +1,7 @@
 package edu.sbu.cse416.sam_system.entity;
 
 /**
- * Enum representing different types of degrees.
- * 
- * TP: Used Cursor to implement degree requirements management system
+ * Enum representing the degree types (BA, BS, Minor)
  */
 public enum DegreeType {
     BA("Bachelor of Arts"),

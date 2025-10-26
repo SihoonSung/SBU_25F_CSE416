@@ -48,6 +48,10 @@ const AdvisorApproval: React.FC = () => {
   
   // Action states
   const [selectedDeclaration, setSelectedDeclaration] = useState<MajorMinorDeclaration | null>(null);
+  
+  // Advisor type and permissions
+  const [advisorType, setAdvisorType] = useState<'CEAS' | 'DEPARTMENT' | 'UNIVERSITY'>('DEPARTMENT');
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [comments, setComments] = useState('');
@@ -58,8 +62,71 @@ const AdvisorApproval: React.FC = () => {
   const [availableDeclarationTypes, setAvailableDeclarationTypes] = useState<string[]>([]);
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchDeclarations();
   }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        setCurrentUser(userData);
+        determineAdvisorType(userData);
+      }
+    } catch (err) {
+      console.error('Error fetching current user:', err);
+    }
+  };
+
+  const determineAdvisorType = (user: any) => {
+    // Based on users1.yaml data structure
+    if (user.role === 'ADVISOR') {
+      if (user.level === 'university') {
+        setAdvisorType('UNIVERSITY');
+      } else if (user.academic_unit && user.academic_unit.includes('CSE')) {
+        setAdvisorType('CEAS');
+      } else {
+        setAdvisorType('DEPARTMENT');
+      }
+    }
+  };
+
+  const canApproveDeclaration = (declaration: MajorMinorDeclaration): boolean => {
+    const ceasSubjects = ['CSE', 'BIO']; // CEAS subjects
+    const departmentSubjects = ['PSY', 'ECO', 'AMS', 'POL']; // Department subjects
+    
+    if (advisorType === 'UNIVERSITY') {
+      return true; // University advisors can approve all
+    } else if (advisorType === 'CEAS') {
+      return ceasSubjects.includes(declaration.subjectCode);
+    } else if (advisorType === 'DEPARTMENT') {
+      return departmentSubjects.includes(declaration.subjectCode);
+    }
+    
+    return false;
+  };
+
+  const getAdvisorTypeDescription = (): string => {
+    switch (advisorType) {
+      case 'CEAS':
+        return 'CEAS Advisor - Can approve CSE and BIO declarations';
+      case 'DEPARTMENT':
+        return 'Department Advisor - Can approve PSY, ECO, AMS, POL declarations';
+      case 'UNIVERSITY':
+        return 'University Advisor - Can approve all declarations';
+      default:
+        return 'Advisor';
+    }
+  };
 
   useEffect(() => {
     // Update filter options when declarations change
@@ -73,7 +140,9 @@ const AdvisorApproval: React.FC = () => {
   const fetchDeclarations = async () => {
     try {
       // Fetch pending declarations
-      const pendingResponse = await fetch('/api/declarations/pending');
+      const pendingResponse = await fetch('/api/major-minor-declarations/pending', {
+        credentials: 'include'
+      });
       const pendingData = await pendingResponse.json();
       
       if (pendingData.success) {
@@ -81,7 +150,9 @@ const AdvisorApproval: React.FC = () => {
       }
 
       // Fetch all declarations for filtering
-      const allResponse = await fetch('/api/declarations/all');
+      const allResponse = await fetch('/api/major-minor-declarations/all', {
+        credentials: 'include'
+      });
       const allData = await allResponse.json();
       
       if (allData.success) {
@@ -100,11 +171,12 @@ const AdvisorApproval: React.FC = () => {
     
     setProcessing(true);
     try {
-      const response = await fetch(`/api/declarations/${selectedDeclaration.declarationId}/approve`, {
+      const response = await fetch(`/api/major-minor-declarations/${selectedDeclaration.declarationId}/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           comments: comments.trim() || null,
         }),
@@ -134,11 +206,12 @@ const AdvisorApproval: React.FC = () => {
     
     setProcessing(true);
     try {
-      const response = await fetch(`/api/declarations/${selectedDeclaration.declarationId}/reject`, {
+      const response = await fetch(`/api/major-minor-declarations/${selectedDeclaration.declarationId}/reject`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           comments: comments.trim() || null,
         }),
@@ -326,6 +399,13 @@ const AdvisorApproval: React.FC = () => {
         </div>
       </div>
 
+      {/* Advisor Type Info */}
+      <div className="advisor-info-section">
+        <div className="advisor-type-badge">
+          <strong>Advisor Type:</strong> {getAdvisorTypeDescription()}
+        </div>
+      </div>
+
       {/* Declarations List */}
       <div className="declarations-section">
         <div className="section-header">
@@ -378,18 +458,28 @@ const AdvisorApproval: React.FC = () => {
                     <td className="actions-cell">
                       {declaration.status === 'PENDING' && (
                         <div className="action-buttons">
-                          <button
-                            className="approve-button"
-                            onClick={() => openApprovalModal(declaration)}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            className="reject-button"
-                            onClick={() => openRejectionModal(declaration)}
-                          >
-                            Reject
-                          </button>
+                          {canApproveDeclaration(declaration) ? (
+                            <>
+                              <button
+                                className="approve-button"
+                                onClick={() => openApprovalModal(declaration)}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                className="reject-button"
+                                onClick={() => openRejectionModal(declaration)}
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <div className="no-permission">
+                              <span className="permission-text">
+                                Requires {declaration.subjectCode === 'CSE' || declaration.subjectCode === 'BIO' ? 'CEAS' : 'Department'} Advisor
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                       {declaration.status === 'REJECTED' && declaration.advisorComments && (

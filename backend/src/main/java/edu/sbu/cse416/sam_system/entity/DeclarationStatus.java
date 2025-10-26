@@ -1,12 +1,10 @@
 package edu.sbu.cse416.sam_system.entity;
 
 /**
- * Enum representing the status of a major/minor declaration.
- * 
- * TP: Used Cursor to implement major/minor declaration system
+ * Enum representing the status of a major/minor declaration
  */
 public enum DeclarationStatus {
-    PENDING("Pending Approval"),
+    PENDING("Pending"),
     APPROVED("Approved"),
     REJECTED("Rejected"),
     WITHDRAWN("Withdrawn");

@@ -1,98 +1,44 @@
 package edu.sbu.cse416.sam_system.repository;
 
+import edu.sbu.cse416.sam_system.entity.MajorMinorDeclaration;
+import edu.sbu.cse416.sam_system.entity.User;
 import edu.sbu.cse416.sam_system.entity.DeclarationStatus;
 import edu.sbu.cse416.sam_system.entity.DeclarationType;
-import edu.sbu.cse416.sam_system.entity.MajorMinorDeclaration;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
-/**
- * Repository interface for MajorMinorDeclaration entity.
- * 
- * TP: Used Cursor to implement major/minor declaration system
- */
 @Repository
 public interface MajorMinorDeclarationRepository extends JpaRepository<MajorMinorDeclaration, Long> {
     
-    /**
-     * Find all declarations for a specific student
-     */
-    @Query("SELECT d FROM MajorMinorDeclaration d WHERE d.studentNetId = :studentNetId " +
-           "AND d.isActive = true ORDER BY d.submittedAt DESC")
-    List<MajorMinorDeclaration> findByStudentNetIdAndActive(@Param("studentNetId") String studentNetId);
+    List<MajorMinorDeclaration> findByStudent(User student);
     
-    /**
-     * Find pending declarations for a specific advisor
-     */
-    @Query("SELECT d FROM MajorMinorDeclaration d WHERE d.advisorNetId = :advisorNetId " +
-           "AND d.status = 'PENDING' AND d.isActive = true ORDER BY d.submittedAt ASC")
-    List<MajorMinorDeclaration> findPendingByAdvisorNetId(@Param("advisorNetId") String advisorNetId);
+    List<MajorMinorDeclaration> findByStatus(DeclarationStatus status);
     
-    /**
-     * Find declarations by status
-     */
-    @Query("SELECT d FROM MajorMinorDeclaration d WHERE d.status = :status " +
-           "AND d.isActive = true ORDER BY d.submittedAt DESC")
-    List<MajorMinorDeclaration> findByStatusAndActive(@Param("status") DeclarationStatus status);
+    List<MajorMinorDeclaration> findByStudentAndStatus(User student, DeclarationStatus status);
     
-    /**
-     * Find active declarations for a specific student and declaration type
-     */
-    @Query("SELECT d FROM MajorMinorDeclaration d WHERE d.studentNetId = :studentNetId " +
-           "AND d.declarationType = :declarationType AND d.status = 'APPROVED' " +
-           "AND d.isActive = true ORDER BY d.submittedAt DESC")
-    List<MajorMinorDeclaration> findActiveByStudentAndType(
-            @Param("studentNetId") String studentNetId,
-            @Param("declarationType") DeclarationType declarationType);
+    List<MajorMinorDeclaration> findBySubjectCode(String subjectCode);
     
-    /**
-     * Count active declarations for a student by type
-     */
-    @Query("SELECT COUNT(d) FROM MajorMinorDeclaration d WHERE d.studentNetId = :studentNetId " +
-           "AND d.declarationType = :declarationType AND d.status = 'APPROVED' " +
-           "AND d.isActive = true")
-    long countActiveByStudentAndType(@Param("studentNetId") String studentNetId,
-                                   @Param("declarationType") DeclarationType declarationType);
+    List<MajorMinorDeclaration> findBySubjectCodeAndStatus(String subjectCode, DeclarationStatus status);
     
-    /**
-     * Find declarations by subject code and effective term
-     */
-    @Query("SELECT d FROM MajorMinorDeclaration d WHERE d.subjectCode = :subjectCode " +
-           "AND d.effectiveTerm = :effectiveTerm AND d.isActive = true " +
-           "ORDER BY d.submittedAt DESC")
-    List<MajorMinorDeclaration> findBySubjectCodeAndEffectiveTerm(
-            @Param("subjectCode") String subjectCode,
-            @Param("effectiveTerm") String effectiveTerm);
+    // Methods required by MajorMinorDeclarationService
+    @Query("SELECT COUNT(d) > 0 FROM MajorMinorDeclaration d WHERE d.student = :student AND d.subjectCode = :subjectCode AND d.declarationType = :declarationType AND d.status = 'PENDING' AND d.isActive = true")
+    boolean existsPendingDeclaration(@Param("student") User student, @Param("subjectCode") String subjectCode, @Param("declarationType") DeclarationType declarationType);
     
-    /**
-     * Find all active declarations
-     */
-    @Query("SELECT d FROM MajorMinorDeclaration d WHERE d.isActive = true " +
-           "ORDER BY d.submittedAt DESC")
-    List<MajorMinorDeclaration> findAllActive();
+    @Query("SELECT COUNT(d) > 0 FROM MajorMinorDeclaration d WHERE d.student = :student AND d.subjectCode = :subjectCode AND d.declarationType = :declarationType AND d.status = 'APPROVED' AND d.isActive = true")
+    boolean existsApprovedDeclaration(@Param("student") User student, @Param("subjectCode") String subjectCode, @Param("declarationType") DeclarationType declarationType);
     
-    /**
-     * Check if student has an active declaration for a specific subject and type
-     */
-    @Query("SELECT COUNT(d) > 0 FROM MajorMinorDeclaration d WHERE d.studentNetId = :studentNetId " +
-           "AND d.subjectCode = :subjectCode AND d.declarationType = :declarationType " +
-           "AND d.status = 'APPROVED' AND d.isActive = true")
-    boolean existsActiveByStudentAndSubjectAndType(
-            @Param("studentNetId") String studentNetId,
-            @Param("subjectCode") String subjectCode,
-            @Param("declarationType") DeclarationType declarationType);
+    List<MajorMinorDeclaration> findByStudentOrderByCreatedAtDesc(User student);
     
-    /**
-     * Find declarations by advisor and status
-     */
-    @Query("SELECT d FROM MajorMinorDeclaration d WHERE d.advisorNetId = :advisorNetId " +
-           "AND d.status = :status AND d.isActive = true ORDER BY d.submittedAt DESC")
-    List<MajorMinorDeclaration> findByAdvisorAndStatus(
-            @Param("advisorNetId") String advisorNetId,
-            @Param("status") DeclarationStatus status);
+    @Query("SELECT d FROM MajorMinorDeclaration d WHERE d.advisor = :advisor OR d.ceasAdvisor = :advisor ORDER BY d.createdAt DESC")
+    List<MajorMinorDeclaration> findByAdvisorOrCeasAdvisorOrderByCreatedAtDesc(@Param("advisor") User advisor);
+    
+    @Query("SELECT COUNT(d) FROM MajorMinorDeclaration d WHERE d.student = :student AND d.declarationType = 'MAJOR' AND d.status = 'APPROVED' AND d.isActive = true")
+    long countActiveMajorsByStudent(@Param("student") User student);
+    
+    @Query("SELECT COUNT(d) FROM MajorMinorDeclaration d WHERE d.student = :student AND d.declarationType = 'MINOR' AND d.status = 'APPROVED' AND d.isActive = true")
+    long countActiveMinorsByStudent(@Param("student") User student);
 }

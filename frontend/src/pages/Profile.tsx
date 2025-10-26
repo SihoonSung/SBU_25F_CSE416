@@ -228,7 +228,12 @@ export default function ProfilePage() {
         setMsg(null);
         try {
           // 1) Login/authorization
-          const whoRaw = await safeFetch(`${BASE}/api/auth/me`);
+          const whoRaw = await safeFetch(`${BASE}/api/auth/me`, {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
 
           // 🔧 Added here: roles standardization (support both array and user.role single string)
           const authRoles =

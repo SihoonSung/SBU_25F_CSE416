@@ -13,10 +13,10 @@ function NavigationBar() {
 
   //Role based navbar menus
    const navbar_menus : Record<string, string[]>  = {
-    "student" : ["Course Search", "Registration", "Planner", "Degree Audit", "Major Minor Declaration", "Sign out"],
-    "professor" :["Course Search", "Roaster", "Grades", "Sign out"],
-    "academic_advisor" : ["Course Search", "Registration Overrides", "Roaster", "Degree Audit", "Advisor Approval", "Sign out"],
-    "registrar" : ["Course Search", "Registration Management", "User Management", "Course Catalog Management", "Degree Requirements Import", "Degree Requirements", "Roaster", "Grades", "Admin", "Sign out"]
+    "student" : ["Course Search", "Registration", "Planner", "Degree Audit", "Major Minor Declaration", "Test Data", "Sign out"],
+    "professor" :["Course Search", "Roaster", "Grades", "Test Data", "Sign out"],
+    "academic_advisor" : ["Course Search", "Registration Overrides", "Roaster", "Degree Audit", "Advisor Approval", "Test Data", "Sign out"],
+    "registrar" : ["Course Search", "Registration Management", "User Management", "Course Catalog Management", "Degree Requirements Import", "Degree Requirements", "Roaster", "Grades", "Admin", "Test Data", "Sign out"]
 
   }
 

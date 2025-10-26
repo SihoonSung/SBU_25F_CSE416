@@ -10,65 +10,35 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Repository interface for DegreeRequirement entity.
- * 
- * TP: Used Cursor to implement degree requirements management system
- */
 @Repository
 public interface DegreeRequirementRepository extends JpaRepository<DegreeRequirement, Long> {
     
-    /**
-     * Find active degree requirements by subject code and degree type
-     */
-    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.subjectCode = :subjectCode " +
-           "AND dr.degreeType = :degreeType AND dr.isActive = true")
-    Optional<DegreeRequirement> findBySubjectCodeAndDegreeTypeAndActive(
-            @Param("subjectCode") String subjectCode, 
-            @Param("degreeType") DegreeType degreeType);
+    List<DegreeRequirement> findBySubjectCode(String subjectCode);
     
-    /**
-     * Find all active degree requirements for a specific subject
-     */
-    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.subjectCode = :subjectCode " +
-           "AND dr.isActive = true ORDER BY dr.effectiveTerm DESC")
-    List<DegreeRequirement> findBySubjectCodeAndActive(@Param("subjectCode") String subjectCode);
+    List<DegreeRequirement> findBySubjectCodeAndDegreeType(String subjectCode, DegreeType degreeType);
     
-    /**
-     * Find degree requirements by effective term
-     */
-    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.effectiveTerm = :effectiveTerm " +
-           "AND dr.isActive = true ORDER BY dr.subjectCode, dr.degreeType")
-    List<DegreeRequirement> findByEffectiveTermAndActive(@Param("effectiveTerm") String effectiveTerm);
+    List<DegreeRequirement> findByIsRestricted(Boolean isRestricted);
     
-    /**
-     * Find all active degree requirements
-     */
-    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.isActive = true " +
-           "ORDER BY dr.subjectCode, dr.degreeType, dr.effectiveTerm DESC")
+    List<DegreeRequirement> findByIsActive(Boolean isActive);
+    
+    // Methods required by DegreeRequirementService
+    boolean existsBySubjectCodeAndDegreeTypeAndEffectiveTerm(String subjectCode, DegreeType degreeType, String effectiveTerm);
+    
+    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.isActive = true")
     List<DegreeRequirement> findAllActive();
     
-    /**
-     * Find restricted degree requirements
-     */
-    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.isRestricted = true " +
-           "AND dr.isActive = true ORDER BY dr.subjectCode, dr.degreeType")
+    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.subjectCode = :subjectCode AND dr.isActive = true")
+    List<DegreeRequirement> findBySubjectCodeAndActive(@Param("subjectCode") String subjectCode);
+    
+    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.effectiveTerm = :effectiveTerm AND dr.isActive = true")
+    List<DegreeRequirement> findByEffectiveTermAndActive(@Param("effectiveTerm") String effectiveTerm);
+    
+    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.subjectCode = :subjectCode AND dr.degreeType = :degreeType AND dr.isActive = true")
+    Optional<DegreeRequirement> findBySubjectCodeAndDegreeTypeAndActive(@Param("subjectCode") String subjectCode, @Param("degreeType") DegreeType degreeType);
+    
+    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.isRestricted = true AND dr.isActive = true")
     List<DegreeRequirement> findRestrictedRequirements();
     
-    /**
-     * Check if a degree requirement exists for a given term
-     */
-    @Query("SELECT COUNT(dr) > 0 FROM DegreeRequirement dr WHERE dr.subjectCode = :subjectCode " +
-           "AND dr.degreeType = :degreeType AND dr.effectiveTerm = :effectiveTerm")
-    boolean existsBySubjectCodeAndDegreeTypeAndEffectiveTerm(
-            @Param("subjectCode") String subjectCode,
-            @Param("degreeType") DegreeType degreeType,
-            @Param("effectiveTerm") String effectiveTerm);
-    
-    /**
-     * Find degree requirements by subject codes
-     */
-    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.subjectCode IN :subjectCodes " +
-           "AND dr.isActive = true ORDER BY dr.subjectCode, dr.degreeType")
+    @Query("SELECT dr FROM DegreeRequirement dr WHERE dr.subjectCode IN :subjectCodes AND dr.isActive = true")
     List<DegreeRequirement> findBySubjectCodeInAndActive(@Param("subjectCodes") List<String> subjectCodes);
 }

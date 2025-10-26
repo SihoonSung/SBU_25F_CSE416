@@ -76,6 +76,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "u.level = :level AND u.academicUnit = :academicUnit")
     List<User> findByAdvisorLevelAndAcademicUnit(@Param("level") String level, @Param("academicUnit") String academicUnit);
 
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.academicUnit = :academicUnit")
+    List<User> findByRoleAndAcademicUnit(@Param("role") UserRole role, @Param("academicUnit") String academicUnit);
+
     boolean existsByEmail(String email);
 
     boolean existsBySbuId(String sbuId);

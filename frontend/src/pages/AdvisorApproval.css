@@ -25,6 +25,36 @@
   margin: 0;
 }
 
+/* Advisor Type Info */
+.advisor-info-section {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+}
+
+.advisor-type-badge {
+  color: #495057;
+  font-size: 1rem;
+}
+
+/* Permission Styles */
+.no-permission {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+}
+
+.permission-text {
+  color: #6c757d;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
 /* Message Styles */
 .message {
   display: flex;

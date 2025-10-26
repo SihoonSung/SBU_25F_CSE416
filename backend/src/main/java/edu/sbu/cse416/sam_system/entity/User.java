@@ -1,9 +1,8 @@
 package edu.sbu.cse416.sam_system.entity;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Entity class representing a user in the SAM system.
@@ -12,6 +11,7 @@ import java.util.Map;
  */
 @Entity
 @Table(name = "users")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class User {
     
     @Id

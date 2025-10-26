@@ -70,6 +70,11 @@ public class YamlParsingService {
             String subjectCode = (String) reqData.get("subject_code");
             String degreeTypeStr = (String) reqData.get("degree_type");
             Integer totalCredits = (Integer) reqData.get("total_credits_required");
+            
+            // Debug logging
+            System.out.println("DEBUG: Parsing degree requirement for subject: " + subjectCode);
+            System.out.println("DEBUG: degreeTypeStr = " + degreeTypeStr);
+            System.out.println("DEBUG: totalCredits = " + totalCredits);
             Boolean isRestricted = (Boolean) reqData.getOrDefault("is_restricted", false);
             Double gpaRequirement = (Double) reqData.get("gpa_requirement");
             
@@ -92,9 +97,12 @@ public class YamlParsingService {
             // Parse degree type
             DegreeType degreeType;
             try {
+                if (degreeTypeStr == null || degreeTypeStr.trim().isEmpty()) {
+                    throw new IllegalArgumentException("degree_type cannot be null or empty");
+                }
                 degreeType = DegreeType.valueOf(degreeTypeStr.toUpperCase());
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid degree type: " + degreeTypeStr);
+                throw new IllegalArgumentException("Invalid degree type: " + degreeTypeStr + ". Must be 'BA', 'BS', or 'MINOR'");
             }
             
             // Create degree requirement

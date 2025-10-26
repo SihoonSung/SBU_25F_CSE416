@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+        "type": "java",
+        "name": "SamSystemApplication",
+        "request": "launch",
+        "mainClass": "edu.sbu.cse416.sam_system.SamSystemApplication",
+        "projectName": "sam-system"
+    },
+    {
+        "type": "java",
+        "name": "Launch SamSystemApplication (Integrated Terminal)",
+        "request": "launch",
+        "mainClass": "edu.sbu.cse416.sam_system.SamSystemApplication",
+        "projectName": "backend",
+        "console": "integratedTerminal"
+    },
+    {
+        "type": "java",
+        "name": "Run SamSystemApplication (No Debug, Integrated Terminal)",
+        "request": "launch",
+        "mainClass": "edu.sbu.cse416.sam_system.SamSystemApplication",
+        "projectName": "backend",
+        "console": "integratedTerminal",
+        "noDebug": true
+    }
+]
+}

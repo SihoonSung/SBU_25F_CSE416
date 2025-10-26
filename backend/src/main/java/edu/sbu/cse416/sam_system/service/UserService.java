@@ -284,10 +284,16 @@ public class UserService {
     // ===== YAML Import (users array + SBU format support) =====
     public List<User> importUsersFromYaml(MultipartFile file) throws IOException {
         List<User> importedUsers = new ArrayList<>();
+        
+        // Configure YAML parser to be more tolerant of formatting issues
         Yaml yaml = new Yaml();
-
+        
         try (InputStream inputStream = file.getInputStream()) {
-            Map<String, Object> data = yaml.load(inputStream);
+            // Pre-process the YAML content to normalize whitespace
+            String content = new String(inputStream.readAllBytes());
+            content = normalizeYamlContent(content);
+            
+            Map<String, Object> data = yaml.load(content);
             if (data == null) return importedUsers;
 
             if (data.containsKey("users")) {
@@ -309,16 +315,54 @@ public class UserService {
         }
         return importedUsers;
     }
+    
+    /**
+     * Normalize YAML content to handle multiple blank lines and formatting issues
+     */
+    private String normalizeYamlContent(String content) {
+        System.out.println("DEBUG: Original YAML content length: " + content.length());
+        
+        // Replace multiple consecutive newlines (2 or more) with double newline
+        content = content.replaceAll("\\n\\s*\\n\\s*\\n+", "\n\n");
+        
+        // Handle cases where there are multiple blank lines between list items
+        content = content.replaceAll("(\\n\\s*-\\s+[^\\n]+\\n)(\\s*\\n)+(\\s*-\\s+)", "$1\n$3");
+        
+        // Ensure proper indentation for list items (fix any misaligned dashes)
+        content = content.replaceAll("\\n(\\s*)-\\s", "\n$1- ");
+        
+        // Remove trailing whitespace from lines
+        content = content.replaceAll("\\s+\\n", "\n");
+        
+        // Fix any remaining multiple blank lines between sections
+        content = content.replaceAll("(\\n\\s*\\n\\s*\\n)+", "\n\n");
+        
+        System.out.println("DEBUG: Normalized YAML content length: " + content.length());
+        System.out.println("DEBUG: YAML content preview (last 200 chars): " + 
+            content.substring(Math.max(0, content.length() - 200)));
+        
+        return content;
+    }
 
     private void importUsersByRole(Map<String, Object> data, String roleKey, UserRole role, List<User> importedUsers) {
         if (data.containsKey(roleKey)) {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> usersData = (List<Map<String, Object>>) data.get(roleKey);
+            System.out.println("DEBUG: Processing " + usersData.size() + " users for role: " + roleKey);
             for (Map<String, Object> userData : usersData) {
+                System.out.println("DEBUG: Processing user: " + userData.get("first_name") + " " + userData.get("last_name") + " (SBU ID: " + userData.get("SBU_ID") + ")");
                 User user = createUserFromSBUYamlData(userData, role);
                 if (user != null) {
+                    System.out.println("DEBUG: Created user object for: " + user.getFirstName() + " " + user.getLastName());
                     User saved = processUserForImport(user, userData);
-                    if (saved != null) importedUsers.add(saved);
+                    if (saved != null) {
+                        System.out.println("DEBUG: Successfully saved user: " + saved.getFirstName() + " " + saved.getLastName() + " (ID: " + saved.getUserId() + ")");
+                        importedUsers.add(saved);
+                    } else {
+                        System.out.println("DEBUG: Failed to save user: " + user.getFirstName() + " " + user.getLastName());
+                    }
+                } else {
+                    System.out.println("DEBUG: Failed to create user object for: " + userData.get("first_name") + " " + userData.get("last_name"));
                 }
             }
         }
@@ -358,6 +402,8 @@ public class UserService {
 
     /** Normalize email + check for duplicates before saving */
     private User processUserForImport(User user, Map<String, Object> userData) {
+        System.out.println("DEBUG: Processing user for import: " + user.getFirstName() + " " + user.getLastName() + " (SBU ID: " + user.getSbuId() + ", Email: " + user.getEmail() + ")");
+        
         if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
         
         // Check for existing user by SBU ID (primary identifier)
@@ -370,11 +416,13 @@ public class UserService {
             }
         }
         
-        // Also check by email as fallback
-        Optional<User> existingByEmail = userRepository.findByEmail(user.getEmail());
-        if (existingByEmail.isPresent() && (user.getSbuId() == null || !existingByEmail.get().getSbuId().equals(user.getSbuId()))) {
-            System.out.println("Warning: User with email " + user.getEmail() + " already exists. Skipping import.");
-            return null;
+        // Also check by email as fallback (only if SBU ID is different)
+        if (user.getSbuId() != null) {
+            Optional<User> existingByEmail = userRepository.findByEmail(user.getEmail());
+            if (existingByEmail.isPresent() && !existingByEmail.get().getSbuId().equals(user.getSbuId())) {
+                System.out.println("Warning: User with email " + user.getEmail() + " already exists for different SBU ID. Skipping import.");
+                return null;
+            }
         }
         
         // Validate SBU ID before saving
@@ -383,7 +431,9 @@ public class UserService {
             return null;
         }
         
+        System.out.println("DEBUG: Attempting to save user: " + user.getFirstName() + " " + user.getLastName());
         User savedUser = userRepository.save(user);
+        System.out.println("DEBUG: User saved successfully with ID: " + savedUser.getUserId());
         
         // Process related data after user is saved
         processUserRelatedData(savedUser, userData);
@@ -630,13 +680,31 @@ public class UserService {
         }
         
         if (userData.containsKey("academic_unit")) {
-            user.setAcademicUnit((String) userData.get("academic_unit"));
+            Object academicUnitObj = userData.get("academic_unit");
+            if (academicUnitObj instanceof List) {
+                // Handle array format like [CSE,ISE]
+                @SuppressWarnings("unchecked")
+                List<String> academicUnits = (List<String>) academicUnitObj;
+                user.setAcademicUnit(String.join(",", academicUnits));
+            } else if (academicUnitObj instanceof String) {
+                // Handle string format
+                user.setAcademicUnit((String) academicUnitObj);
+            }
         }
     }
     
     private void processInstructorData(User user, Map<String, Object> userData) {
         if (userData.containsKey("academic_unit")) {
-            user.setDepartment((String) userData.get("academic_unit"));
+            Object academicUnitObj = userData.get("academic_unit");
+            if (academicUnitObj instanceof List) {
+                // Handle array format like [CSE,ISE]
+                @SuppressWarnings("unchecked")
+                List<String> academicUnits = (List<String>) academicUnitObj;
+                user.setDepartment(String.join(",", academicUnits));
+            } else if (academicUnitObj instanceof String) {
+                // Handle string format
+                user.setDepartment((String) academicUnitObj);
+            }
         }
     }
     

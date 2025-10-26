@@ -1,11 +1,3 @@
-# sample user data file.  version: 2025-10-14
-# CSE416, Software Engineering, Scott D. Stoller
-
-# change log:
-# 2025-10-14 added fields related to planned majors and minor for students
-# 2025-10-13 note that 'department' field in entries for classes should have been named 'subject'
-# 2025-10-13 added 'degrees' field for students
-# 2025-10-03 replaced "department" with "subject" in description of academic_unit
 # sample user data file
 # CSE416, Software Engineering, Scott D. Stoller
 
@@ -44,6 +36,20 @@ academic_advisors:
   level: department
   academic_unit: [CSE,ISE]
 
+- SBU_ID: 114665641
+  first_name: Minseo1
+  last_name: Kim1
+  email: minseo.kim@stonybrook.edu
+  level: department
+  academic_unit: [AMS,BIO,POL,CSE,ECO,PSY]
+
+- SBU_ID: 114665642
+  first_name: CEAS
+  last_name: CEAS
+  email: minseohappy06@gmail.com
+  level: department
+  academic_unit: [CSE, AMS]
+  
 instructors:
 - SBU_ID: 100987654
   first_name: Scott
@@ -53,6 +59,7 @@ instructors:
   first_name: Alan
   last_name: Turing
   email: alan.turing@stonybrook.edu
+
 
 students:
 - SBU_ID: 100123456
@@ -64,6 +71,40 @@ students:
   AOI: CSE # major for which the student is AOI if any, otherwise null
   college: # college or school that the student is in, identified by acronym, e.g., CEAS
   majors: [CSE,AMS] # list of majors, identified by 3-letter codes, e.g., CSE
+  degrees: [BS,BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
+  major_requirement_versions: [{semester: Fall, year: 2020}, {semester: Fall, year: 2021}] # the degree requirements version the student is following for each major.  entry i in this list corresponds to entry i in the majors list.
+  minors: [] # list of minors, identified by 3-letter codes
+  minor_requirement_versions: []
+  planned_majors: [] # planned additional majors that are not yet declared.
+  planned_major_requirement_versions: [] # degree requirements version for each planned major
+  planned_degrees: [] # degree types corresponding to planned_majors
+  planned_minors: [POL] # planned additional minors that are not yet declared.
+  planned_minor_requirement_versions: [{semester: Fall, year: 2022}] # degree requirements version for each planned minor
+  graduation: null # term in which the student graduated (if they did), otherwise null
+  transfer_courses: # list of transfer courses and transfer credits.
+    # 'class' and 'university' identify the original class.  department and course_num identify the equivalent SBU course, if any, otherwise they are null.
+    - {class: CSE101, university: SCCC, credits: 3, department: CSE, course_num: 101, grade: A}
+    - {class: CSE999, university: SCCC, credits: 3, department: null, course_num: null, grade: null}
+  classes:  # list of classes the student took, is taking, or is registered for in a future semester.
+    # GPNC is the selected grade threshold if GPMC option was selected, otherwise null.
+    - {class_id: 12345, department: CSE, course_num: 101, section: 01, semester: Fall, year: 2020, credits: 3, GPNC: null, grade: A}
+    - {class_id: 23456, department: AMS, course_num: 151, section: 01, semester: Spring, year: 2021, credits: 3, GPNC: null, grade: A-}
+    - {class_id: 34567, department: CSE, course_num: 214, section: 02, semester: SummerI, year: 2020, credits: 4, GPNC: B, grade: P}
+    - {class_id: 45678, department: AMS, course_num: 261, section: 01, semester: Fall, year: 2025, credits: 3, GPNC: null, grade: null}
+    - {class_id: 56789, department: CSE, course_num: 220, section: R01, semester: Spring, year: 2026, credits: 4, GPNC: null, grade: null}
+  course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
+    - {department: CSE, course_num: 216, semester: Fall, year: 2026, credits: 3}
+    - {department: CSE, course_num: 320, semester: Spring, year: 2027, credits: 3}
+
+- SBU_ID: 114665644
+  first_name: Minseo2
+  last_name: Kim2
+  email: minseohappy07@gmail.com
+  university_entry: {semester: Fall, year: 2020} # term in which the student entered the university.  valid values for semester: Fall, Spring, SummerI, SummerII
+  direct_admit: null # major to which the student was directly admitted when accepted to the university, if any, otherwise null
+  AOI: CSE # major for which the student is AOI if any, otherwise null
+  college: # college or school that the student is in, identified by acronym, e.g., CEAS
+  majors: [CSE] # list of majors, identified by 3-letter codes, e.g., CSE
   degrees: [BS,BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
   major_requirement_versions: [{semester: Fall, year: 2020}, {semester: Fall, year: 2021}] # the degree requirements version the student is following for each major.  entry i in this list corresponds to entry i in the majors list.
   minors: [] # list of minors, identified by 3-letter codes
