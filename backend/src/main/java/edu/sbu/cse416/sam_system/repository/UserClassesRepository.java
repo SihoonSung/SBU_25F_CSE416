@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
+ * TP: Used cursor to implement repository for UserClasses entity.
  * Repository for UserClasses entity.
  * Handles database operations for user's classes data.
  */

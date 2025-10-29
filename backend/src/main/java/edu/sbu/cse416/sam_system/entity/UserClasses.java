@@ -3,6 +3,7 @@ package edu.sbu.cse416.sam_system.entity;
 import jakarta.persistence.*;
 
 /**
+ * TP: Used cursor to implement entity representing a user's classes.
  * Entity representing a user's classes (taken, taking, or registered for).
  * Normalized from User entity's JSON classes field.
  */

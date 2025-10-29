@@ -11,6 +11,9 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * TP: Used cursor to implement repository for MajorMinorDeclaration entity.
+ */
 @Repository
 public interface MajorMinorDeclarationRepository extends JpaRepository<MajorMinorDeclaration, Long> {
     

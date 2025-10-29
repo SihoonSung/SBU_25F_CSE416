@@ -1,6 +1,7 @@
 package edu.sbu.cse416.sam_system.service;
 
 /**
+ * TP: Used cursor to implement web scraping service for SBU course catalog.
  * Web scraping service for SBU course catalog.
  * Implements comprehensive course data extraction with advanced parsing capabilities.
  * 

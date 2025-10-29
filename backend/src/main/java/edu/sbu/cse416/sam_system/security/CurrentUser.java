@@ -6,6 +6,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Component;
 
+/**
+ * TP: Used cursor to implement component for accessing current user information.
+ */
 @Component
 public class CurrentUser {
 

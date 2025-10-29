@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
+ * TP: Used cursor to implement repository for PlannedMajor entity.
  * Repository for PlannedMajor entity.
  * Handles database operations for planned majors.
  */

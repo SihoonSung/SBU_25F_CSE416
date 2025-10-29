@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
+ * TP: Used cursor to implement entity representing a student's planned major.
  * Entity representing a student's planned major.
  * This is different from MajorMinorDeclaration - it's just for tracking
  * admission and degree requirements status without formal declaration.

@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
+ * TP: Used cursor to implement REST controller for degree requirements management.
  * Controller for degree requirements management.
  */
 @RestController

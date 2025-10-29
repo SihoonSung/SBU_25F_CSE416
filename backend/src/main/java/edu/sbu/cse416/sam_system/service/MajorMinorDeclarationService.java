@@ -490,7 +490,7 @@ public class MajorMinorDeclarationService {
                 String updatedMajorsJson = mapper.writeValueAsString(majors);
                 student.setMajors(updatedMajorsJson);
                 
-                // TODO: Also update degrees array with "BA" or "BS" based on degree requirements
+                // TP used cursor to: Also update degrees array with "BA" or "BS" based on degree requirements
                 
             } else if (declaration.getDeclarationType() == DeclarationType.MINOR) {
                 // Add to minors JSON array

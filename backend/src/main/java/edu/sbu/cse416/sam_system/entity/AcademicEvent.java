@@ -3,6 +3,9 @@ package edu.sbu.cse416.sam_system.entity;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
+/**
+ * TP: Used cursor to implement entity for academic events.
+ */
 @Entity
 @Table(name = "academic_events")
 public class AcademicEvent {

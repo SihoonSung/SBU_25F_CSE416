@@ -13,6 +13,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 
+/**
+ * TP: Used cursor to implement service for academic calendar management.
+ */
 @Service
 public class AcademicCalendarService {
 

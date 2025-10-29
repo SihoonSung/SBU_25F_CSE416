@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * REST Controller for room capacity management
+ * TP: Used cursor to implement REST Controller for room capacity management.
+ * REST Controller for room capacity management.
  * Provides endpoints for:
  * - Loading room capacities from YAML
  * - Viewing room capacities

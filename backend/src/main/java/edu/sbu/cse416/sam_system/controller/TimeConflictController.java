@@ -7,7 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Simple REST controller for time conflict checking
+ * TP: Used cursor to implement REST controller for time conflict checking.
+ * Simple REST controller for time conflict checking.
  */
 @RestController
 @RequestMapping("/api/time-conflict")

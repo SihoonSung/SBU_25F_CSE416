@@ -2,6 +2,9 @@ package edu.sbu.cse416.sam_system.model;
 
 import jakarta.persistence.*;
 
+/**
+ * TP: Used cursor to implement Student model entity.
+ */
 @Entity
 @Table(name = "students")
 public class Student {

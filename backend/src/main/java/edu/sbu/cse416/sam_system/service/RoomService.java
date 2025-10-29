@@ -12,8 +12,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Service for managing room capacities
- * Loads room data from YAML file and provides capacity lookup
+ * TP: Used cursor to implement service for managing room capacities.
+ * Service for managing room capacities.
+ * Loads room data from YAML file and provides capacity lookup.
  */
 @Service
 public class RoomService {

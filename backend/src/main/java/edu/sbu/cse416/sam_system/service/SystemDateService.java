@@ -5,6 +5,9 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * TP: Used cursor to implement service for system date management.
+ */
 @Service
 public class SystemDateService {
     private final AtomicReference<LocalDate> override = new AtomicReference<>(null);

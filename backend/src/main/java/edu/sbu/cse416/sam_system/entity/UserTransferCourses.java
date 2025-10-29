@@ -3,6 +3,7 @@ package edu.sbu.cse416.sam_system.entity;
 import jakarta.persistence.*;
 
 /**
+ * TP: Used cursor to implement entity representing a user's transfer courses and transfer credits.
  * Entity representing a user's transfer courses and transfer credits.
  * Normalized from User entity's JSON transfer_courses field.
  */

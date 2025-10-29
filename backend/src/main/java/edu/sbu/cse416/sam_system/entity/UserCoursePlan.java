@@ -3,6 +3,7 @@ package edu.sbu.cse416.sam_system.entity;
 import jakarta.persistence.*;
 
 /**
+ * TP: Used cursor to implement entity representing a user's course plan.
  * Entity representing a user's course plan (planned courses for future semesters).
  * Normalized from User entity's JSON course_plan field.
  */

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 /**
+ * TP: Used cursor to implement service for building normalized person profile.
  * Builds a normalized "person profile" for the currently logged-in user.
  * MODIFIED to use DB UserRepository instead of YAML to fetch profile details 
  * including department and office information.
@@ -64,10 +65,10 @@ public class PersonProfileService {
         dto.gpa = u.getGpa();               
         dto.graduationYear = u.getGraduationYear(); 
         
-        // Class Standing: Provides same information as GpaSummary Standing (currently temporary value)
+        // Class Standing: Get from GPA summary endpoint
         if ("student".equals(kind)) {
-             // Temporary Class Standing calculation (should be credit-based, but using GPA from users table as temporary)
-             dto.classStanding = toStanding(u.getGpa() != null ? u.getGpa().doubleValue() : 0.0);
+             // For now, set to null - will be properly calculated from GPA endpoint which includes standing
+             dto.classStanding = null;
         } else {
              dto.classStanding = null;
         }
@@ -111,38 +112,56 @@ public class PersonProfileService {
 
         return details;
     }
-    
-    // Temporary Standing calculation helper based on GPA value (should use Credits)
-    private String toStanding(Double gpa) {
-        if (gpa == null) return null;
-        if (gpa >= 3.5) return "Senior (Excellent)";
-        if (gpa >= 3.0) return "Junior (Good)";
-        if (gpa >= 2.5) return "Sophomore";
-        if (gpa >= 2.0) return "Freshman";
-        return null;
-    }
 
     // 🚨 Modified: Changed to public static
     public static TermRef parseTermRef(String jsonString) {
-        // Need to implement actual JSON parsing
-        return null; 
+        if (jsonString == null || jsonString.isBlank() || jsonString.equals("null")) {
+            return null;
+        }
+        
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.readValue(jsonString, TermRef.class);
+        } catch (Exception e) {
+            System.err.println("Error parsing TermRef JSON: " + jsonString + " - " + e.getMessage());
+            return null;
+        }
     }
     
     // 🚨 Modified: Changed to public static
     public static List<String> parseStrList(String jsonString) {
-        // Need to implement actual JSON parsing (JSON Array String -> List<String>)
-        // Temporarily assume comma-separated string instead of JSON and process
-        if (jsonString == null || jsonString.isBlank() || jsonString.equals("[]")) {
+        if (jsonString == null || jsonString.isBlank() || jsonString.equals("[]") || jsonString.equals("null")) {
             return Collections.emptyList();
         }
-        // Actual JSON parsing code will go here.
-        return Arrays.asList(jsonString.replaceAll("[\\[\\]\"]", "").split(",")); // temporary processing
+        
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            @SuppressWarnings("unchecked")
+            List<String> result = mapper.readValue(jsonString, List.class);
+            return result != null ? result : Collections.emptyList();
+        } catch (Exception e) {
+            System.err.println("Error parsing string list JSON: " + jsonString + " - " + e.getMessage());
+            // Fallback: try simple comma-separated string
+            return Arrays.asList(jsonString.replaceAll("[\\[\\]\"]", "").split(","));
+        }
     }
     
     // 🚨 Modified: Changed to public static
     public static List<TermRef> parseTermList(String jsonString) {
-        // Need to implement actual JSON parsing
-        return Collections.emptyList(); 
+        if (jsonString == null || jsonString.isBlank() || jsonString.equals("[]") || jsonString.equals("null")) {
+            return Collections.emptyList();
+        }
+        
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.core.type.TypeReference<List<TermRef>> typeRef = 
+                new com.fasterxml.jackson.core.type.TypeReference<List<TermRef>>() {};
+            List<TermRef> result = mapper.readValue(jsonString, typeRef);
+            return result != null ? result : Collections.emptyList();
+        } catch (Exception e) {
+            System.err.println("Error parsing TermRef list JSON: " + jsonString + " - " + e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
 

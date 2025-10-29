@@ -1,6 +1,7 @@
 package edu.sbu.cse416.sam_system.service;
 
 /**
+ * TP: Used cursor to implement PDF parsing service for SBU Course Schedule PDFs.
  * PDF parsing service for SBU Course Schedule PDFs.
  * Implements comprehensive PDF text extraction and class data parsing.
  * 

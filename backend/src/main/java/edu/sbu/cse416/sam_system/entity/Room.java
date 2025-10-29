@@ -3,8 +3,9 @@ package edu.sbu.cse416.sam_system.entity;
 import jakarta.persistence.*;
 
 /**
- * Room entity for storing room capacities
- * Used to determine class capacities based on location
+ * TP: Used cursor to implement room entity for storing room capacities.
+ * Room entity for storing room capacities.
+ * Used to determine class capacities based on location.
  */
 @Entity
 @Table(name = "rooms", uniqueConstraints = {

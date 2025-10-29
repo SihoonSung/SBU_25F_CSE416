@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * DTO for user API responses with properly structured data
+ * TP: Used cursor to implement DTO for user API responses with properly structured data.
+ * DTO for user API responses with properly structured data.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class UserResponseDto {

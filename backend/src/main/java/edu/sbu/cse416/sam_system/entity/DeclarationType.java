@@ -1,7 +1,8 @@
 package edu.sbu.cse416.sam_system.entity;
 
 /**
- * Enum representing the type of declaration (Major or Minor)
+ * TP: Used cursor to implement enum representing the type of declaration (Major or Minor).
+ * Enum representing the type of declaration (Major or Minor).
  */
 public enum DeclarationType {
     MAJOR("Major"),

@@ -26,6 +26,9 @@ import java.util.Optional;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * TP: Used cursor to implement service for user management.
+ */
 @Service
 public class UserService {
 

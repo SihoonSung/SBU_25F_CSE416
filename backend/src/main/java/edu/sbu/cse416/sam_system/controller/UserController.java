@@ -33,6 +33,10 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.*;
 
+/**
+ * TP: Used cursor to implement REST controller for user management.
+ * Handles user lookup, registration, and profile management endpoints.
+ */
 @CrossOrigin(
     origins = {"http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"},
     allowCredentials = "true"

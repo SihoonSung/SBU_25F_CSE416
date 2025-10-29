@@ -15,6 +15,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 /**
+ * TP: Used cursor to implement Spring Security configuration for SAM System.
  * Spring Security configuration for SAM System.
  * Implements Google OAuth2 authentication with CORS support.
  * 

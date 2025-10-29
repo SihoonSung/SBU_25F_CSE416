@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.LocalDateTime;
 
 /**
+ * TP: Used cursor to implement entity representing a student's request to declare a major or minor.
  * Entity representing a student's request to declare a major or minor.
  * Supports up to 2 majors and 3 minors per student.
  */

@@ -5,6 +5,9 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.Map;
 
+/**
+ * TP: Used cursor to implement REST controller for system date management.
+ */
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 @RestController
 @RequestMapping("/api/admin/system-date")

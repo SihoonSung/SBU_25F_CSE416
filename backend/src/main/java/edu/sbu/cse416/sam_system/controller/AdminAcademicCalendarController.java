@@ -7,6 +7,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * TP: Used cursor to implement REST controller for admin academic calendar management.
+ */
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 @RestController
 @RequestMapping("/api/admin/academic-calendar")

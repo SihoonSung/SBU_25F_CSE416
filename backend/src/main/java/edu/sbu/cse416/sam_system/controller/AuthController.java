@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
+ * TP: Used cursor to implement authentication-related endpoints.
  * Controller for authentication-related endpoints.
  * Handles Google OAuth2 login/logout and user session management.
  */

@@ -5,6 +5,7 @@ import java.time.LocalTime;
 import java.util.*;
 
 /**
+ * TP: Used cursor to implement time conflict checker for class schedules.
  * Simple time conflict checker for class schedules.
  * Parses schedule strings in format: "MW 05:00-06:20PM", "TR 02:00-03:20PM"
  * 

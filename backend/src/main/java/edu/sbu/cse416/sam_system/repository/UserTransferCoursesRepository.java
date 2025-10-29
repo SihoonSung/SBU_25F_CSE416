@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 /**
+ * TP: Used cursor to implement repository for UserTransferCourses entity.
  * Repository for UserTransferCourses entity.
  * Handles database operations for user's transfer courses data.
  */

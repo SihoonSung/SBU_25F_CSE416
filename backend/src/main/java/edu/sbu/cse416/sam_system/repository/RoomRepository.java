@@ -8,6 +8,9 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+/**
+ * TP: Used cursor to implement repository for Room entity.
+ */
 @Repository
 public interface RoomRepository extends JpaRepository<Room, Long> {
     

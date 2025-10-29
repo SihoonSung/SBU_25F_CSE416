@@ -23,6 +23,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * TP: Used cursor to implement REST controller for declaration management.
+ * Handles major/minor declaration submission, approval, rejection, and withdrawal.
+ */
 @CrossOrigin(
     origins = {"http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"},
     allowCredentials = "true"

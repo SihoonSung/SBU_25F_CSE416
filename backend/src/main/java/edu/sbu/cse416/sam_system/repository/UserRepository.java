@@ -10,6 +10,9 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * TP: Used cursor to implement repository for User entity.
+ */
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 

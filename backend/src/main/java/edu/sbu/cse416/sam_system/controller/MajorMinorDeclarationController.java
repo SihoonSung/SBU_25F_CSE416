@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
+ * TP: Used cursor to implement REST controller for major/minor declaration requests.
  * Controller for major/minor declaration requests.
  * Handles API endpoints for students and advisors.
  */

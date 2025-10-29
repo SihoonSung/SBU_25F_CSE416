@@ -13,6 +13,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.io.IOException;
 
 /**
+ * TP: Used cursor to implement handler for successful OAuth2 login attempts.
  * Handles successful OAuth2 login attempts.
  * Creates or updates user data in the database and redirects to frontend.
  * 

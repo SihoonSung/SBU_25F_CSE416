@@ -10,6 +10,9 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * TP: Used cursor to implement repository for DegreeRequirement entity.
+ */
 @Repository
 public interface DegreeRequirementRepository extends JpaRepository<DegreeRequirement, Long> {
     

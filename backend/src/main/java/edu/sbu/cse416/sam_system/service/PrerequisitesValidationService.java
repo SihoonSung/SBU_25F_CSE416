@@ -9,6 +9,9 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * TP: Used cursor to implement service for prerequisites validation.
+ */
 @Service
 public class PrerequisitesValidationService {
 
@@ -31,7 +34,12 @@ public class PrerequisitesValidationService {
 
         // Get user's completed classes
         List<UserClasses> userClasses = userClassesRepository.findCompletedClassesByUserId(userId);
+        
+        // Get user's current semester classes (for counting in-progress credits)
+        List<UserClasses> allUserClasses = userClassesRepository.findByUserId(userId);
+        
         System.out.println("    [PREREQ VALIDATION] User has " + userClasses.size() + " completed classes");
+        System.out.println("    [PREREQ VALIDATION] User has " + allUserClasses.size() + " total classes (including in-progress)");
 
         // Parse prerequisites string
         // Format: "BIO 351; C or higher in BIO 205 or BIO 207"
@@ -44,7 +52,7 @@ public class PrerequisitesValidationService {
             
             System.out.println("    [PREREQ VALIDATION] Checking group: " + group);
             
-            if (!checkPrerequisiteGroup(userClasses, group)) {
+            if (!checkPrerequisiteGroup(userClasses, group, allUserClasses)) {
                 System.out.println("    [PREREQ VALIDATION] FAILED - Group not satisfied: " + group);
                 return false;
             }
@@ -143,9 +151,15 @@ public class PrerequisitesValidationService {
      * Check if a single prerequisite group is satisfied
      * @param userClasses User's completed classes
      * @param group Prerequisite group (e.g., "BIO 351" or "C or higher in BIO 205 or BIO 207")
+     * @param allUserClasses All user's classes (including in-progress) for standing calculation
      * @return true if group is satisfied
      */
-    private boolean checkPrerequisiteGroup(List<UserClasses> userClasses, String group) {
+    private boolean checkPrerequisiteGroup(List<UserClasses> userClasses, String group, List<UserClasses> allUserClasses) {
+        // Handle class standing requirements like "U3 standing", "Junior standing"
+        if (group.toLowerCase().contains("standing")) {
+            return checkStandingRequirement(allUserClasses, group);
+        }
+        
         // Handle grade requirements like "C or higher in BIO 205 or BIO 207"
         if (group.toLowerCase().contains("or higher in") || group.toLowerCase().contains("c or higher")) {
             return checkGradeRequirement(userClasses, group);
@@ -199,14 +213,68 @@ public class PrerequisitesValidationService {
     }
     
     /**
+     * Check class standing requirement (e.g., "U3 standing", "Junior standing")
+     * Class standing is calculated from ALL credits (including in-progress courses)
+     * U1: 0-23 credits, U2: 24-56, U3: 57-84, U4: 85+
+     */
+    private boolean checkStandingRequirement(List<UserClasses> allUserClasses, String group) {
+        System.out.println("    [PREREQ VALIDATION] Checking standing requirement: " + group);
+        
+        // Calculate total credits (including in-progress courses)
+        int totalCredits = 0;
+        for (UserClasses userClass : allUserClasses) {
+            if (userClass.getCredits() != null) {
+                totalCredits += userClass.getCredits();
+            }
+        }
+        
+        // Determine required standing
+        String standing = calculateStanding(totalCredits);
+        System.out.println("    [PREREQ VALIDATION] User has " + totalCredits + " credits (including in-progress) = " + standing);
+        
+        // Check for standing keywords in the requirement
+        String lowerGroup = group.toLowerCase();
+        
+        // Check for U1, U2, U3, U4
+        if (lowerGroup.contains("u4") || lowerGroup.contains("senior")) {
+            System.out.println("    [PREREQ VALIDATION] Required standing: U4 (Senior)");
+            return standing.equals("U4");
+        } else if (lowerGroup.contains("u3") || lowerGroup.contains("junior")) {
+            System.out.println("    [PREREQ VALIDATION] Required standing: U3 (Junior)");
+            return standing.equals("U3") || standing.equals("U4");
+        } else if (lowerGroup.contains("u2") || lowerGroup.contains("sophomore")) {
+            System.out.println("    [PREREQ VALIDATION] Required standing: U2 (Sophomore)");
+            return standing.equals("U2") || standing.equals("U3") || standing.equals("U4");
+        } else if (lowerGroup.contains("u1") || lowerGroup.contains("freshman")) {
+            System.out.println("    [PREREQ VALIDATION] Required standing: U1 (Freshman)");
+            return true; // U1 is the minimum, everyone qualifies
+        }
+        
+        // Default: if just says "standing" without specific level, assume satisfied
+        System.out.println("    [PREREQ VALIDATION] Standing requirement not specific, assuming satisfied");
+        return true;
+    }
+    
+    /**
+     * Calculate class standing from total credits
+     * U1: 0-23, U2: 24-56, U3: 57-84, U4: 85+
+     */
+    private String calculateStanding(int credits) {
+        if (credits < 24) return "U1";
+        if (credits < 57) return "U2";
+        if (credits < 85) return "U3";
+        return "U4";
+    }
+
+    /**
      * Check if a requirement is a non-course requirement (like placement exams)
+     * Note: "standing" is now handled separately, not here
      */
     private boolean isNonCourseRequirement(String group) {
         String lowerGroup = group.toLowerCase();
         
-        // Check for placement exams, standing requirements, etc.
+        // Check for placement exams, etc. (standing is now handled separately)
         return lowerGroup.contains("placement exam") ||
-               lowerGroup.contains("standing") ||
                lowerGroup.contains("major") ||
                lowerGroup.contains("dec") ||
                lowerGroup.contains("sbc") ||
