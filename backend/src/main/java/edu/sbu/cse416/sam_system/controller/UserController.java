@@ -15,6 +15,8 @@ import edu.sbu.cse416.sam_system.repository.UserCoursePlanRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRosterRepository;
 import edu.sbu.cse416.sam_system.service.UserService;
+import edu.sbu.cse416.sam_system.entity.WaitlistEntry;
+import edu.sbu.cse416.sam_system.repository.WaitlistRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -46,13 +48,15 @@ public class UserController {
     private final UserCoursePlanRepository userCoursePlanRepository;
     private final ClassRepository classRepository;
     private final ClassRosterRepository classRosterRepository;
+    private final WaitlistRepository waitlistRepository;
 
     public UserController(UserRepository userRepository, UserService userService,
                          UserClassesRepository userClassesRepository,
                          UserTransferCoursesRepository userTransferCoursesRepository,
                          UserCoursePlanRepository userCoursePlanRepository,
                          ClassRepository classRepository,
-                         ClassRosterRepository classRosterRepository) {
+                         ClassRosterRepository classRosterRepository,
+                         WaitlistRepository waitlistRepository) {
         this.userRepository = userRepository;
         this.userService = userService;
         this.userClassesRepository = userClassesRepository;
@@ -60,6 +64,7 @@ public class UserController {
         this.userCoursePlanRepository = userCoursePlanRepository;
         this.classRepository = classRepository;
         this.classRosterRepository = classRosterRepository;
+        this.waitlistRepository = waitlistRepository;
     }
 
     /** Test endpoint to verify controller is loaded */
@@ -416,6 +421,51 @@ public class UserController {
                 classEntity.setCurrentCapacity(classEntity.getCurrentCapacity() - 1);
                 classRepository.save(classEntity);
             }
+
+            // Ensure any waitlist entry for this user/class is removed (safety)
+            try {
+                waitlistRepository.deleteByClassEntityAndUser(classEntity, user);
+            } catch (Exception ignore) {}
+
+            // Auto-enroll next waitlisted student if any
+            try {
+                Optional<WaitlistEntry> next = waitlistRepository.findFirstByClassEntityOrderByCreatedAtAsc(classEntity);
+                if (next.isPresent() && !classEntity.isFull()) {
+                    WaitlistEntry wl = next.get();
+                    User nextUser = wl.getUser();
+
+                    // Create UserClasses
+                    UserClasses userClass = new UserClasses();
+                    userClass.setUser(nextUser);
+                    userClass.setClassId(classEntity.getClassId());
+                    userClass.setDepartment(classEntity.getDepartment());
+                    userClass.setCourseNum(classEntity.getCourseNum());
+                    userClass.setSection(classEntity.getSection());
+                    userClass.setSemester(classEntity.getSemester());
+                    userClass.setYear(classEntity.getYear());
+                    userClass.setCredits(classEntity.getMinCredits());
+                    userClass.setGpnc(null);
+                    userClass.setGrade(null);
+
+                    // Create roster
+                    ClassRoster roster = new ClassRoster(classEntity, nextUser);
+
+                    if (classEntity.getCurrentCapacity() == null) {
+                        classEntity.setCurrentCapacity(0);
+                    }
+                    classEntity.setCurrentCapacity(classEntity.getCurrentCapacity() + 1);
+
+                    userClassesRepository.save(userClass);
+                    classRosterRepository.save(roster);
+                    classRepository.save(classEntity);
+
+                    // Mark waitlist entry and remove
+                    wl.setStatus("ENROLLED");
+                    waitlistRepository.deleteByClassEntityAndUser(classEntity, nextUser);
+                }
+            } catch (Exception ignore) {
+                // best-effort; do not fail drop if waitlist processing fails
+            }
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -430,6 +480,45 @@ public class UserController {
             return ResponseEntity.badRequest().body(Map.of(
                 "success", false,
                 "message", "Failed to drop class: " + e.getMessage()
+            ));
+        }
+    }
+
+    /** Cancel waitlist for a class (remove from waitlist without affecting enrollment) */
+    @PostMapping("/{userId}/classes/{classId}/waitlist/cancel")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> cancelWaitlist(
+            @PathVariable Long userId,
+            @PathVariable Long classId
+    ) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            ClassEntity classEntity = classRepository.findById(classId)
+                    .orElseThrow(() -> new RuntimeException("Class not found"));
+
+            boolean exists = waitlistRepository.existsByClassEntityAndUser(classEntity, user);
+            if (!exists) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "User is not on the waitlist for this class"
+                ));
+            }
+
+            waitlistRepository.deleteByClassEntityAndUser(classEntity, user);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Waitlist entry removed",
+                    "classId", classId,
+                    "department", classEntity.getDepartment(),
+                    "courseNum", classEntity.getCourseNum(),
+                    "title", classEntity.getTitle()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Failed to cancel waitlist: " + e.getMessage()
             ));
         }
     }

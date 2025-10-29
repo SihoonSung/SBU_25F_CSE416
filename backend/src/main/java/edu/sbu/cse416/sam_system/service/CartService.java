@@ -11,6 +11,8 @@ import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRosterRepository;
 import edu.sbu.cse416.sam_system.service.PrerequisitesValidationService;
+import edu.sbu.cse416.sam_system.entity.WaitlistEntry;
+import edu.sbu.cse416.sam_system.repository.WaitlistRepository;
 import edu.sbu.cse416.sam_system.util.TimeConflictChecker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -50,6 +52,9 @@ public class CartService {
     
     @Autowired
     private ClassRosterRepository classRosterRepository;
+
+    @Autowired
+    private WaitlistRepository waitlistRepository;
     
     @Autowired
     private PrerequisitesValidationService prerequisitesValidationService;
@@ -72,14 +77,16 @@ public class CartService {
             return null; // Class not found
         }
         
-        // Check if class is full
+        // Default status
+        String status = "Added";
+
+        // If class is full, mark cart item as Waitlist (등록 시 대기자 등록 예정)
         if (classEntity.isFull()) {
-            throw new RuntimeException("Class is full. Current: " + classEntity.getCurrentCapacity() + "/" + classEntity.getMaxCapacity() + " students");
+            status = "Waitlist";
         }
-        
+
         // Check prerequisites
         String prerequisites = classEntity.getPrerequisites();
-        String status = "Added";
         
         if (prerequisites != null && !prerequisites.trim().isEmpty() && !prerequisites.trim().equalsIgnoreCase("None")) {
             boolean prerequisitesMet = prerequisitesValidationService.validatePrerequisites(userId, prerequisites);
@@ -453,12 +460,38 @@ public class CartService {
             
             // Register all non-conflict cart items and remove them from cart
             List<UserClasses> registeredClasses = new ArrayList<>();
+            List<Map<String, Object>> waitlistedClasses = new ArrayList<>();
             List<Long> cartItemsToDelete = new ArrayList<>();
             
             for (CartEntity cartItem : cartItems) {
-                if (cartItem.getStatus().equals("Added")) {
+                if (cartItem.getStatus().equals("Added") || cartItem.getStatus().equals("Waitlist")) {
                     ClassEntity classEntity = cartItem.getClassEntity();
                     
+                    // If class is full, add to waitlist instead of registering
+                    if (classEntity.isFull()) {
+                        if (classEntity.getCurrentCapacity() == null) {
+                            classEntity.setCurrentCapacity(0);
+                        }
+
+                        // Avoid duplicate waitlist entries
+                        if (!waitlistRepository.existsByClassEntityAndUser(classEntity, user)) {
+                            WaitlistEntry entry = new WaitlistEntry(classEntity, user);
+                            waitlistRepository.save(entry);
+                        }
+
+                        Map<String, Object> wl = new HashMap<>();
+                        wl.put("classId", classEntity.getClassId());
+                        wl.put("department", classEntity.getDepartment());
+                        wl.put("courseNum", classEntity.getCourseNum());
+                        wl.put("title", classEntity.getTitle());
+                        wl.put("position", waitlistRepository.countByClassEntity(classEntity));
+                        waitlistedClasses.add(wl);
+
+                        // Remove from cart regardless
+                        cartItemsToDelete.add(cartItem.getId());
+                        continue;
+                    }
+
                     // Create UserClasses entry
                     UserClasses userClass = new UserClasses();
                     userClass.setUser(user);
@@ -497,9 +530,30 @@ public class CartService {
             }
             
             result.put("success", true);
-            result.put("message", "Registration successful");
             result.put("registeredCount", registeredClasses.size());
             result.put("registeredClasses", registeredClasses);
+            if (!waitlistedClasses.isEmpty()) {
+                result.put("waitlistedCount", waitlistedClasses.size());
+                result.put("waitlistedClasses", waitlistedClasses);
+
+                // Build human-readable message for waitlist positions
+                StringBuilder wb = new StringBuilder();
+                if (registeredClasses.isEmpty()) {
+                    wb.append("0 classes registered. ");
+                }
+                wb.append("Added to waitlist: ");
+                for (int i = 0; i < waitlistedClasses.size(); i++) {
+                    Map<String, Object> wl = waitlistedClasses.get(i);
+                    String dept = String.valueOf(wl.get("department"));
+                    String num = String.valueOf(wl.get("courseNum"));
+                    Object pos = wl.get("position");
+                    if (i > 0) wb.append(", ");
+                    wb.append(dept).append(" ").append(num).append(" (position ").append(pos).append(")");
+                }
+                result.put("message", wb.toString());
+            } else {
+                result.put("message", "Registration processed");
+            }
             
         } catch (Exception e) {
             System.err.println("Error submitting registration: " + e.getMessage());

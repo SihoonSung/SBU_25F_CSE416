@@ -88,10 +88,11 @@ public class ClassUploadController {
     }
     
     /**
-     * Update the capacity of a specific class
-     * 
+     * Update the max capacity of a specific class
+     * Renamed semantics: uses maxCapacity/currentCapacity instead of legacy capacity.
+     *
      * @param classId The class ID
-     * @param capacity The new capacity
+     * @param capacity The new max capacity
      * @return Response with updated class information
      */
     @PutMapping("/classes/{classId}/capacity")
@@ -113,14 +114,22 @@ public class ClassUploadController {
             }
             
             ClassEntity classEntity = classOptional.get();
-            classEntity.setCapacity(capacity);
+            classEntity.setMaxCapacity(capacity);
+            // If reducing maxCapacity below currentCapacity, do not auto-drop; just report both values
+            if (classEntity.getCurrentCapacity() == null) {
+                classEntity.setCurrentCapacity(0);
+            }
             classRepository.save(classEntity);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("message", "Class capacity updated successfully");
+            response.put("message", "Class maxCapacity updated successfully");
             response.put("classId", classId);
-            response.put("newCapacity", capacity);
+            response.put("maxCapacity", classEntity.getMaxCapacity());
+            response.put("currentCapacity", classEntity.getCurrentCapacity());
+            response.put("availableSpots", classEntity.getMaxCapacity() != null && classEntity.getCurrentCapacity() != null
+                    ? Math.max(0, classEntity.getMaxCapacity() - classEntity.getCurrentCapacity())
+                    : null);
             
             return ResponseEntity.ok(response);
             
