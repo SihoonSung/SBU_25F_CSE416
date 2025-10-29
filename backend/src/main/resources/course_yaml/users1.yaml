@@ -105,7 +105,7 @@ students:
   AOI: CSE # major for which the student is AOI if any, otherwise null
   college: # college or school that the student is in, identified by acronym, e.g., CEAS
   majors: [CSE] # list of majors, identified by 3-letter codes, e.g., CSE
-  degrees: [BS,BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
+  degrees: [BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
   major_requirement_versions: [{semester: Fall, year: 2020}, {semester: Fall, year: 2021}] # the degree requirements version the student is following for each major.  entry i in this list corresponds to entry i in the majors list.
   minors: [] # list of minors, identified by 3-letter codes
   minor_requirement_versions: []

@@ -50,6 +50,7 @@ const DegreeRequirements: React.FC = () => {
     setAvailableTerms(terms);
   }, [requirements]);
 
+  // TP Used cursor to fetch degree requirements data
   const fetchRequirements = async () => {
     try {
       const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
@@ -172,6 +173,7 @@ const DegreeRequirements: React.FC = () => {
     fetchRequirements();
   };
 
+  // TP Used cursor to delete degree requirement
   const deleteRequirement = async (requirementId: number) => {
     if (!window.confirm('Are you sure you want to delete this degree requirement? This action cannot be undone.')) {
       return;
@@ -241,6 +243,7 @@ const DegreeRequirements: React.FC = () => {
     }
   };
 
+  // TP Used cursor to parse JSON fields safely
   const parseJsonField = (jsonString?: string) => {
     if (!jsonString) return null;
     try {
@@ -503,16 +506,54 @@ const DegreeRequirements: React.FC = () => {
                       {(() => {
                         const sbcReqs = parseJsonField(requirement.sbcRequirements);
                         if (sbcReqs) {
-                          return (
-                            <div className="sbc-grid">
-                              {sbcReqs.map((sbc: any, index: number) => (
-                                <div key={index} className="sbc-item">
-                                  <span className="sbc-code">{sbc.category}</span>
-                                  <span className="sbc-credits">{sbc.credits_required} credits</span>
-                                </div>
-                              ))}
-                            </div>
-                          );
+                          // Check if it's an array of strings (simple format)
+                          if (Array.isArray(sbcReqs) && sbcReqs.length > 0 && typeof sbcReqs[0] === 'string') {
+                            return (
+                              <div className="sbc-grid">
+                                {sbcReqs.map((sbc: string, index: number) => (
+                                  <div key={index} className="sbc-item">
+                                    <span className="sbc-code">{sbc}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+                          // Check if it's an array of objects (complex format)
+                          else if (Array.isArray(sbcReqs) && sbcReqs.length > 0 && typeof sbcReqs[0] === 'object') {
+                            return (
+                              <div className="sbc-grid">
+                                {sbcReqs.map((sbc: any, index: number) => (
+                                  <div key={index} className="sbc-item">
+                                    <span className="sbc-code">{sbc.category}</span>
+                                    <span className="sbc-credits">{sbc.credits_required} credits</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+                          // Check if it's an object with categories
+                          else if (typeof sbcReqs === 'object' && sbcReqs !== null) {
+                            return (
+                              <div className="sbc-details">
+                                {Object.entries(sbcReqs).map(([category, details]: [string, any]) => (
+                                  <div key={category} className="sbc-category">
+                                    <h5>{category.replace(/_/g, ' ').toUpperCase()}:</h5>
+                                    {typeof details === 'string' ? (
+                                      <p>{details}</p>
+                                    ) : (
+                                      <ul>
+                                        {Array.isArray(details) ? details.map((item: any, index: number) => (
+                                          <li key={index}>{item}</li>
+                                        )) : Object.entries(details).map(([key, value]: [string, any]) => (
+                                          <li key={key}><strong>{key}:</strong> {value}</li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
                         }
                         return <p>{requirement.sbcRequirements}</p>;
                       })()}

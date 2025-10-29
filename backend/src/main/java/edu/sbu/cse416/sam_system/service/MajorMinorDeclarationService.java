@@ -245,23 +245,44 @@ public class MajorMinorDeclarationService {
     /**
      * Check if this is a CEAS transfer
      */
+    // TP Used cursor to check if declaration requires CEAS transfer
     private boolean isCeasTransfer(User student, String subjectCode) {
-        // CEAS subjects: CSE, BIO
-        boolean isCeasSubject = "CSE".equals(subjectCode) || "BIO".equals(subjectCode);
-        
-        if (!isCeasSubject) {
+        // CEAS subjects: AMS, BME, CME, CIV, ECE, CSE, ESE, ESG, ISE, MEC, TSM
+        if (!isCeasMajor(subjectCode)) {
             return false;
         }
         
-        // Check if student is already in CEAS
+        // Check if student is already in CEAS (has AOI or declared major in CEAS)
         return !isStudentInCeas(student);
+    }
+    
+    /**
+     * Check if a subject is a CEAS major
+     */
+    // TP Used cursor to check if subject is a CEAS major
+    private boolean isCeasMajor(String subjectCode) {
+        String[] ceasSubjects = {"AMS", "BME", "CME", "CIV", "ECE", "CSE", "ESE", "ESG", "ISE", "MEC", "TSM"};
+        for (String ceasSubject : ceasSubjects) {
+            if (ceasSubject.equals(subjectCode)) {
+                return true;
+            }
+        }
+        return false;
     }
     
     /**
      * Check if student is already in CEAS
      */
+    // TP Used cursor to check if student is already in CEAS
     private boolean isStudentInCeas(User student) {
-        // Check if student has any approved CEAS majors (CSE, BIO)
+        // Check if student has AOI (Area of Interest) in CEAS
+        if (student.getAoi() != null && !student.getAoi().trim().isEmpty()) {
+            if (isCeasMajor(student.getAoi())) {
+                return true;
+            }
+        }
+        
+        // Check if student has any approved CEAS majors
         if (student.getMajors() == null || student.getMajors().trim().isEmpty()) {
             return false;
         }
@@ -272,7 +293,7 @@ public class MajorMinorDeclarationService {
             if (majors != null) {
                 for (Object major : majors) {
                     String majorStr = major.toString();
-                    if ("CSE".equals(majorStr) || "BIO".equals(majorStr)) {
+                    if (isCeasMajor(majorStr)) {
                         return true;
                     }
                 }
@@ -287,19 +308,27 @@ public class MajorMinorDeclarationService {
     /**
      * Find CEAS advisor
      */
+    // TP Used cursor to find CEAS advisor for CEAS transfers
     private User findCeasAdvisor() {
-        // Find advisor with academic_unit containing CSE (CEAS advisor)
-        List<User> ceasAdvisors = userRepository.findByRoleAndAcademicUnit(
-                edu.sbu.cse416.sam_system.entity.UserRole.ADVISOR, "CSE");
+        // Find advisor with academic_unit containing any CEAS subject
+        List<User> allAdvisors = userRepository.findByRole(edu.sbu.cse416.sam_system.entity.UserRole.ADVISOR);
         
-        if (!ceasAdvisors.isEmpty()) {
-            return ceasAdvisors.get(0);
+        for (User advisor : allAdvisors) {
+            if (advisor.getAcademicUnit() != null) {
+                String academicUnit = advisor.getAcademicUnit();
+                // Check if advisor's academic unit contains any CEAS subject
+                String[] ceasSubjects = {"AMS", "BME", "CME", "CIV", "ECE", "CSE", "ESE", "ESG", "ISE", "MEC", "TSM"};
+                for (String ceasSubject : ceasSubjects) {
+                    if (academicUnit.contains(ceasSubject)) {
+                        return advisor;
+                    }
+                }
+            }
         }
         
-        // Fallback: find any advisor with CSE in academic_unit
-        List<User> allAdvisors = userRepository.findByRole(edu.sbu.cse416.sam_system.entity.UserRole.ADVISOR);
+        // Fallback: find advisor with level "university" or "ceas"
         for (User advisor : allAdvisors) {
-            if (advisor.getAcademicUnit() != null && advisor.getAcademicUnit().contains("CSE")) {
+            if ("university".equals(advisor.getLevel()) || "ceas".equals(advisor.getLevel())) {
                 return advisor;
             }
         }
@@ -339,6 +368,7 @@ public class MajorMinorDeclarationService {
     /**
      * Check if advisor can approve this declaration
      */
+    // TP Used cursor to check if advisor can approve declaration
     private boolean canAdvisorApprove(User advisor, MajorMinorDeclaration declaration) {
         // Check if advisor is the assigned advisor or CEAS advisor
         if ((declaration.getAdvisor() != null && declaration.getAdvisor().equals(advisor)) ||
@@ -354,9 +384,16 @@ public class MajorMinorDeclarationService {
             return true;
         }
         
-        // CEAS advisors can approve CSE and BIO
-        if (advisor.getAcademicUnit() != null && advisor.getAcademicUnit().contains("CSE")) {
-            return "CSE".equals(subjectCode) || "BIO".equals(subjectCode);
+        // CEAS advisors can approve all CEAS subjects
+        if (advisor.getAcademicUnit() != null) {
+            String academicUnit = advisor.getAcademicUnit();
+            String[] ceasSubjects = {"AMS", "BME", "CME", "CIV", "ECE", "CSE", "ESE", "ESG", "ISE", "MEC", "TSM"};
+            for (String ceasSubject : ceasSubjects) {
+                if (academicUnit.contains(ceasSubject)) {
+                    // This is a CEAS advisor, can approve any CEAS subject
+                    return isCeasMajor(subjectCode);
+                }
+            }
         }
         
         // Department advisors can approve their subjects
@@ -435,7 +472,9 @@ public class MajorMinorDeclarationService {
                 if (majorsJson != null && !majorsJson.trim().isEmpty()) {
                     try {
                         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                        majors = mapper.readValue(majorsJson, List.class);
+                        @SuppressWarnings("unchecked")
+                        List<String> parsedMajors = mapper.readValue(majorsJson, List.class);
+                        majors = parsedMajors;
                     } catch (Exception e) {
                         System.err.println("Error parsing majors JSON: " + e.getMessage());
                     }
@@ -461,7 +500,9 @@ public class MajorMinorDeclarationService {
                 if (minorsJson != null && !minorsJson.trim().isEmpty()) {
                     try {
                         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                        minors = mapper.readValue(minorsJson, List.class);
+                        @SuppressWarnings("unchecked")
+                        List<String> parsedMinors = mapper.readValue(minorsJson, List.class);
+                        minors = parsedMinors;
                     } catch (Exception e) {
                         System.err.println("Error parsing minors JSON: " + e.getMessage());
                     }

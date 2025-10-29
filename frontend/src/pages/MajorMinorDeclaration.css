@@ -368,3 +368,396 @@
     padding: 0.75rem 0.5rem;
   }
 }
+
+/* Course Requirements Section */
+.course-requirements-section {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-top: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: slideIn 0.3s ease-out;
+}
+
+.course-requirements-section h3 {
+  color: #2c3e50;
+  margin: 0 0 1.5rem 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 0.5rem;
+}
+
+.requirements-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.requirement-summary {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-left: 4px solid #3498db;
+}
+
+.requirement-summary p {
+  margin: 0.5rem 0;
+  color: #555;
+  font-size: 1rem;
+}
+
+.requirement-summary strong {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.admission-requirements,
+.course-requirements {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.admission-requirements h4,
+.course-requirements h4 {
+  color: #2c3e50;
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.required-courses,
+.elective-courses,
+.concentration-requirements {
+  margin-top: 1rem;
+}
+
+.required-courses h5,
+.elective-courses h5,
+.concentration-requirements h5 {
+  color: #34495e;
+  margin: 0 0 0.75rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.concentration h6 {
+  color: #7f8c8d;
+  margin: 0.5rem 0 0.25rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.admission-requirements ul,
+.course-requirements ul,
+.required-courses ul,
+.elective-courses ul,
+.concentration ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.admission-requirements li,
+.course-requirements li,
+.required-courses li,
+.elective-courses li,
+.concentration li {
+  background: white;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  border-left: 3px solid #3498db;
+  color: #555;
+  font-size: 0.95rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.admission-requirements li:hover,
+.course-requirements li:hover,
+.required-courses li:hover,
+.elective-courses li:hover,
+.concentration li:hover {
+  transform: translateX(4px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.elective-courses p,
+.concentration-requirements p {
+  color: #555;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.elective-courses strong,
+.concentration-requirements strong {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+/* Responsive Design for Course Requirements */
+@media (max-width: 768px) {
+  .course-requirements-section {
+    padding: 1rem;
+  }
+  
+  .requirements-details {
+    gap: 1rem;
+  }
+  
+  .requirement-summary,
+  .admission-requirements,
+  .course-requirements {
+    padding: 1rem;
+  }
+  
+  .course-requirements-section h3 {
+    font-size: 1.2rem;
+  }
+  
+  .admission-requirements h4,
+  .course-requirements h4 {
+    font-size: 1.1rem;
+  }
+}
+
+/* Planned Majors Section */
+.planned-majors-section {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.planned-majors-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.planned-majors-section h2 {
+  color: #2c3e50;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.section-description {
+  color: #6c757d;
+  margin-bottom: 1.5rem;
+  font-style: italic;
+}
+
+.planned-major-form {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  margin-bottom: 1.5rem;
+}
+
+.planned-majors-list {
+  margin-top: 1rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.planned-majors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.planned-major-card {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: box-shadow 0.2s ease;
+}
+
+.planned-major-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.planned-major-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.planned-major-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.2rem;
+}
+
+.unplan-button {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.unplan-button:hover {
+  background: #c82333;
+}
+
+.planned-major-details {
+  color: #495057;
+}
+
+.planned-major-details p {
+  margin: 0.5rem 0;
+}
+
+.requirement-info {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+}
+
+.admission-info {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border-left: 4px solid #007bff;
+}
+
+.admission-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: #007bff;
+  font-size: 1rem;
+}
+
+.admission-info p {
+  margin: 0;
+  color: #495057;
+}
+
+/* Responsive Design for Planned Majors */
+@media (max-width: 768px) {
+  .planned-majors-section {
+    padding: 1rem;
+  }
+  
+  .planned-majors-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .planned-major-card {
+    padding: 1rem;
+  }
+  
+  .planned-major-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .planned-major-header h3 {
+    font-size: 1.1rem;
+  }
+}
+
+/* SBC Requirements Section */
+.sbc-requirements {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 1rem;
+  border-left: 4px solid #28a745;
+}
+
+.sbc-requirements h4 {
+  color: #2c3e50;
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.sbc-content {
+  color: #555;
+}
+
+.sbc-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sbc-category {
+  background: white;
+  border-radius: 6px;
+  padding: 1rem;
+  border-left: 3px solid #28a745;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.sbc-category h5 {
+  color: #28a745;
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.sbc-category p {
+  margin: 0.5rem 0;
+  color: #555;
+  font-size: 0.95rem;
+}
+
+.sbc-category ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sbc-category li {
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.25rem 0;
+  color: #555;
+  font-size: 0.9rem;
+  border-left: 2px solid #28a745;
+}
+
+.sbc-category li strong {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+/* Responsive Design for SBC Requirements */
+@media (max-width: 768px) {
+  .sbc-requirements {
+    padding: 1rem;
+  }
+  
+  .sbc-category {
+    padding: 0.75rem;
+  }
+  
+  .sbc-requirements h4 {
+    font-size: 1.1rem;
+  }
+}

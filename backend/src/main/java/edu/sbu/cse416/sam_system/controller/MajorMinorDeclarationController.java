@@ -4,8 +4,10 @@ import edu.sbu.cse416.sam_system.entity.MajorMinorDeclaration;
 import edu.sbu.cse416.sam_system.entity.DeclarationStatus;
 import edu.sbu.cse416.sam_system.entity.DeclarationType;
 import edu.sbu.cse416.sam_system.entity.User;
+import edu.sbu.cse416.sam_system.entity.DegreeType;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.service.MajorMinorDeclarationService;
+import edu.sbu.cse416.sam_system.service.DegreeRequirementService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +32,9 @@ public class MajorMinorDeclarationController {
     
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private DegreeRequirementService degreeRequirementService;
     
     /**
      * Test endpoint to check authentication status
@@ -372,35 +377,6 @@ public class MajorMinorDeclarationController {
         }
     }
     
-    /**
-     * Get available subjects for declaration
-     */
-    @GetMapping("/available-subjects")
-    public ResponseEntity<?> getAvailableSubjects() {
-        try {
-            // Return list of available majors and minors
-            // This could be fetched from degree requirements or a separate subjects table
-            List<Map<String, Object>> subjects = List.of(
-                    Map.of("code", "CSE", "name", "Computer Science", "type", "MAJOR", "restricted", true),
-                    Map.of("code", "PSY", "name", "Psychology", "type", "MAJOR", "restricted", false),
-                    Map.of("code", "BIO", "name", "Biology", "type", "MAJOR", "restricted", false),
-                    Map.of("code", "AMS", "name", "Applied Mathematics and Statistics", "type", "MAJOR", "restricted", false),
-                    Map.of("code", "POL", "name", "Political Science", "type", "MAJOR", "restricted", false),
-                    Map.of("code", "ECO", "name", "Economics", "type", "MAJOR", "restricted", false)
-            );
-            
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "subjects", subjects
-            ));
-            
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of(
-                    "success", false,
-                    "error", "Failed to retrieve available subjects: " + e.getMessage()
-            ));
-        }
-    }
     
     /**
      * Get student's current major/minor status
@@ -481,5 +457,78 @@ public class MajorMinorDeclarationController {
         }
         
         throw new IllegalArgumentException("User not found in system. Please contact administrator.");
+    }
+    
+    /**
+     * Get all available subjects from degree requirements
+     */
+    @GetMapping("/available-subjects")
+    public ResponseEntity<Map<String, Object>> getAvailableSubjects() {
+        try {
+            List<String> subjects = degreeRequirementService.getAllAvailableSubjects();
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "subjects", subjects,
+                "totalCount", subjects.size(),
+                "note", "SAM supports all subjects for which degree requirements have been imported"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to retrieve available subjects: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Get available degree types for a specific subject
+     */
+    @GetMapping("/available-degree-types/{subjectCode}")
+    public ResponseEntity<Map<String, Object>> getAvailableDegreeTypes(@PathVariable String subjectCode) {
+        try {
+            List<DegreeType> degreeTypes = degreeRequirementService.getAvailableDegreeTypesForSubject(subjectCode);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "subjectCode", subjectCode,
+                "degreeTypes", degreeTypes
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to retrieve degree types for " + subjectCode + ": " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Get detailed course requirements for a specific subject and degree type
+     */
+    @GetMapping("/course-requirements/{subjectCode}/{degreeType}")
+    public ResponseEntity<Map<String, Object>> getCourseRequirements(
+            @PathVariable String subjectCode, 
+            @PathVariable String degreeType) {
+        try {
+            DegreeType type = DegreeType.valueOf(degreeType.toUpperCase());
+            Map<String, Object> requirements = degreeRequirementService.getDetailedCourseRequirements(subjectCode, type);
+            
+            if (requirements.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "requirements", requirements
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", "Invalid degree type: " + degreeType
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to retrieve course requirements: " + e.getMessage()
+            ));
+        }
     }
 }

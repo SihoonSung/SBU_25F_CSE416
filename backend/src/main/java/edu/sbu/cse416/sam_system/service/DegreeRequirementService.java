@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -206,5 +207,80 @@ public class DegreeRequirementService {
     @Transactional
     public void deleteAllRequirements() {
         degreeRequirementRepository.deleteAll();
+    }
+    
+    /**
+     * Get all available subjects from active degree requirements
+     */
+    @Transactional(readOnly = true)
+    public List<String> getAllAvailableSubjects() {
+        List<DegreeRequirement> requirements = getAllActiveRequirements();
+        return requirements.stream()
+                .map(DegreeRequirement::getSubjectCode)
+                .distinct()
+                .sorted()
+                .collect(java.util.stream.Collectors.toList());
+    }
+    
+    /**
+     * Get available degree types for a specific subject
+     */
+    @Transactional(readOnly = true)
+    public List<DegreeType> getAvailableDegreeTypesForSubject(String subjectCode) {
+        List<DegreeRequirement> requirements = getRequirementsBySubject(subjectCode);
+        return requirements.stream()
+                .map(DegreeRequirement::getDegreeType)
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+    }
+    
+    /**
+     * Get detailed course requirements for a specific subject and degree type
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getDetailedCourseRequirements(String subjectCode, DegreeType degreeType) {
+        Optional<DegreeRequirement> requirementOpt = getRequirement(subjectCode, degreeType);
+        if (requirementOpt.isEmpty()) {
+            return new java.util.HashMap<>();
+        }
+        
+        DegreeRequirement requirement = requirementOpt.get();
+        Map<String, Object> details = new java.util.HashMap<>();
+        
+        details.put("subjectCode", requirement.getSubjectCode());
+        details.put("degreeType", requirement.getDegreeType());
+        details.put("totalCreditsRequired", requirement.getTotalCreditsRequired());
+        details.put("isRestricted", requirement.getIsRestricted());
+        details.put("gpaRequirement", requirement.getGpaRequirement());
+        
+        // Parse JSON fields
+        if (requirement.getAdmissionRequirements() != null) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                details.put("admissionRequirements", mapper.readValue(requirement.getAdmissionRequirements(), Object.class));
+            } catch (Exception e) {
+                details.put("admissionRequirements", requirement.getAdmissionRequirements());
+            }
+        }
+        
+        if (requirement.getCourseRequirements() != null) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                details.put("courseRequirements", mapper.readValue(requirement.getCourseRequirements(), Object.class));
+            } catch (Exception e) {
+                details.put("courseRequirements", requirement.getCourseRequirements());
+            }
+        }
+        
+        if (requirement.getSbcRequirements() != null) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                details.put("sbcRequirements", mapper.readValue(requirement.getSbcRequirements(), Object.class));
+            } catch (Exception e) {
+                details.put("sbcRequirements", requirement.getSbcRequirements());
+            }
+        }
+        
+        return details;
     }
 }

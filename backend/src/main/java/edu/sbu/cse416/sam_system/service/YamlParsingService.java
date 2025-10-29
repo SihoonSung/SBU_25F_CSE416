@@ -29,6 +29,7 @@ public class YamlParsingService {
     /**
      * Parse YAML file and create degree requirements
      */
+    // TP Used cursor to parse YAML file and create degree requirements
     public List<DegreeRequirement> parseAndCreateRequirements(MultipartFile file, String createdBy) throws IOException {
         try (InputStream inputStream = file.getInputStream()) {
             Map<String, Object> yamlData = yaml.load(inputStream);
@@ -64,6 +65,7 @@ public class YamlParsingService {
     /**
      * Parse individual degree requirement from YAML data
      */
+    // TP Used cursor to parse individual degree requirement from YAML data
     private DegreeRequirement parseDegreeRequirement(Map<String, Object> reqData, Map<String, Object> yamlData, String createdBy) {
         try {
             // Extract basic information
@@ -137,7 +139,10 @@ public class YamlParsingService {
             // Parse and set SBC requirements
             if (reqData.containsKey("sbc_requirements")) {
                 Object sbcReqs = reqData.get("sbc_requirements");
+                System.out.println("DEBUG: SBC Requirements raw data: " + sbcReqs);
+                System.out.println("DEBUG: SBC Requirements type: " + (sbcReqs != null ? sbcReqs.getClass().getName() : "null"));
                 String sbcReqsJson = convertToJson(sbcReqs);
+                System.out.println("DEBUG: SBC Requirements JSON: " + sbcReqsJson);
                 requirement.setSbcRequirements(sbcReqsJson);
             }
             
@@ -149,25 +154,20 @@ public class YamlParsingService {
     }
     
     /**
-     * Convert object to JSON string
+     * Convert object to JSON string with proper formatting
      */
+    // TP Used cursor to convert object to JSON string with proper formatting
     private String convertToJson(Object obj) {
         if (obj == null) {
             return null;
         }
         
         try {
-            // Simple JSON conversion for basic objects
-            if (obj instanceof String) {
-                return (String) obj;
-            } else if (obj instanceof Map || obj instanceof List) {
-                // For complex objects, we'll use a simple string representation
-                // In a real implementation, you might want to use a proper JSON library
-                return obj.toString();
-            } else {
-                return obj.toString();
-            }
+            // Use Jackson ObjectMapper for proper JSON conversion
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.writeValueAsString(obj);
         } catch (Exception e) {
+            // Fallback to simple string representation
             return obj.toString();
         }
     }

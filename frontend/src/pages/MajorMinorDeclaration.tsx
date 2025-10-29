@@ -17,8 +17,9 @@ interface DegreeRequirement {
   totalCreditsRequired: number;
   isRestricted: boolean;
   gpaRequirement?: number;
-  admissionRequirements?: string;
-  courseRequirements?: string;
+  admissionRequirements?: any;
+  courseRequirements?: any;
+  sbcRequirements?: any;
 }
 
 interface MajorMinorDeclaration {
@@ -35,15 +36,62 @@ interface MajorMinorDeclaration {
   submittedAt: string;
 }
 
+interface PlannedMajor {
+  plannedMajorId: number;
+  subjectCode: string;
+  degreeType: 'BA' | 'BS' | 'MINOR';
+  plannedAt: string;
+  isActive: boolean;
+  degreeRequirement?: {
+    totalCreditsRequired: number;
+    isRestricted: boolean;
+    gpaRequirement?: number;
+    admissionRequirements?: any;
+    courseRequirements?: any;
+    prerequisiteCourses?: any;
+    sbcRequirements?: any;
+  };
+}
+
 const MajorMinorDeclaration: React.FC = () => {
   const [degreeRequirements, setDegreeRequirements] = useState<DegreeRequirement[]>([]);
   const [myDeclarations, setMyDeclarations] = useState<MajorMinorDeclaration[]>([]);
+  // Load planned majors from localStorage
+  // TP Used cursor to load planned majors from localStorage
+  const loadPlannedMajorsFromStorage = () => {
+    try {
+      const stored = localStorage.getItem('plannedMajors');
+      if (stored) {
+        const plannedMajors = JSON.parse(stored);
+        setMyPlannedMajors(plannedMajors);
+        console.log('Loaded planned majors from storage:', plannedMajors.length);
+      }
+    } catch (err) {
+      console.error('Error loading planned majors from storage:', err);
+    }
+  };
+
+  // Save planned majors to localStorage
+  // TP Used cursor to save planned majors to localStorage
+  const savePlannedMajorsToStorage = (plannedMajors: PlannedMajor[]) => {
+    try {
+      localStorage.setItem('plannedMajors', JSON.stringify(plannedMajors));
+      console.log('Saved planned majors to storage:', plannedMajors.length);
+    } catch (err) {
+      console.error('Error saving planned majors to storage:', err);
+    }
+  };
+  const [myPlannedMajors, setMyPlannedMajors] = useState<PlannedMajor[]>([]);
+  const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
+  const [availableDegreeTypes, setAvailableDegreeTypes] = useState<string[]>([]);
+  const [courseRequirements, setCourseRequirements] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
   // Form state
   const [showDeclarationForm, setShowDeclarationForm] = useState(false);
+  const [showPlannedMajorForm, setShowPlannedMajorForm] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedDegreeType, setSelectedDegreeType] = useState<'BA' | 'BS' | 'MINOR'>('BA');
   const [selectedDeclarationType, setSelectedDeclarationType] = useState<'MAJOR' | 'MINOR'>('MAJOR');
@@ -55,7 +103,7 @@ const MajorMinorDeclaration: React.FC = () => {
     const currentDate = new Date();
     const allTerms = [
       { value: 'FALL 2025', label: 'Fall 2025 (Mar 31 - Aug 29, 2025)', start: '2025-03-31', end: '2025-08-29' },
-      { value: 'SPRING 2026', label: 'Spring 2026 (Oct 25, 2025 - Jan 30, 2026)', start: '2025-10-25', end: '2026-01-30' }
+      { value: 'SPRING 2026', label: 'Spring 2026 (Oct 27, 2025 - Jan 30, 2026)', start: '2025-10-27', end: '2026-01-30' }
     ];
     
     return allTerms.filter(term => {
@@ -66,16 +114,41 @@ const MajorMinorDeclaration: React.FC = () => {
       return currentDate >= startDate && currentDate <= endDate;
     });
   };
-  const availableSubjects = ['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL'];
 
   useEffect(() => {
     fetchData();
+    loadPlannedMajorsFromStorage();
   }, []);
 
+  // TP Used cursor to fetch data from APIs
   const fetchData = async () => {
     try {
       setLoading(true);
       console.log('Starting to fetch data...');
+      
+      // Fetch available subjects dynamically
+      try {
+        const subjectsResponse = await fetch('/api/major-minor-declarations/available-subjects', {
+          credentials: 'include',
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        if (subjectsResponse.ok) {
+          const subjectsData = await subjectsResponse.json();
+          if (subjectsData.success) {
+            setAvailableSubjects(subjectsData.subjects || []);
+            console.log('Available subjects loaded:', subjectsData.subjects?.length || 0);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch available subjects:', err);
+        // Fallback to hardcoded subjects if API fails
+        setAvailableSubjects(['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']);
+      }
       
       // Fetch degree requirements
       try {
@@ -121,6 +194,8 @@ const MajorMinorDeclaration: React.FC = () => {
         console.warn('Failed to fetch my declarations:', err);
       }
       
+      // Planned majors are now loaded from localStorage in useEffect
+      
       console.log('Data fetch completed');
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -130,6 +205,7 @@ const MajorMinorDeclaration: React.FC = () => {
     }
   };
 
+  // TP Used cursor to handle declaration submission
   const handleSubmitDeclaration = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -192,6 +268,76 @@ const MajorMinorDeclaration: React.FC = () => {
     }
   };
 
+  // TP Used cursor to handle planned major creation
+  const handlePlanMajor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedSubject) {
+      setError('Please select a subject.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Create new planned major
+      const newPlannedMajor: PlannedMajor = {
+        plannedMajorId: Date.now(), // Use timestamp as ID
+        subjectCode: selectedSubject,
+        degreeType: selectedDegreeType,
+        plannedAt: new Date().toISOString(),
+        isActive: true
+      };
+
+      // Add to existing planned majors
+      const updatedPlannedMajors = [...myPlannedMajors, newPlannedMajor];
+      setMyPlannedMajors(updatedPlannedMajors);
+      savePlannedMajorsToStorage(updatedPlannedMajors);
+
+      setSuccess('Major planned successfully!');
+      setShowPlannedMajorForm(false);
+      
+      // Reset form
+      setSelectedSubject('');
+      setSelectedDegreeType('BA');
+      
+    } catch (err) {
+      console.error('Error planning major:', err);
+      setError('Failed to plan major. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // TP Used cursor to handle planned major removal
+  const handleUnplanMajor = async (subjectCode: string, degreeType: string) => {
+    if (!confirm(`Are you sure you want to unplan ${subjectCode} ${degreeType}?`)) {
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Remove planned major from list
+      const updatedPlannedMajors = myPlannedMajors.filter(
+        pm => !(pm.subjectCode === subjectCode && pm.degreeType === degreeType)
+      );
+      
+      setMyPlannedMajors(updatedPlannedMajors);
+      savePlannedMajorsToStorage(updatedPlannedMajors);
+
+      setSuccess('Major unplanned successfully!');
+      
+    } catch (err) {
+      console.error('Error unplanning major:', err);
+      setError('Failed to unplan major. Please try again.');
+    }
+  };
+
+  // TP Used cursor to handle declaration withdrawal
   const handleWithdrawDeclaration = async (declarationId: number) => {
     if (!window.confirm('Are you sure you want to withdraw this declaration?')) {
       return;
@@ -222,20 +368,86 @@ const MajorMinorDeclaration: React.FC = () => {
     }
   };
 
-  const getAvailableDegreeTypes = (subject: string): ('BA' | 'BS' | 'MINOR')[] => {
-    // Based on degree_requirements.yaml data
-    const subjectDegreeMap: Record<string, ('BA' | 'BS' | 'MINOR')[]> = {
-      'CSE': ['BS'],
-      'PSY': ['BA'],
-      'BIO': ['BA'],
-      'AMS': ['BS'],
-      'POL': ['BA'],
-      'ECO': ['BA']
-    };
+  // Load available degree types for selected subject
+  // TP Used cursor to load degree types for selected subject
+  const loadDegreeTypesForSubject = async (subjectCode: string) => {
+    if (!subjectCode) {
+      setAvailableDegreeTypes([]);
+      return;
+    }
     
-    return subjectDegreeMap[subject] || [];
+    try {
+      const response = await fetch(`/api/major-minor-declarations/available-degree-types/${subjectCode}`, {
+        credentials: 'include',
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const degreeTypes = data.degreeTypes.map((dt: any) => dt.toString());
+          setAvailableDegreeTypes(degreeTypes);
+          
+          // Set the first available degree type
+          if (degreeTypes.length > 0) {
+            setSelectedDegreeType(degreeTypes[0] as 'BA' | 'BS' | 'MINOR');
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch degree types for subject:', err);
+      // Fallback to hardcoded mapping
+      const subjectDegreeMap: Record<string, string[]> = {
+        'CSE': ['BS'],
+        'PSY': ['BA'],
+        'BIO': ['BA'],
+        'AMS': ['BS'],
+        'POL': ['BA'],
+        'ECO': ['BA']
+      };
+      const fallbackTypes = subjectDegreeMap[subjectCode] || [];
+      setAvailableDegreeTypes(fallbackTypes);
+      if (fallbackTypes.length > 0) {
+        setSelectedDegreeType(fallbackTypes[0] as 'BA' | 'BS' | 'MINOR');
+      }
+    }
+  };
+  
+  // Load course requirements for selected subject and degree type
+  // TP Used cursor to load course requirements for subject and degree type
+  const loadCourseRequirements = async (subjectCode: string, degreeType: string) => {
+    if (!subjectCode || !degreeType) {
+      setCourseRequirements(null);
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/major-minor-declarations/course-requirements/${subjectCode}/${degreeType}`, {
+        credentials: 'include',
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setCourseRequirements(data.requirements);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch course requirements:', err);
+      setCourseRequirements(null);
+    }
   };
 
+  // TP Used cursor to check declaration period validity
   const checkDeclarationPeriod = (term: string, currentDate: Date): boolean => {
     // Declaration periods based on academic calendar
     const declarationPeriods: Record<string, { start: string, end: string }> = {
@@ -243,9 +455,8 @@ const MajorMinorDeclaration: React.FC = () => {
         start: '2025-03-31',
         end: '2025-08-29'
       },
-      // NEED TO CHAGE THIS TO 2025 10 27 LATER
       'SPRING 2026': {
-        start: '2025-10-25',
+        start: '2025-10-27',
         end: '2026-01-30'
       }
     };
@@ -339,10 +550,14 @@ const MajorMinorDeclaration: React.FC = () => {
             • <strong>Spring 2026:</strong> October 27, 2025 - January 30, 2026
           </p>
           <p>
-            Restricted majors and minors (such as CSE) have course requirements or GPA requirements for admission; 
-            department-level academic advisors can waive these requirements. Requests to transfer into CEAS (where all 
-            majors are restricted), by declaring an AOI or a major in CEAS without currently being an AOI or a major 
-            in CEAS, requires approval of a CEAS academic advisor.
+            Restricted majors and minors have course requirements or GPA requirements for admission; 
+            department-level academic advisors can waive these requirements. 
+          </p>
+          <p>
+            <strong>CEAS Transfer Policy:</strong><br/>
+            Requests to transfer into CEAS (College of Engineering and Applied Sciences) by declaring an AOI or a major 
+            in CEAS without currently being an AOI or a major in CEAS requires approval of a CEAS academic advisor.<br/>
+            <strong>CEAS Subjects:</strong> AMS, BME, CME, CIV, ECE, CSE, ESE, ESG, ISE, MEC, TSM
           </p>
         </div>
       </div>
@@ -439,11 +654,8 @@ const MajorMinorDeclaration: React.FC = () => {
                   value={selectedSubject}
                   onChange={(e) => {
                     setSelectedSubject(e.target.value);
-                    // Set the first available degree type for the selected subject
-                    const availableTypes = getAvailableDegreeTypes(e.target.value);
-                    if (availableTypes.length > 0) {
-                      setSelectedDegreeType(availableTypes[0]);
-                    }
+                    // Load degree types for selected subject
+                    loadDegreeTypesForSubject(e.target.value);
                   }}
                   required
                 >
@@ -472,15 +684,19 @@ const MajorMinorDeclaration: React.FC = () => {
                 </select>
               </div>
 
-              {selectedSubject && (
+              {selectedSubject && availableDegreeTypes.length > 0 && (
                 <div className="form-group">
                   <label>Degree Type:</label>
                   <select
                     value={selectedDegreeType}
-                    onChange={(e) => setSelectedDegreeType(e.target.value as 'BA' | 'BS' | 'MINOR')}
+                    onChange={(e) => {
+                      setSelectedDegreeType(e.target.value as 'BA' | 'BS' | 'MINOR');
+                      // Load course requirements for selected subject and degree type
+                      loadCourseRequirements(selectedSubject, e.target.value);
+                    }}
                     required
                   >
-                    {getAvailableDegreeTypes(selectedSubject).map(degreeType => (
+                    {availableDegreeTypes.map(degreeType => (
                       <option key={degreeType} value={degreeType}>
                         {degreeType === 'MINOR' ? 'Minor' : degreeType}
                       </option>
@@ -502,6 +718,272 @@ const MajorMinorDeclaration: React.FC = () => {
           </form>
         )}
       </div>
+
+      {/* Planned Majors Section */}
+      <div className="planned-majors-section">
+        <div className="section-header">
+          <h2>Planned Majors</h2>
+          <button 
+            className="toggle-form-button"
+            onClick={() => setShowPlannedMajorForm(!showPlannedMajorForm)}
+          >
+            {showPlannedMajorForm ? 'Cancel' : 'Plan New Major'}
+          </button>
+        </div>
+
+        <p className="section-description">
+          Plan majors to track admission and degree requirements. This is different from declaring a major - 
+          planning just shows you the status of requirements without formal declaration.
+        </p>
+
+        {showPlannedMajorForm && (
+          <form onSubmit={handlePlanMajor} className="planned-major-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label>Subject:</label>
+                <select
+                  value={selectedSubject}
+                  onChange={(e) => {
+                    setSelectedSubject(e.target.value);
+                    if (e.target.value) {
+                      loadDegreeTypesForSubject(e.target.value);
+                    }
+                  }}
+                  required
+                >
+                  <option value="">Select Subject</option>
+                  {availableSubjects.map(subject => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedSubject && availableDegreeTypes.length > 0 && (
+                <div className="form-group">
+                  <label>Degree Type:</label>
+                  <select
+                    value={selectedDegreeType}
+                    onChange={(e) => {
+                      setSelectedDegreeType(e.target.value as 'BA' | 'BS' | 'MINOR');
+                      if (selectedSubject) {
+                        loadCourseRequirements(selectedSubject, e.target.value);
+                      }
+                    }}
+                    required
+                  >
+                    {availableDegreeTypes.map(degreeType => (
+                      <option key={degreeType} value={degreeType}>
+                        {degreeType === 'MINOR' ? 'Minor' : degreeType}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="form-actions">
+              <button 
+                type="submit" 
+                className="submit-button"
+                disabled={submitting}
+              >
+                {submitting ? 'Planning...' : 'Plan Major'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Planned Majors List */}
+        <div className="planned-majors-list">
+          {myPlannedMajors.length === 0 ? (
+            <div className="empty-state">
+              <p>No planned majors yet. Plan a major to track admission and degree requirements.</p>
+            </div>
+          ) : (
+            <div className="planned-majors-grid">
+              {myPlannedMajors.map((plannedMajor) => (
+                <div key={plannedMajor.plannedMajorId} className="planned-major-card">
+                  <div className="planned-major-header">
+                    <h3>{plannedMajor.subjectCode} {plannedMajor.degreeType}</h3>
+                    <button 
+                      className="unplan-button"
+                      onClick={() => handleUnplanMajor(plannedMajor.subjectCode, plannedMajor.degreeType)}
+                    >
+                      Unplan
+                    </button>
+                  </div>
+                  
+                  <div className="planned-major-details">
+                    <p><strong>Planned:</strong> {new Date(plannedMajor.plannedAt).toLocaleDateString()}</p>
+                    
+                    {plannedMajor.degreeRequirement && (
+                      <div className="requirement-info">
+                        <p><strong>Total Credits:</strong> {plannedMajor.degreeRequirement.totalCreditsRequired}</p>
+                        <p><strong>Restricted:</strong> {plannedMajor.degreeRequirement.isRestricted ? 'Yes' : 'No'}</p>
+                        {plannedMajor.degreeRequirement.gpaRequirement && (
+                          <p><strong>GPA Requirement:</strong> {plannedMajor.degreeRequirement.gpaRequirement}</p>
+                        )}
+                        
+                        {plannedMajor.degreeRequirement.admissionRequirements && (
+                          <div className="admission-info">
+                            <h4>Admission Requirements:</h4>
+                            <p>{plannedMajor.degreeRequirement.admissionRequirements}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Course Requirements Display */}
+      {courseRequirements && (
+        <div className="course-requirements-section">
+          <h3>Course Requirements for {selectedSubject} {selectedDegreeType}</h3>
+          <div className="requirements-details">
+            <div className="requirement-summary">
+              <p><strong>Total Credits Required:</strong> {courseRequirements.totalCreditsRequired}</p>
+              <p><strong>Restricted Major:</strong> {courseRequirements.isRestricted ? 'Yes' : 'No'}</p>
+              {courseRequirements.gpaRequirement && (
+                <p><strong>GPA Requirement:</strong> {courseRequirements.gpaRequirement}</p>
+              )}
+            </div>
+            
+            {courseRequirements.admissionRequirements && (
+              <div className="admission-requirements">
+                <h4>Admission Requirements:</h4>
+                <ul>
+                  {Array.isArray(courseRequirements.admissionRequirements) 
+                    ? courseRequirements.admissionRequirements.map((req: string, index: number) => (
+                        <li key={index}>{req}</li>
+                      ))
+                    : <li>{courseRequirements.admissionRequirements}</li>
+                  }
+                </ul>
+              </div>
+            )}
+            
+            {courseRequirements.courseRequirements && (
+              <div className="course-requirements">
+                <h4>Course Requirements:</h4>
+                {courseRequirements.courseRequirements.required_courses && (
+                  <div className="required-courses">
+                    <h5>Required Courses:</h5>
+                    <ul>
+                      {courseRequirements.courseRequirements.required_courses.map((course: string, index: number) => (
+                        <li key={index}>{course}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {courseRequirements.courseRequirements.elective_courses && (
+                  <div className="elective-courses">
+                    <h5>Elective Courses:</h5>
+                    <p><strong>Credits Required:</strong> {courseRequirements.courseRequirements.elective_courses.credits_required}</p>
+                    <ul>
+                      {courseRequirements.courseRequirements.elective_courses.courses.map((course: string, index: number) => (
+                        <li key={index}>{course}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {courseRequirements.courseRequirements.concentration_requirements && (
+                  <div className="concentration-requirements">
+                    <h5>Concentration Requirements:</h5>
+                    <p><strong>Credits Required:</strong> {courseRequirements.courseRequirements.concentration_requirements.credits_required}</p>
+                    {Object.entries(courseRequirements.courseRequirements.concentration_requirements.concentrations).map(([concentration, courses]: [string, any]) => (
+                      <div key={concentration} className="concentration">
+                        <h6>{concentration.replace(/_/g, ' ').toUpperCase()}:</h6>
+                        <ul>
+                          {courses.courses.map((course: string, index: number) => (
+                            <li key={index}>{course}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {courseRequirements.sbcRequirements && (
+              <div className="sbc-requirements">
+                <h4>SBC Requirements:</h4>
+                <div className="sbc-content">
+                  {typeof courseRequirements.sbcRequirements === 'string' ? (
+                    <div>
+                      {(() => {
+                        try {
+                          const parsed = JSON.parse(courseRequirements.sbcRequirements);
+                          if (Array.isArray(parsed)) {
+                            return (
+                              <ul>
+                                {parsed.map((item: any, index: number) => (
+                                  <li key={index}>{item}</li>
+                                ))}
+                              </ul>
+                            );
+                          } else if (typeof parsed === 'object') {
+                            return (
+                              <div className="sbc-details">
+                                {Object.entries(parsed).map(([category, details]: [string, any]) => (
+                                  <div key={category} className="sbc-category">
+                                    <h5>{category.replace(/_/g, ' ').toUpperCase()}:</h5>
+                                    {typeof details === 'string' ? (
+                                      <p>{details}</p>
+                                    ) : (
+                                      <ul>
+                                        {Array.isArray(details) ? details.map((item: any, index: number) => (
+                                          <li key={index}>{item}</li>
+                                        )) : Object.entries(details).map(([key, value]: [string, any]) => (
+                                          <li key={key}><strong>{key}:</strong> {value}</li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          } else {
+                            return <p>{parsed}</p>;
+                          }
+                        } catch (e) {
+                          return <p>{courseRequirements.sbcRequirements}</p>;
+                        }
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="sbc-details">
+                      {Object.entries(courseRequirements.sbcRequirements).map(([category, details]: [string, any]) => (
+                        <div key={category} className="sbc-category">
+                          <h5>{category.replace(/_/g, ' ').toUpperCase()}:</h5>
+                          {typeof details === 'string' ? (
+                            <p>{details}</p>
+                          ) : (
+                            <ul>
+                              {Array.isArray(details) ? details.map((item: any, index: number) => (
+                                <li key={index}>{item}</li>
+                              )) : Object.entries(details).map(([key, value]: [string, any]) => (
+                                <li key={key}><strong>{key}:</strong> {value}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* My Declarations */}
       <div className="my-declarations-section">
