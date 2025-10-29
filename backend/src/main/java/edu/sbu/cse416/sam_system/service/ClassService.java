@@ -82,9 +82,13 @@ public class ClassService {
     public void setCapacityBasedOnLocation(ClassEntity classEntity) {
         if (classEntity.getLocation() != null) {
             int capacity = roomService.getCapacityForLocation(classEntity.getLocation());
-            classEntity.setCapacity(capacity);
+            classEntity.setMaxCapacity(capacity);
         } else {
-            classEntity.setCapacity(20); // Default capacity
+            classEntity.setMaxCapacity(20); // Default max capacity
+        }
+        // Set current capacity to 0 if not already set
+        if (classEntity.getCurrentCapacity() == null) {
+            classEntity.setCurrentCapacity(0);
         }
     }
     
@@ -95,7 +99,7 @@ public class ClassService {
         Optional<ClassEntity> classOpt = classRepository.findById(classId);
         if (classOpt.isPresent()) {
             ClassEntity classEntity = classOpt.get();
-            classEntity.setCapacity(newCapacity);
+            classEntity.setMaxCapacity(newCapacity);
             return classRepository.save(classEntity);
         }
         return null;

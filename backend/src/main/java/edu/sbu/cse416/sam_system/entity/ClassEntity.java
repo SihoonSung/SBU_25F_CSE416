@@ -104,6 +104,14 @@ public class ClassEntity {
     @Column(name = "capacity")
     private Integer capacity;
     
+    // Maximum capacity (fixed, cannot be changed)
+    @Column(name = "max_capacity")
+    private Integer maxCapacity;
+    
+    // Current capacity (number of students currently enrolled)
+    @Column(name = "current_capacity")
+    private Integer currentCapacity;
+    
     // Constructors
     public ClassEntity() {
     }
@@ -311,6 +319,44 @@ public class ClassEntity {
     
     public void setCapacity(Integer capacity) {
         this.capacity = capacity;
+    }
+    
+    public Integer getMaxCapacity() {
+        return maxCapacity;
+    }
+    
+    public void setMaxCapacity(Integer maxCapacity) {
+        this.maxCapacity = maxCapacity;
+    }
+    
+    public Integer getCurrentCapacity() {
+        return currentCapacity;
+    }
+    
+    public void setCurrentCapacity(Integer currentCapacity) {
+        this.currentCapacity = currentCapacity;
+    }
+    
+    /**
+     * Check if the class is full
+     * @return true if current capacity >= max capacity
+     */
+    public boolean isFull() {
+        if (maxCapacity == null || currentCapacity == null) {
+            return false;
+        }
+        return currentCapacity >= maxCapacity;
+    }
+    
+    /**
+     * Get available spots in the class
+     * @return number of available spots
+     */
+    public Integer getAvailableSpots() {
+        if (maxCapacity == null || currentCapacity == null) {
+            return null;
+        }
+        return Math.max(0, maxCapacity - currentCapacity);
     }
 }
 

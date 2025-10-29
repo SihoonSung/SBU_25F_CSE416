@@ -6,10 +6,14 @@ import edu.sbu.cse416.sam_system.entity.UserRole;
 import edu.sbu.cse416.sam_system.entity.UserClasses;
 import edu.sbu.cse416.sam_system.entity.UserTransferCourses;
 import edu.sbu.cse416.sam_system.entity.UserCoursePlan;
+import edu.sbu.cse416.sam_system.entity.ClassEntity;
+import edu.sbu.cse416.sam_system.entity.ClassRoster;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
 import edu.sbu.cse416.sam_system.repository.UserTransferCoursesRepository;
 import edu.sbu.cse416.sam_system.repository.UserCoursePlanRepository;
+import edu.sbu.cse416.sam_system.repository.ClassRepository;
+import edu.sbu.cse416.sam_system.repository.ClassRosterRepository;
 import edu.sbu.cse416.sam_system.service.UserService;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -39,16 +44,22 @@ public class UserController {
     private final UserClassesRepository userClassesRepository;
     private final UserTransferCoursesRepository userTransferCoursesRepository;
     private final UserCoursePlanRepository userCoursePlanRepository;
+    private final ClassRepository classRepository;
+    private final ClassRosterRepository classRosterRepository;
 
     public UserController(UserRepository userRepository, UserService userService,
                          UserClassesRepository userClassesRepository,
                          UserTransferCoursesRepository userTransferCoursesRepository,
-                         UserCoursePlanRepository userCoursePlanRepository) {
+                         UserCoursePlanRepository userCoursePlanRepository,
+                         ClassRepository classRepository,
+                         ClassRosterRepository classRosterRepository) {
         this.userRepository = userRepository;
         this.userService = userService;
         this.userClassesRepository = userClassesRepository;
         this.userTransferCoursesRepository = userTransferCoursesRepository;
         this.userCoursePlanRepository = userCoursePlanRepository;
+        this.classRepository = classRepository;
+        this.classRosterRepository = classRosterRepository;
     }
 
     /** Test endpoint to verify controller is loaded */
@@ -351,6 +362,75 @@ public class UserController {
             return ResponseEntity.ok(futureClasses);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /** Drop a class for a user (delete from UserClasses and ClassRoster) */
+    @PostMapping("/{userId}/classes/{classId}/drop")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> dropClass(@PathVariable Long userId, @PathVariable Long classId) {
+        try {
+            // Check if user exists
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Check if class exists
+            ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new RuntimeException("Class not found"));
+            
+            // Check if user is enrolled in this class
+            if (!userClassesRepository.existsByUserIdAndClassId(userId, classId)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "User is not enrolled in this class"
+                ));
+            }
+            
+            // Check if this is a current semester class (can only drop current semester classes)
+            // Get current semester/year from the class entity
+            String currentSemester = classEntity.getSemester();
+            Integer currentYear = classEntity.getYear();
+            
+            // Check if this class is from current semester
+            List<UserClasses> currentSemesterClasses = userClassesRepository
+                .findByUserIdAndSemesterAndYear(userId, currentSemester, currentYear);
+            
+            boolean isCurrentSemesterClass = currentSemesterClasses.stream()
+                .anyMatch(uc -> uc.getClassId().equals(classId));
+            
+            if (!isCurrentSemesterClass) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Can only drop classes from current semester"
+                ));
+            }
+            
+            // Delete from UserClasses
+            userClassesRepository.deleteByUserIdAndClassId(userId, classId);
+            
+            // Delete from ClassRoster
+            classRosterRepository.deleteByClassEntityAndUser(classEntity, user);
+            
+            // Update class capacity
+            if (classEntity.getCurrentCapacity() != null && classEntity.getCurrentCapacity() > 0) {
+                classEntity.setCurrentCapacity(classEntity.getCurrentCapacity() - 1);
+                classRepository.save(classEntity);
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Class dropped successfully",
+                "classId", classId,
+                "department", classEntity.getDepartment(),
+                "courseNum", classEntity.getCourseNum(),
+                "title", classEntity.getTitle()
+            ));
+            
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", "Failed to drop class: " + e.getMessage()
+            ));
         }
     }
 }

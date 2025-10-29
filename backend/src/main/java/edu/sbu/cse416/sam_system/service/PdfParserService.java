@@ -536,7 +536,8 @@ public class PdfParserService {
                     classEntity.setPrerequisites(currentPrerequisites);
                     classEntity.setCorequisites(currentCorequisites);
                     classEntity.setAntirequisites(currentAntirequisites);
-                    classEntity.setCapacity(100); // Default capacity
+                    classEntity.setMaxCapacity(100); // Default max capacity
+                    classEntity.setCurrentCapacity(0); // Default current capacity
                     
                     classes.add(classEntity);
                 } catch (Exception e) {

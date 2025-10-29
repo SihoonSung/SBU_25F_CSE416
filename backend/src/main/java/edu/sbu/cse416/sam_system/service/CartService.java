@@ -4,10 +4,13 @@ import edu.sbu.cse416.sam_system.entity.CartEntity;
 import edu.sbu.cse416.sam_system.entity.ClassEntity;
 import edu.sbu.cse416.sam_system.entity.User;
 import edu.sbu.cse416.sam_system.entity.UserClasses;
+import edu.sbu.cse416.sam_system.entity.ClassRoster;
 import edu.sbu.cse416.sam_system.repository.CartRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRepository;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
+import edu.sbu.cse416.sam_system.repository.ClassRosterRepository;
+import edu.sbu.cse416.sam_system.service.PrerequisitesValidationService;
 import edu.sbu.cse416.sam_system.util.TimeConflictChecker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -46,6 +49,9 @@ public class CartService {
     private UserClassesRepository userClassesRepository;
     
     @Autowired
+    private ClassRosterRepository classRosterRepository;
+    
+    @Autowired
     private PrerequisitesValidationService prerequisitesValidationService;
     
     /**
@@ -64,6 +70,11 @@ public class CartService {
         ClassEntity classEntity = classRepository.findById(classId).orElse(null);
         if (classEntity == null) {
             return null; // Class not found
+        }
+        
+        // Check if class is full
+        if (classEntity.isFull()) {
+            throw new RuntimeException("Class is full. Current: " + classEntity.getCurrentCapacity() + "/" + classEntity.getMaxCapacity() + " students");
         }
         
         // Check prerequisites
@@ -133,6 +144,22 @@ public class CartService {
                 if (existsInUserClasses) {
                     // Remove from UserClasses (registered class)
                     userClassesRepository.deleteByUserIdAndClassId(userId, classId);
+                    
+                    // Remove from ClassRoster and update capacity
+                    ClassEntity classEntity = classRepository.findById(classId).orElse(null);
+                    if (classEntity != null) {
+                        User user = userRepository.findById(userId).orElse(null);
+                        if (user != null) {
+                            // Remove from roster
+                            classRosterRepository.deleteByClassEntityAndUser(classEntity, user);
+                            
+                            // Update capacity
+                            if (classEntity.getCurrentCapacity() != null && classEntity.getCurrentCapacity() > 0) {
+                                classEntity.setCurrentCapacity(classEntity.getCurrentCapacity() - 1);
+                                classRepository.save(classEntity);
+                            }
+                        }
+                    }
                 }
             }
             
@@ -445,7 +472,18 @@ public class CartService {
                     userClass.setGpnc(null); // Default to null for new registrations
                     userClass.setGrade(null); // Default to null for new registrations
                     
+                    // Create ClassRoster entry
+                    ClassRoster roster = new ClassRoster(classEntity, user);
+                    
+                    // Update class capacity
+                    if (classEntity.getCurrentCapacity() == null) {
+                        classEntity.setCurrentCapacity(0);
+                    }
+                    classEntity.setCurrentCapacity(classEntity.getCurrentCapacity() + 1);
+                    
                     UserClasses saved = userClassesRepository.save(userClass);
+                    classRosterRepository.save(roster);
+                    classRepository.save(classEntity);
                     registeredClasses.add(saved);
                     
                     // Mark cart item for deletion (remove from cart completely)
