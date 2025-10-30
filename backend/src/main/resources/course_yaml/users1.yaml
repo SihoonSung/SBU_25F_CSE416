@@ -133,14 +133,13 @@ students:
     - {class_id: 12983, department: AMS, course_num: 210, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: A-}
     - {class_id: 12973, department: AMS, course_num: 161, section: 03, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: B+}
     - {class_id: 29384, department: POL, course_num: 102, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: C, grade: P}
-    - {class_id: 38721, department: BIO, course_num: 203, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: C-}
-    - {class_id: 23013, department: BIO, course_num: 204, section: R01, semester: Fall, year: 2026, credits: 4, GPNC: null, grade: B}
-    
-    - {class_id: 12983, department: AMS, course_num: 215, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: A-}
+    - {class_id: 38721, department: BIO, course_num: 203, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: B}
+    - {class_id: 12985, department: AMS, course_num: 215, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: A-}
     - {class_id: 12873, department: AMS, course_num: 301, section: 03, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: B+}
     - {class_id: 13234, department: PSY, course_num: 102, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: C, grade: P}
-    - {class_id: 48821, department: PHY, course_num: 131, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: C-}
-    - {class_id: 48823, department: PHY, course_num: 132, section: R01, semester: Fall, year: 2026, credits: 4, GPNC: null, grade: B}
+    - {class_id: 48821, department: PHY, course_num: 131, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: C+}
+    - {class_id: 23013, department: BIO, course_num: 204, section: R01, semester: Fall, year: 2026, credits: 4, GPNC: null, grade: null}
+    - {class_id: 48823, department: PHY, course_num: 132, section: R01, semester: Fall, year: 2026, credits: 4, GPNC: null, grade: null}
   course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
     - {department: CSE, course_num: 101, semester: Spring, year: 2026, credits: 3}
     - {department: CSE, course_num: 114, semester: Spring, year: 2026, credits: 3}

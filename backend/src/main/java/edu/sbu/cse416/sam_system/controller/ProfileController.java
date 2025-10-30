@@ -385,6 +385,34 @@ public class ProfileController {
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("terms", terms);
+        // Fallback: if no graded enrollments found, derive credits from user_classes (graded only)
+        if (cumCredits == 0) {
+            String fallbackSql =
+                "SELECT COALESCE(SUM(uc.credits), 0) AS credits " +
+                "FROM user_classes uc " +
+                "JOIN users u ON u.user_id = uc.user_id " +
+                "WHERE u.student_id = ? " +
+                "  AND uc.grade IS NOT NULL";
+
+            Integer fallbackCredits = safeQueryOne(() ->
+                jdbc.query(fallbackSql, rs -> {
+                    if (rs.next()) {
+                        return rs.getInt("credits");
+                    }
+                    return 0;
+                }, studentId)
+            );
+
+            // Update cumulative credits for UI and standing calculation if fallback yields > 0
+            if (fallbackCredits != null && fallbackCredits > 0) {
+                Map<String, Object> adjustedCumulative = new LinkedHashMap<>(cumulative);
+                adjustedCumulative.put("credits", fallbackCredits);
+                resp.put("cumulative", adjustedCumulative);
+                resp.put("standing", toStanding(fallbackCredits));
+                return resp;
+            }
+        }
+
         resp.put("cumulative", cumulative);
         resp.put("standing", toStanding(cumCredits));
         return resp;

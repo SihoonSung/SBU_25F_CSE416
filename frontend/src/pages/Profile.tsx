@@ -535,8 +535,7 @@ export default function ProfilePage() {
               <div style={{ color: "#666" }}>Email</div>
               <div>{myPerson?.email || "-"}</div>
               
-              <div style={{ color: "#666" }}>Role Type</div>
-              <div style={{ textTransform: "capitalize" }}>{myPerson?.role || "-"}</div>
+              
               
               {/* ******************** Fields from users table (conditional display) ******************** */}
               

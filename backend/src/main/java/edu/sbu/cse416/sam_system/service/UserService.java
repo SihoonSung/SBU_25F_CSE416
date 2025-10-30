@@ -562,7 +562,12 @@ public class UserService {
     /** Helper method to safely convert Object to String */
     private String getStringValue(Object value) {
         if (value == null) return null;
-        return value.toString();
+        String s = value.toString();
+        if (s == null) return null;
+        s = s.trim();
+        if (s.isEmpty()) return null;
+        if ("null".equalsIgnoreCase(s)) return null;
+        return s;
     }
 
     private User createUserFromSBUYamlData(Map<String, Object> userData, UserRole role) {
