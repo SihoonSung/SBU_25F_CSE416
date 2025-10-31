@@ -4,6 +4,7 @@ import edu.sbu.cse416.sam_system.entity.ClassRoster;
 import edu.sbu.cse416.sam_system.entity.ClassEntity;
 import edu.sbu.cse416.sam_system.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -81,4 +82,14 @@ public interface ClassRosterRepository extends JpaRepository<ClassRoster, Long> 
      * @param user The student
      */
     void deleteByClassEntityAndUser(ClassEntity classEntity, User user);
+    
+    /**
+     * Delete all roster entries for classes in a specific semester/year
+     * @param semester The semester
+     * @param year The year
+     */
+    @Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query("DELETE FROM ClassRoster cr WHERE cr.classEntity.semester = :semester AND cr.classEntity.year = :year")
+    void deleteBySemesterAndYear(@Param("semester") String semester, @Param("year") Integer year);
 }

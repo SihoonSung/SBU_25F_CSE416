@@ -391,7 +391,8 @@ function CourseRegistration() {
       if (data.success) {
         // Reload cart from database to show updated statuses
         await loadCartFromDB()
-        alert(`Registration successful! Registered for ${data.registeredCount} class(es).`)
+        // Use message from backend (includes waitlist information if applicable)
+        alert(data.message || `Registration successful! Registered for ${data.registeredCount} class(es).`)
       } else {
         if (data.conflicts && data.conflicts.length > 0) {
           alert(`Registration failed due to time conflicts:\n${data.conflicts.join('\n')}\n\nPlease resolve conflicts before registering.`)

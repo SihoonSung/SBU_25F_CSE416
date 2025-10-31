@@ -30,6 +30,16 @@ public interface WaitlistRepository extends JpaRepository<WaitlistEntry, Long> {
 
     @Query("SELECT COALESCE(MIN(w.createdAt), CURRENT_TIMESTAMP) FROM WaitlistEntry w WHERE w.classEntity.classId = :classId")
     Optional<java.time.LocalDateTime> firstCreatedAt(@Param("classId") Long classId);
+    
+    /**
+     * Delete all waitlist entries for classes in a specific semester/year
+     * @param semester The semester
+     * @param year The year
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM WaitlistEntry w WHERE w.classEntity.semester = :semester AND w.classEntity.year = :year")
+    void deleteBySemesterAndYear(@Param("semester") String semester, @Param("year") Integer year);
 }
 
 

@@ -15,6 +15,9 @@ import java.util.regex.Pattern;
 @Service
 public class PrerequisitesValidationService {
 
+    // Common pattern for matching course codes (e.g., "CSE 216", "BIO 351")
+    private static final Pattern COURSE_PATTERN = Pattern.compile("\\b([A-Z]{2,4})\\s+(\\d{3,4})\\b");
+
     @Autowired
     private UserClassesRepository userClassesRepository;
 
@@ -175,41 +178,34 @@ public class PrerequisitesValidationService {
     private boolean checkGradeRequirement(List<UserClasses> userClasses, String group) {
         System.out.println("    [PREREQ VALIDATION] Checking grade requirement: " + group);
         
-        // Skip placement exams and similar non-course requirements
-        if (isNonCourseRequirement(group)) {
-            System.out.println("    [PREREQ VALIDATION] Skipping non-course requirement: " + group);
-            return true; // Consider as satisfied
+        // Extract courses from "C or higher in BIO 205 or BIO 207"
+        Matcher matcher = COURSE_PATTERN.matcher(group);
+        
+        // If no course code found, ignore this requirement
+        if (!matcher.find()) {
+            System.out.println("    [PREREQ VALIDATION] No course code found in grade requirement, ignoring: " + group);
+            return true; // Ignore non-course requirements
         }
         
-        // Extract courses from "C or higher in BIO 205 or BIO 207"
-        Pattern coursePattern = Pattern.compile("\\b([A-Z]{2,4})\\s+(\\d{3,4})\\b");
-        Matcher matcher = coursePattern.matcher(group);
+        // Reset matcher to check all course codes in the group
+        matcher = COURSE_PATTERN.matcher(group);
         
-        boolean foundValidCourse = false;
+        // Check if user has taken any of the courses with C or higher grade
         while (matcher.find()) {
             String department = matcher.group(1);
             String courseNum = matcher.group(2);
             
             System.out.println("    [PREREQ VALIDATION] Looking for course: " + department + " " + courseNum);
             
-            // Check if user has taken this course with C or higher
-            for (UserClasses userClass : userClasses) {
-                if (userClass.getDepartment().equals(department) && 
-                    userClass.getCourseNum().toString().equals(courseNum)) {
-                    
-                    String grade = userClass.getGrade();
-                    if (grade != null && isGradeSufficient(grade)) {
-                        System.out.println("    [PREREQ VALIDATION] Found valid grade: " + grade + " in " + department + " " + courseNum);
-                        foundValidCourse = true;
-                        break;
-                    }
-                }
+            // Check if user has taken this course with C or higher grade
+            if (hasTakenCourseWithGrade(userClasses, department, courseNum)) {
+                System.out.println("    [PREREQ VALIDATION] Found valid grade in " + department + " " + courseNum);
+                return true;
             }
-            
-            if (foundValidCourse) break;
         }
         
-        return foundValidCourse;
+        System.out.println("    [PREREQ VALIDATION] Grade requirement not met: " + group);
+        return false;
     }
     
     /**
@@ -267,58 +263,38 @@ public class PrerequisitesValidationService {
     }
 
     /**
-     * Check if a requirement is a non-course requirement (like placement exams)
-     * Note: "standing" is now handled separately, not here
-     */
-    private boolean isNonCourseRequirement(String group) {
-        String lowerGroup = group.toLowerCase();
-        
-        // Check for placement exams, etc. (standing is now handled separately)
-        return lowerGroup.contains("placement exam") ||
-               lowerGroup.contains("major") ||
-               lowerGroup.contains("dec") ||
-               lowerGroup.contains("sbc") ||
-               lowerGroup.contains("permission") ||
-               lowerGroup.contains("instructor") ||
-               lowerGroup.contains("advisory") ||
-               lowerGroup.contains("audition required") ||
-               lowerGroup.contains("audition") ||
-               lowerGroup.contains("interview") ||
-               lowerGroup.contains("portfolio");
-    }
-
-    /**
      * Check simple course requirements like "BIO 351"
+     * If no course code is found in the group, ignore it (return true)
      */
     private boolean checkSimpleCourseRequirement(List<UserClasses> userClasses, String group) {
         System.out.println("    [PREREQ VALIDATION] Checking simple course requirement: " + group);
         
-        // Skip placement exams and similar non-course requirements
-        if (isNonCourseRequirement(group)) {
-            System.out.println("    [PREREQ VALIDATION] Skipping non-course requirement: " + group);
-            return true; // Consider as satisfied
+        // Extract course code from group
+        Matcher matcher = COURSE_PATTERN.matcher(group);
+        
+        // If no course code found, ignore this requirement
+        if (!matcher.find()) {
+            System.out.println("    [PREREQ VALIDATION] No course code found, ignoring requirement: " + group);
+            return true; // Ignore non-course requirements
         }
         
-        // Extract course code from group
-        Pattern coursePattern = Pattern.compile("\\b([A-Z]{2,4})\\s+(\\d{3,4})\\b");
-        Matcher matcher = coursePattern.matcher(group);
+        // Reset matcher to check all course codes in the group
+        matcher = COURSE_PATTERN.matcher(group);
         
-        if (matcher.find()) {
+        // Check if user has taken any of the courses mentioned in this group
+        while (matcher.find()) {
             String department = matcher.group(1);
             String courseNum = matcher.group(2);
             
             System.out.println("    [PREREQ VALIDATION] Looking for course: " + department + " " + courseNum);
             
-            // Check if user has taken this course
-            for (UserClasses userClass : userClasses) {
-                if (userClass.getDepartment().equals(department) && 
-                    userClass.getCourseNum().toString().equals(courseNum)) {
-                    System.out.println("    [PREREQ VALIDATION] Found course: " + department + " " + courseNum);
-                    return true;
-                }
+            if (hasTakenCourse(userClasses, department, courseNum)) {
+                System.out.println("    [PREREQ VALIDATION] Found course: " + department + " " + courseNum);
+                return true;
             }
         }
         
+        System.out.println("    [PREREQ VALIDATION] Course requirement not met: " + group);
         return false;
     }
     
@@ -331,29 +307,28 @@ public class PrerequisitesValidationService {
     private boolean checkAntirequisiteConflict(List<UserClasses> userClasses, String group) {
         System.out.println("    [ANTIREQ VALIDATION] Checking antirequisite conflict: " + group);
         
-        // Skip non-course requirements
-        if (isNonCourseRequirement(group)) {
-            System.out.println("    [ANTIREQ VALIDATION] Skipping non-course antirequisite: " + group);
+        // Extract course code from group
+        Matcher matcher = COURSE_PATTERN.matcher(group);
+        
+        // If no course code found, ignore this requirement (no conflict)
+        if (!matcher.find()) {
+            System.out.println("    [ANTIREQ VALIDATION] No course code found, ignoring antirequisite: " + group);
             return false; // No conflict for non-course requirements
         }
         
-        // Extract course code from group
-        Pattern coursePattern = Pattern.compile("\\b([A-Z]{2,4})\\s+(\\d{3,4})\\b");
-        Matcher matcher = coursePattern.matcher(group);
+        // Reset matcher to check all course codes in the group
+        matcher = COURSE_PATTERN.matcher(group);
         
-        if (matcher.find()) {
+        // Check if user has taken any of the antirequisite courses
+        while (matcher.find()) {
             String department = matcher.group(1);
             String courseNum = matcher.group(2);
             
             System.out.println("    [ANTIREQ VALIDATION] Looking for antirequisite: " + department + " " + courseNum);
             
-            // Check if user has taken this course (any grade)
-            for (UserClasses userClass : userClasses) {
-                if (userClass.getDepartment().equals(department) && 
-                    userClass.getCourseNum().toString().equals(courseNum)) {
-                    System.out.println("    [ANTIREQ VALIDATION] CONFLICT FOUND - User has taken: " + department + " " + courseNum);
-                    return true; // Conflict found
-                }
+            if (hasTakenCourse(userClasses, department, courseNum)) {
+                System.out.println("    [ANTIREQ VALIDATION] CONFLICT FOUND - User has taken: " + department + " " + courseNum);
+                return true; // Conflict found
             }
         }
         
@@ -370,12 +345,6 @@ public class PrerequisitesValidationService {
      */
     private boolean checkCorequisiteRequirement(List<UserClasses> userClasses, List<UserClasses> currentSemesterClasses, String group, String prerequisites) {
         System.out.println("    [COREQ VALIDATION] Checking corequisite requirement: " + group);
-        
-        // Skip non-course requirements
-        if (isNonCourseRequirement(group)) {
-            System.out.println("    [COREQ VALIDATION] Skipping non-course corequisite: " + group);
-            return true; // Consider as satisfied
-        }
         
         // Check for range patterns like "MUS 161 through 187"
         Pattern rangePattern = Pattern.compile("\\b([A-Z]{2,4})\\s+(\\d{3,4})\\s+through\\s+(\\d{3,4})\\b", Pattern.CASE_INSENSITIVE);
@@ -417,10 +386,19 @@ public class PrerequisitesValidationService {
         }
         
         // Extract course code from group (for single courses)
-        Pattern coursePattern = Pattern.compile("\\b([A-Z]{2,4})\\s+(\\d{3,4})\\b");
-        Matcher matcher = coursePattern.matcher(group);
+        Matcher matcher = COURSE_PATTERN.matcher(group);
         
-        if (matcher.find()) {
+        // If no course code found, ignore this requirement
+        if (!matcher.find()) {
+            System.out.println("    [COREQ VALIDATION] No course code found, ignoring corequisite: " + group);
+            return true; // Ignore non-course requirements
+        }
+        
+        // Reset matcher to check all course codes in the group
+        matcher = COURSE_PATTERN.matcher(group);
+        
+        // Check each course code in the group
+        while (matcher.find()) {
             String department = matcher.group(1);
             String courseNum = matcher.group(2);
             String courseCode = department + " " + courseNum;
@@ -432,12 +410,9 @@ public class PrerequisitesValidationService {
                 System.out.println("    [COREQ VALIDATION] Course " + courseCode + " is also in prerequisites - checking if already taken");
                 
                 // Check if user has already taken this course (any grade)
-                for (UserClasses userClass : userClasses) {
-                    if (userClass.getDepartment().equals(department) && 
-                        userClass.getCourseNum().toString().equals(courseNum)) {
-                        System.out.println("    [COREQ VALIDATION] Found prerequisite completion: " + courseCode);
-                        return true; // Already taken as prerequisite
-                    }
+                if (hasTakenCourse(userClasses, department, courseNum)) {
+                    System.out.println("    [COREQ VALIDATION] Found prerequisite completion: " + courseCode);
+                    return true; // Already taken as prerequisite
                 }
                 
                 System.out.println("    [COREQ VALIDATION] Course " + courseCode + " not taken as prerequisite - corequisite required");
@@ -446,20 +421,52 @@ public class PrerequisitesValidationService {
                 System.out.println("    [COREQ VALIDATION] Course " + courseCode + " is pure corequisite - checking if taken in current semester");
                 
                 // Check if user has taken this course in current semester
-                for (UserClasses userClass : currentSemesterClasses) {
-                    if (userClass.getDepartment().equals(department) && 
-                        userClass.getCourseNum().toString().equals(courseNum)) {
-                        System.out.println("    [COREQ VALIDATION] Found corequisite completion (current semester): " + courseCode);
-                        return true; // Already taken in current semester
-                    }
+                if (hasTakenCourse(currentSemesterClasses, department, courseNum)) {
+                    System.out.println("    [COREQ VALIDATION] Found corequisite completion (current semester): " + courseCode);
+                    return true; // Already taken in current semester
                 }
-                
-                System.out.println("    [COREQ VALIDATION] Course " + courseCode + " not taken in current semester - corequisite required");
-                return false; // Must take as corequisite
             }
         }
         
-        return false; // No valid course found
+        System.out.println("    [COREQ VALIDATION] Corequisite requirement not met: " + group);
+        return false; // Must take as corequisite
+    }
+    
+    /**
+     * Helper method to check if user has taken a specific course
+     * @param userClasses List of user's classes to check
+     * @param department Course department
+     * @param courseNum Course number
+     * @return true if user has taken the course, false otherwise
+     */
+    private boolean hasTakenCourse(List<UserClasses> userClasses, String department, String courseNum) {
+        for (UserClasses userClass : userClasses) {
+            if (userClass.getDepartment().equals(department) && 
+                userClass.getCourseNum().toString().equals(courseNum)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Helper method to check if user has taken a specific course with C or higher grade
+     * @param userClasses List of user's classes to check
+     * @param department Course department
+     * @param courseNum Course number
+     * @return true if user has taken the course with sufficient grade, false otherwise
+     */
+    private boolean hasTakenCourseWithGrade(List<UserClasses> userClasses, String department, String courseNum) {
+        for (UserClasses userClass : userClasses) {
+            if (userClass.getDepartment().equals(department) && 
+                userClass.getCourseNum().toString().equals(courseNum)) {
+                String grade = userClass.getGrade();
+                if (grade != null && isGradeSufficient(grade)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

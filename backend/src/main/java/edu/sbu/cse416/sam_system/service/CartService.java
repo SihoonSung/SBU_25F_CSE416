@@ -565,6 +565,9 @@ public class CartService {
         return result;
     }
     
+    // Pattern for matching course codes in corequisite error messages
+    private static final java.util.regex.Pattern COURSE_PATTERN = java.util.regex.Pattern.compile("\\b([A-Z]{2,4})\\s+(\\d{3,4})\\b");
+    
     /**
      * Generate detailed corequisite error message with specific course recommendations
      */
@@ -596,8 +599,7 @@ public class CartService {
                 }
             } else {
                 // Extract individual course codes
-                java.util.regex.Pattern coursePattern = java.util.regex.Pattern.compile("\\b([A-Z]{2,4})\\s+(\\d{3,4})\\b");
-                java.util.regex.Matcher matcher = coursePattern.matcher(group);
+                java.util.regex.Matcher matcher = COURSE_PATTERN.matcher(group);
                 while (matcher.find()) {
                     String courseDept = matcher.group(1);
                     String courseNumber = matcher.group(2);
