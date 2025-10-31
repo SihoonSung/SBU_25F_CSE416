@@ -3,9 +3,12 @@ package edu.sbu.cse416.sam_system.controller;
 import edu.sbu.cse416.sam_system.entity.ClassRoster;
 import edu.sbu.cse416.sam_system.entity.ClassEntity;
 import edu.sbu.cse416.sam_system.entity.User;
+import edu.sbu.cse416.sam_system.entity.UserRole;
+import edu.sbu.cse416.sam_system.entity.UserClasses;
 import edu.sbu.cse416.sam_system.repository.ClassRosterRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRepository;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
+import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +37,9 @@ public class ClassRosterController {
     
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UserClassesRepository userClassesRepository;
     
     /**
      * Get roster for a specific class
@@ -137,6 +143,99 @@ public class ClassRosterController {
             return ResponseEntity.ok(stats);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    /**
+     * Assign grade to a student for a specific class (by instructor)
+     * POST /api/roster/class/{classId}/student/{studentId}/grade
+     * Body: { "instructorId": 10, "grade": "A-" }
+     */
+    @PostMapping("/class/{classId}/student/{studentId}/grade")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<Map<String, Object>> assignGrade(
+            @PathVariable Long classId,
+            @PathVariable Long studentId,
+            @RequestBody Map<String, Object> body
+    ) {
+        try {
+            // Validate input
+            if (body == null || !body.containsKey("instructorId") || !body.containsKey("grade")) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "instructorId and grade are required"
+                ));
+            }
+
+            Long instructorId = Long.parseLong(body.get("instructorId").toString());
+            String grade = String.valueOf(body.get("grade")).trim();
+            if (grade.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "grade cannot be empty"
+                ));
+            }
+
+            // Load entities
+            User instructor = userRepository.findById(instructorId)
+                .orElseThrow(() -> new RuntimeException("Instructor not found"));
+            if (instructor.getRole() != UserRole.INSTRUCTOR) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Only instructors can assign grades"
+                ));
+            }
+
+            ClassEntity classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new RuntimeException("Class not found"));
+            User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new RuntimeException("Student not found"));
+
+            // Optional: verify instructor teaches this class by name match
+            if (classEntity.getInstructor() != null) {
+                String classInstr = classEntity.getInstructor().trim().toLowerCase();
+                // If class has instructor string and it doesn't contain instructor's last name, block
+                if (!classInstr.isEmpty() && !classInstr.contains(instructor.getLastName().toLowerCase())) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Instructor is not assigned to this class"
+                    ));
+                }
+            }
+
+            // Verify student is enrolled
+            boolean enrolled = classRosterRepository.isStudentEnrolled(classEntity, student);
+            if (!enrolled) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Student is not enrolled in this class"
+                ));
+            }
+
+            // Update grade in UserClasses
+            java.util.Optional<UserClasses> ucOpt = userClassesRepository.findByUserIdAndClassIdOptional(studentId, classId);
+            if (ucOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "UserClasses record not found for this student/class"
+                ));
+            }
+            UserClasses uc = ucOpt.get();
+            uc.setGrade(grade);
+            userClassesRepository.save(uc);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Grade assigned successfully",
+                "classId", classId,
+                "studentId", studentId,
+                "grade", grade
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", "Failed to assign grade: " + e.getMessage()
+            ));
         }
     }
     

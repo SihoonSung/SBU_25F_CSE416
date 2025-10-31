@@ -72,4 +72,10 @@ public interface UserClassesRepository extends JpaRepository<UserClasses, Long> 
      */
     @Query("SELECT COUNT(uc) > 0 FROM UserClasses uc WHERE uc.user.userId = :userId AND uc.classId = :classId")
     boolean existsByUserIdAndClassId(@Param("userId") Long userId, @Param("classId") Long classId);
+
+    /**
+     * Find a specific class record for a user (for grading)
+     */
+    @Query("SELECT uc FROM UserClasses uc WHERE uc.user.userId = :userId AND uc.classId = :classId")
+    java.util.Optional<UserClasses> findByUserIdAndClassIdOptional(@Param("userId") Long userId, @Param("classId") Long classId);
 }
