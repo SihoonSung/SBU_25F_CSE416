@@ -1,7 +1,7 @@
 effective_term: "Fall 2025"
 
 degree_requirements:
-  - subject_code: "ECE"
+  - subject_code: "CSE"
     degree_type: "BS"
     total_credits_required: 120
     is_restricted: true
@@ -365,52 +365,7 @@ degree_requirements:
       - "WRTD"
 
 
-  - subject_code: "BIO2"
-    degree_type: "BA"
-    total_credits_required: 120
-    is_restricted: false
-    gpa_requirement: 2.0
-    admission_requirements:
-      - "BIO 201"
-      - "BIO 202"
-    course_requirements:
-      required_courses:
-        - "BIO 203"
-        - "BIO 204"
-        - "BIO 205"
-        - "BIO 320"
-        - "BIO 321"
-        - "BIO 325"
-        - "BIO 350"
-        - "BIO 360"
-      elective_courses:
-        credits_required: 6
-        courses:
-          - "BIO 300+"
-          - "BIO 400+"
-    sbc_requirements:
-      - "ARTS"
-      - "GLO"
-      - "HUM"
-      - "LANG"
-      - "QPS"
-      - "SBS"
-      - "SNW"
-      - "TECH"
-      - "USA"
-      - "WRT"
-      - "EXP+"
-      - "HFA+"
-      - "SBS+"
-      - "STEM+"
-      - "CER"
-      - "DIV"
-      - "ESI"
-      - "SPK"
-      - "WRTD"
-
-  
-  - subject_code: "BIO3"
+  - subject_code: "BIO"
     degree_type: "BA"
     total_credits_required: 120
     is_restricted: false

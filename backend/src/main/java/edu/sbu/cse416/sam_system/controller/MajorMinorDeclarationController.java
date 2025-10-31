@@ -135,6 +135,7 @@ public class MajorMinorDeclarationController {
             }
             
             String subjectCode = (String) request.get("subjectCode");
+            String fromSubjectCode = (String) request.get("fromSubjectCode"); // Optional: for change requests
             String declarationTypeStr = (String) request.get("declarationType");
             String effectiveTerm = (String) request.get("effectiveTerm");
             
@@ -157,7 +158,7 @@ public class MajorMinorDeclarationController {
             }
             
             MajorMinorDeclaration declaration = declarationService.submitDeclaration(
-                    studentId, subjectCode, declarationType, effectiveTerm);
+                    studentId, subjectCode, declarationType, effectiveTerm, fromSubjectCode);
             
             return ResponseEntity.ok(Map.of(
                     "success", true,

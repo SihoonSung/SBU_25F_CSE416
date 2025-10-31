@@ -2,14 +2,18 @@ package edu.sbu.cse416.sam_system.service;
 
 import edu.sbu.cse416.sam_system.entity.MajorMinorDeclaration;
 import edu.sbu.cse416.sam_system.entity.DeclarationType;
-import edu.sbu.cse416.sam_system.entity.DeclarationStatus;
 import edu.sbu.cse416.sam_system.entity.User;
+import edu.sbu.cse416.sam_system.entity.AcademicEvent;
+import edu.sbu.cse416.sam_system.entity.DegreeRequirement;
 import edu.sbu.cse416.sam_system.repository.MajorMinorDeclarationRepository;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
+import edu.sbu.cse416.sam_system.repository.AcademicEventRepository;
+import edu.sbu.cse416.sam_system.repository.DegreeRequirementRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +33,15 @@ public class MajorMinorDeclarationService {
     @Autowired
     private UserRepository userRepository;
     
+    @Autowired
+    private AcademicEventRepository academicEventRepository;
+    
+    @Autowired
+    private DegreeRequirementRepository degreeRequirementRepository;
+    
+    @Autowired
+    private SystemDateService systemDateService;
+    
     // Constants for limits
     private static final int MAX_MAJORS = 2;
     private static final int MAX_MINORS = 3;
@@ -39,6 +52,15 @@ public class MajorMinorDeclarationService {
     public MajorMinorDeclaration submitDeclaration(Long studentId, String subjectCode, 
                                                   DeclarationType declarationType,
                                                   String effectiveTerm) {
+        return submitDeclaration(studentId, subjectCode, declarationType, effectiveTerm, null);
+    }
+    
+    /**
+     * Submit a new major/minor declaration request (with optional fromSubjectCode for change requests)
+     */
+    public MajorMinorDeclaration submitDeclaration(Long studentId, String subjectCode, 
+                                                  DeclarationType declarationType,
+                                                  String effectiveTerm, String fromSubjectCode) {
         
         User student = userRepository.findById(studentId)
                 .orElseThrow(() -> new IllegalArgumentException("Student not found"));
@@ -48,17 +70,42 @@ public class MajorMinorDeclarationService {
             throw new IllegalArgumentException("Only students can declare majors/minors");
         }
         
-        // Validate limits
-        validateDeclarationLimits(student, declarationType);
+        // Validate that the major/minor exists in degree requirements
+        validateSubjectExists(subjectCode, declarationType);
         
+        // Cross-type duplication rules:
+        // - A minor cannot duplicate any existing major
+        // - A major cannot duplicate any existing minor (defensive)
+        if (declarationType == DeclarationType.MINOR) {
+            if (subjectExistsInJsonArray(student.getMajors(), subjectCode)) {
+                throw new IllegalArgumentException("You cannot declare a minor in '" + subjectCode +
+                    "' because it matches one of your current majors.");
+            }
+        } else if (declarationType == DeclarationType.MAJOR) {
+            if (subjectExistsInJsonArray(student.getMinors(), subjectCode)) {
+                throw new IllegalArgumentException("You cannot declare a major in '" + subjectCode +
+                    "' because it matches one of your current minors.");
+            }
+        }
+
         // Check for duplicate pending declarations
         if (declarationRepository.existsPendingDeclaration(student, subjectCode, declarationType)) {
             throw new IllegalArgumentException("A pending declaration for this subject already exists");
         }
         
-        // Check for duplicate approved declarations
-        if (declarationRepository.existsApprovedDeclaration(student, subjectCode, declarationType)) {
-            throw new IllegalArgumentException("You already have an approved declaration for this subject");
+        // Check if student already has this approved subject
+        boolean hasApprovedSubject = declarationRepository.existsApprovedDeclaration(student, subjectCode, declarationType);
+        
+        if (hasApprovedSubject) {
+            // Student already has this approved major/minor - reject duplicate
+            throw new IllegalArgumentException("You already have an approved " + declarationType.toString().toLowerCase() + 
+                " for " + subjectCode + ". Cannot declare the same " + declarationType.toString().toLowerCase() + " again.");
+        }
+        
+        // If this is a change request (fromSubjectCode provided), don't check limits
+        // Otherwise validate limits (2 majors, 3 minors)
+        if (fromSubjectCode == null || fromSubjectCode.trim().isEmpty()) {
+            validateDeclarationLimits(student, declarationType);
         }
         
         // Validate academic calendar dates (implement based on your calendar system)
@@ -73,6 +120,11 @@ public class MajorMinorDeclarationService {
         declaration.setEffectiveTerm(effectiveTerm);
         declaration.setSubmittedAt(LocalDateTime.now());
         
+        // Store fromSubjectCode in advisor notes (temporary storage for change requests)
+        if (fromSubjectCode != null && !fromSubjectCode.trim().isEmpty()) {
+            declaration.setAdvisorNotes("CHANGE_FROM:" + fromSubjectCode);
+        }
+        
         // Determine if CEAS advisor approval is needed
         if (isCeasTransfer(student, subjectCode)) {
             // Set CEAS advisor (you'll need to implement logic to find CEAS advisor)
@@ -85,6 +137,19 @@ public class MajorMinorDeclarationService {
         }
         
         return declarationRepository.save(declaration);
+    }
+
+    private boolean subjectExistsInJsonArray(String jsonArray, String subjectCode) {
+        if (jsonArray == null || jsonArray.trim().isEmpty()) return false;
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            java.util.List<?> list = mapper.readValue(jsonArray, java.util.List.class);
+            if (list == null) return false;
+            for (Object o : list) {
+                if (subjectCode.equals(String.valueOf(o))) return true;
+            }
+        } catch (Exception ignored) { }
+        return false;
     }
     
     /**
@@ -102,7 +167,19 @@ public class MajorMinorDeclarationService {
             throw new IllegalArgumentException("Advisor does not have permission to approve this declaration");
         }
         
-        declaration.approve(advisor, notes);
+        // Preserve existing advisor notes if they contain CHANGE_FROM
+        String existingNotes = declaration.getAdvisorNotes();
+        String finalNotes = notes;
+        if (existingNotes != null && existingNotes.startsWith("CHANGE_FROM:")) {
+            // If notes are provided, append them after the CHANGE_FROM info
+            if (notes != null && !notes.trim().isEmpty()) {
+                finalNotes = existingNotes + " | Advisor: " + notes;
+            } else {
+                finalNotes = existingNotes;
+            }
+        }
+        
+        declaration.approve(advisor, finalNotes);
         declarationRepository.save(declaration);
         
         // Update student's majors/minors in User table
@@ -151,6 +228,23 @@ public class MajorMinorDeclarationService {
                 .stream()
                 .filter(MajorMinorDeclaration::isPending)
                 .toList();
+    }
+    
+    /**
+     * Validate that the subject exists in degree requirements
+     */
+    private void validateSubjectExists(String subjectCode, DeclarationType declarationType) {
+        // Check if subject exists in active degree requirements
+        List<DegreeRequirement> requirements = degreeRequirementRepository
+            .findBySubjectCodeAndActive(subjectCode);
+        
+        if (requirements.isEmpty()) {
+            throw new IllegalArgumentException("The " + declarationType.toString().toLowerCase() + 
+                " '" + subjectCode + "' does not exist or is not available for declaration");
+        }
+        
+        // Project policy: Any subject present in degree requirements is eligible for both
+        // major and minor declarations. No separate MINOR record required.
     }
     
     /**
@@ -213,26 +307,73 @@ public class MajorMinorDeclarationService {
     }
     
     /**
-     * Validate academic calendar dates
+     * Validate academic calendar dates dynamically from AcademicEvents
      */
     private void validateAcademicCalendarDates(String effectiveTerm) {
         if (effectiveTerm == null || effectiveTerm.trim().isEmpty()) {
             throw new IllegalArgumentException("Effective term is required");
         }
         
-        // Declaration periods based on academic calendar
-        java.time.LocalDate currentDate = java.time.LocalDate.now();
+        // Get current date from system date service (respects registrar's override)
+        LocalDate currentDate = systemDateService.today();
+        
+        // Try to find academic events for major/minor changes period
+        List<AcademicEvent> beginEvents = academicEventRepository.findByTitleContainingIgnoreCase("Major And Minor Changes Begin");
+        List<AcademicEvent> endEvents = academicEventRepository.findByTitleContainingIgnoreCase("Major And Minor Changes End");
+        
+        // If no academic calendar events found, fall back to hardcoded dates (for backward compatibility)
+        if (beginEvents.isEmpty() || endEvents.isEmpty()) {
+            System.out.println("WARNING: No academic calendar events found, using fallback dates");
+            validateAcademicCalendarDatesFallback(effectiveTerm);
+            return;
+        }
+        
+        // Use the most recent start and end dates
+        AcademicEvent startEvent = beginEvents.stream()
+            .max((e1, e2) -> e1.getDate().compareTo(e2.getDate()))
+            .orElse(null);
+        AcademicEvent endEvent = endEvents.stream()
+            .max((e1, e2) -> e1.getDate().compareTo(e2.getDate()))
+            .orElse(null);
+        
+        if (startEvent == null || endEvent == null) {
+            throw new IllegalArgumentException("Academic calendar dates for major/minor declaration not found");
+        }
+        
+        LocalDate startDate = startEvent.getDate();
+        LocalDate endDate = endEvent.getDate();
+        
+        // Validate if current date is within the declaration period
+        if (currentDate.isBefore(startDate)) {
+            throw new IllegalArgumentException(
+                "Declaration period for " + effectiveTerm + " has not started yet. " +
+                "It begins on " + startDate + ". Please check the academic calendar for available terms."
+            );
+        }
+        if (currentDate.isAfter(endDate)) {
+            throw new IllegalArgumentException(
+                "Declaration period for " + effectiveTerm + " has ended on " + endDate + ". " +
+                "Please check the academic calendar for available terms."
+            );
+        }
+    }
+    
+    /**
+     * Fallback method with hardcoded dates for backward compatibility
+     */
+    private void validateAcademicCalendarDatesFallback(String effectiveTerm) {
+        LocalDate currentDate = systemDateService.today();
         
         if ("FALL 2025".equals(effectiveTerm)) {
-            java.time.LocalDate startDate = java.time.LocalDate.of(2025, 3, 31);
-            java.time.LocalDate endDate = java.time.LocalDate.of(2025, 8, 29);
+            LocalDate startDate = LocalDate.of(2025, 3, 31);
+            LocalDate endDate = LocalDate.of(2025, 8, 29);
             
             if (currentDate.isBefore(startDate) || currentDate.isAfter(endDate)) {
                 throw new IllegalArgumentException("Declaration period for Fall 2025 has ended. Please check the academic calendar for available terms.");
             }
         } else if ("SPRING 2026".equals(effectiveTerm)) {
-            java.time.LocalDate startDate = java.time.LocalDate.of(2025, 10, 25);
-            java.time.LocalDate endDate = java.time.LocalDate.of(2026, 1, 30);
+            LocalDate startDate = LocalDate.of(2025, 10, 27);
+            LocalDate endDate = LocalDate.of(2026, 1, 30);
             
             if (currentDate.isBefore(startDate) || currentDate.isAfter(endDate)) {
                 throw new IllegalArgumentException("Declaration period for Spring 2026 has ended. Please check the academic calendar for available terms.");
@@ -310,9 +451,16 @@ public class MajorMinorDeclarationService {
      */
     // TP Used cursor to find CEAS advisor for CEAS transfers
     private User findCeasAdvisor() {
-        // Find advisor with academic_unit containing any CEAS subject
         List<User> allAdvisors = userRepository.findByRole(edu.sbu.cse416.sam_system.entity.UserRole.ADVISOR);
         
+        // Priority 1: Find advisor with level "CEAS" or "ceas" (case insensitive)
+        for (User advisor : allAdvisors) {
+            if (advisor.getLevel() != null && "CEAS".equalsIgnoreCase(advisor.getLevel())) {
+                return advisor;
+            }
+        }
+        
+        // Priority 2: Find advisor with academic_unit containing any CEAS subject
         for (User advisor : allAdvisors) {
             if (advisor.getAcademicUnit() != null) {
                 String academicUnit = advisor.getAcademicUnit();
@@ -326,9 +474,9 @@ public class MajorMinorDeclarationService {
             }
         }
         
-        // Fallback: find advisor with level "university" or "ceas"
+        // Priority 3: Fallback to university level advisor
         for (User advisor : allAdvisors) {
-            if ("university".equals(advisor.getLevel()) || "ceas".equals(advisor.getLevel())) {
+            if ("university".equalsIgnoreCase(advisor.getLevel())) {
                 return advisor;
             }
         }
@@ -348,12 +496,25 @@ public class MajorMinorDeclarationService {
             return advisors.get(0);
         }
         
-        // Fallback: find any advisor with subject in academic_unit
+        // Fallback: find any advisor with subject in academic_unit (but prefer department-level with fewer subjects)
         List<User> allAdvisors = userRepository.findByRole(edu.sbu.cse416.sam_system.entity.UserRole.ADVISOR);
+        User bestMatch = null;
+        int minSubjects = Integer.MAX_VALUE;
+        
         for (User advisor : allAdvisors) {
             if (advisor.getAcademicUnit() != null && advisor.getAcademicUnit().contains(subjectCode)) {
-                return advisor;
+                // Count subjects in academic_unit (by counting commas)
+                int subjectCount = advisor.getAcademicUnit().split(",").length;
+                // Prefer advisors with fewer subjects (more specific)
+                if (bestMatch == null || subjectCount < minSubjects) {
+                    bestMatch = advisor;
+                    minSubjects = subjectCount;
+                }
             }
+        }
+        
+        if (bestMatch != null) {
+            return bestMatch;
         }
         
         // Final fallback: find any department-level advisor
@@ -380,11 +541,16 @@ public class MajorMinorDeclarationService {
         String subjectCode = declaration.getSubjectCode();
         
         // University-level advisors can approve anything
-        if ("university".equals(advisor.getLevel())) {
+        if ("university".equalsIgnoreCase(advisor.getLevel())) {
             return true;
         }
         
-        // CEAS advisors can approve all CEAS subjects
+        // CEAS level advisors can approve all CEAS subjects
+        if (advisor.getLevel() != null && "CEAS".equalsIgnoreCase(advisor.getLevel())) {
+            return isCeasMajor(subjectCode);
+        }
+        
+        // CEAS advisors (by academic_unit) can approve all CEAS subjects
         if (advisor.getAcademicUnit() != null) {
             String academicUnit = advisor.getAcademicUnit();
             String[] ceasSubjects = {"AMS", "BME", "CME", "CIV", "ECE", "CSE", "ESE", "ESG", "ISE", "MEC", "TSM"};
@@ -419,9 +585,8 @@ public class MajorMinorDeclarationService {
     }
     
     /**
-     * Withdraw a declaration
-     * If PENDING: Delete from database completely
-     * If APPROVED/REJECTED: Mark as WITHDRAWN (soft delete)
+     * Withdraw a declaration (PENDING only)
+     * Once approved, declarations cannot be withdrawn
      */
     public MajorMinorDeclaration withdrawDeclaration(Long declarationId, Long studentId) {
         MajorMinorDeclaration declaration = declarationRepository.findById(declarationId)
@@ -435,18 +600,14 @@ public class MajorMinorDeclarationService {
             throw new IllegalArgumentException("You can only withdraw your own declarations");
         }
         
-        // If PENDING: Delete from database completely
-        if (declaration.isPending()) {
-            declarationRepository.delete(declaration);
-            return null; // Deleted
+        // Only allow withdrawal of PENDING declarations
+        if (!declaration.isPending()) {
+            throw new IllegalArgumentException("Cannot withdraw an approved or rejected declaration. Once a major or minor is approved, it cannot be removed.");
         }
         
-        // If already APPROVED or REJECTED: Mark as WITHDRAWN (soft delete)
-        declaration.setStatus(DeclarationStatus.WITHDRAWN);
-        declaration.setUpdatedAt(LocalDateTime.now());
-        declaration.setIsActive(false);
-        
-        return declarationRepository.save(declaration);
+        // Delete PENDING declaration from database
+        declarationRepository.delete(declaration);
+        return null; // Deleted
     }
     
     /**
@@ -464,6 +625,15 @@ public class MajorMinorDeclarationService {
             User student = declaration.getStudent();
             String subjectCode = declaration.getSubjectCode();
             
+            // Check if this is a change request (from advisor notes)
+            String advisorNotes = declaration.getAdvisorNotes();
+            String fromSubjectCode = null;
+            boolean isChangeRequest = false;
+            if (advisorNotes != null && advisorNotes.startsWith("CHANGE_FROM:")) {
+                fromSubjectCode = advisorNotes.substring("CHANGE_FROM:".length());
+                isChangeRequest = true;
+            }
+            
             if (declaration.getDeclarationType() == DeclarationType.MAJOR) {
                 // Add to majors JSON array
                 String majorsJson = student.getMajors();
@@ -480,15 +650,34 @@ public class MajorMinorDeclarationService {
                     }
                 }
                 
-                // Add new major if not already present
-                if (!majors.contains(subjectCode)) {
-                    majors.add(subjectCode);
+                // If this is a change request, replace at the same index to preserve ordering/primary major
+                if (isChangeRequest && fromSubjectCode != null) {
+                    int idx = majors.indexOf(fromSubjectCode);
+                    if (idx >= 0) {
+                        majors.set(idx, subjectCode);
+                        System.out.println("Replaced major " + fromSubjectCode + " -> " + subjectCode + " at index " + idx);
+                    } else {
+                        // Fallback: remove if present then add
+                        majors.remove(fromSubjectCode);
+                        if (!majors.contains(subjectCode)) {
+                            majors.add(subjectCode);
+                        }
+                        System.out.println("Replaced major (fallback) " + fromSubjectCode + " -> " + subjectCode);
+                    }
+                } else {
+                    // Add new major (duplicate check already done in submitDeclaration)
+                    if (!majors.contains(subjectCode)) {
+                        majors.add(subjectCode);
+                    }
                 }
                 
-                // Update JSON
+                // Update JSON and sync single major field (first major)
                 com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
                 String updatedMajorsJson = mapper.writeValueAsString(majors);
                 student.setMajors(updatedMajorsJson);
+                // Keep legacy single major column in sync with the first major in the list
+                String primaryMajor = majors.isEmpty() ? null : majors.get(0);
+                student.setMajor(primaryMajor);
                 
                 // TP used cursor to: Also update degrees array with "BA" or "BS" based on degree requirements
                 
@@ -508,7 +697,13 @@ public class MajorMinorDeclarationService {
                     }
                 }
                 
-                // Add new minor if not already present
+                // If this is a change request, remove the old subject first
+                if (isChangeRequest && fromSubjectCode != null) {
+                    minors.remove(fromSubjectCode);
+                    System.out.println("Removed old minor " + fromSubjectCode + " due to change request");
+                }
+                
+                // Add new minor (duplicate check already done in submitDeclaration)
                 if (!minors.contains(subjectCode)) {
                     minors.add(subjectCode);
                 }

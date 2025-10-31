@@ -21,6 +21,10 @@ registrars:
   first_name: Ralph
   last_name: Randall
   email: ralph.randall@stonybrook.edu
+- SBU_ID: 114665643
+  first_name: Minseo1
+  last_name: Registrar1
+  email: minseo.kim@stonybrook.edu
 
 academic_advisors:
 - SBU_ID: 100765431
@@ -28,19 +32,19 @@ academic_advisors:
   last_name: Alda
   email: alan.alda@stonybrook.edu
   level: university # valid values: university, college, department
-  academic_unit: SBU # list of acronyms of colleges/schools (e.g., [CAS]) or subjects (e.g., [CSE, ISE]), or [SBU] for university-level advisors
+  academic_unit: [SBU] # list of acronyms of colleges/schools (e.g., [CAS]) or subjects (e.g., [CSE, ISE]), or [SBU] for university-level advisors
 - SBU_ID: 100765430
   first_name: Kevin
   last_name: Kamper
   email: kevin.kamper@stonybrook.edu
   level: department
-  academic_unit: [CSE,ISE]
+  academic_unit: [BIO, ECO]
 - SBU_ID: 114665642
   first_name: CEAS
   last_name: Advisor
   email: minseohappy06@gmail.com
-  level: department
-  academic_unit: [AMS,BIO,POL,CSE,ECO,PSY]
+  level: CEAS
+  academic_unit: [AMS, BME, CME, CIV, ECE, CSE, ESE, ESG, ISE, MEC, TSM]
   
 instructors:
 - SBU_ID: 100987654
@@ -63,10 +67,7 @@ instructors:
   first_name: Richard
   last_name: Mckenna
   email: richard.mckenna@stonybrook.edu
-- SBU_ID: 114665641
-  first_name: Minseo1
-  last_name: Instructor
-  email: minseo.kim@stonybrook.edu
+
 
 
 
@@ -115,7 +116,7 @@ students:
   direct_admit: null # major to which the student was directly admitted when accepted to the university, if any, otherwise null
   AOI: null  # major for which the student is AOI if any, otherwise null
   college: # college or school that the student is in, identified by acronym, e.g., CEAS
-  majors: [AMS] # list of majors, identified by 3-letter codes, e.g., CSE
+  majors: [PSY] # list of majors, identified by 3-letter codes, e.g., CSE
   degrees: [BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
   major_requirement_versions: [{semester: Spring, year: 2025}] # the degree requirements version the student is following for each major.  entry i in this list corresponds to entry i in the majors list.
   minors: [] # list of minors, identified by 3-letter codes

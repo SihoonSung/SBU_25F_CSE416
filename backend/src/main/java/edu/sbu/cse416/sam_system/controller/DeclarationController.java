@@ -378,23 +378,8 @@ public class DeclarationController {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can withdraw declarations");
             }
 
-            Optional<MajorMinorDeclaration> declarationOpt = declarationRepository.findById(declarationId);
-            if (declarationOpt.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Declaration not found");
-            }
-
-            MajorMinorDeclaration declaration = declarationOpt.get();
-            if (!declaration.getStudent().getUserId().equals(student.getUserId())) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only withdraw your own declarations");
-            }
-
-            if (!declaration.isPending()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only pending declarations can be withdrawn");
-            }
-
-            declaration.setStatus(DeclarationStatus.WITHDRAWN);
-            declaration.setUpdatedAt(LocalDateTime.now());
-            declarationRepository.save(declaration);
+            // Use the service to withdraw declaration
+            majorMinorDeclarationService.withdrawDeclaration(declarationId, student.getUserId());
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -402,6 +387,11 @@ public class DeclarationController {
 
             return ResponseEntity.ok(response);
 
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {

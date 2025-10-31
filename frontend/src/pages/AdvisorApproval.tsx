@@ -22,6 +22,9 @@ interface MajorMinorDeclaration {
   advisorApprovalDate?: string;
   advisorComments?: string;
   submittedAt: string;
+  // Helper method to detect if this is a change request
+  getIsChangeRequest?: () => boolean;
+  getFromSubject?: () => string | null;
 }
 
 interface StudentInfo {
@@ -92,7 +95,7 @@ const AdvisorApproval: React.FC = () => {
     if (user.role === 'ADVISOR') {
       if (user.level === 'university') {
         setAdvisorType('UNIVERSITY');
-      } else if (user.academic_unit && user.academic_unit.includes('CSE')) {
+      } else if (user.level === 'CEAS' || (user.academic_unit && user.academic_unit.includes('CSE'))) {
         setAdvisorType('CEAS');
       } else {
         setAdvisorType('DEPARTMENT');
@@ -101,15 +104,15 @@ const AdvisorApproval: React.FC = () => {
   };
 
   const canApproveDeclaration = (declaration: MajorMinorDeclaration): boolean => {
-    const ceasSubjects = ['CSE', 'BIO']; // CEAS subjects
-    const departmentSubjects = ['PSY', 'ECO', 'AMS', 'POL']; // Department subjects
+    const ceasSubjects = ['AMS', 'BME', 'CME', 'CIV', 'ECE', 'CSE', 'ESE', 'ESG', 'ISE', 'MEC', 'TSM']; // CEAS subjects
     
     if (advisorType === 'UNIVERSITY') {
       return true; // University advisors can approve all
     } else if (advisorType === 'CEAS') {
       return ceasSubjects.includes(declaration.subjectCode);
     } else if (advisorType === 'DEPARTMENT') {
-      return departmentSubjects.includes(declaration.subjectCode);
+      // Department advisors can approve their subjects
+      return true; // Will be validated by backend
     }
     
     return false;
@@ -118,9 +121,9 @@ const AdvisorApproval: React.FC = () => {
   const getAdvisorTypeDescription = (): string => {
     switch (advisorType) {
       case 'CEAS':
-        return 'CEAS Advisor - Can approve CSE and BIO declarations';
+        return 'CEAS Advisor - Can approve all CEAS majors (AMS, BME, CME, CIV, ECE, CSE, ESE, ESG, ISE, MEC, TSM)';
       case 'DEPARTMENT':
-        return 'Department Advisor - Can approve PSY, ECO, AMS, POL declarations';
+        return 'Department Advisor - Can approve department-specific majors/minors';
       case 'UNIVERSITY':
         return 'University Advisor - Can approve all declarations';
       default:
@@ -308,6 +311,21 @@ const AdvisorApproval: React.FC = () => {
     });
   };
 
+  // Helper functions to detect change requests
+  const isChangeRequest = (declaration: MajorMinorDeclaration): boolean => {
+    if (!declaration.advisorComments) return false;
+    return declaration.advisorComments.startsWith('CHANGE_FROM:');
+  };
+
+  const getFromSubject = (declaration: MajorMinorDeclaration): string | null => {
+    if (!declaration.advisorComments) return null;
+    if (declaration.advisorComments.startsWith('CHANGE_FROM:')) {
+      const match = declaration.advisorComments.match(/^CHANGE_FROM:(\w+)/);
+      return match ? match[1] : null;
+    }
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="advisor-approval">
@@ -441,9 +459,21 @@ const AdvisorApproval: React.FC = () => {
                       <div className="student-info">
                         <div className="student-name">{declaration.studentNetId}</div>
                         <div className="student-id">NetID: {declaration.studentNetId}</div>
+                        {isChangeRequest(declaration) && (
+                          <div className="change-badge" style={{color: 'orange', fontWeight: 'bold', marginTop: '4px'}}>
+                            🔄 Change Request
+                          </div>
+                        )}
                       </div>
                     </td>
-                    <td className="subject-cell">{declaration.subjectCode}</td>
+                    <td className="subject-cell">
+                      {declaration.subjectCode}
+                      {isChangeRequest(declaration) && getFromSubject(declaration) && (
+                        <div style={{fontSize: '0.85em', color: '#666', marginTop: '2px'}}>
+                          From: {getFromSubject(declaration)}
+                        </div>
+                      )}
+                    </td>
                     <td className="type-cell">{declaration.declarationType}</td>
                     <td className="degree-cell">{declaration.degreeType}</td>
                     <td className="term-cell">{declaration.effectiveTerm}</td>
@@ -476,7 +506,7 @@ const AdvisorApproval: React.FC = () => {
                           ) : (
                             <div className="no-permission">
                               <span className="permission-text">
-                                Requires {declaration.subjectCode === 'CSE' || declaration.subjectCode === 'BIO' ? 'CEAS' : 'Department'} Advisor
+                                Requires CEAS Advisor
                               </span>
                             </div>
                           )}
@@ -511,6 +541,18 @@ const AdvisorApproval: React.FC = () => {
             </div>
             <div className="modal-body">
               <div className="declaration-summary">
+                {isChangeRequest(selectedDeclaration) && (
+                  <div style={{backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', padding: '10px', marginBottom: '15px'}}>
+                    <p style={{margin: 0, fontWeight: 'bold', color: '#856404'}}>
+                      🔄 CHANGE REQUEST
+                    </p>
+                    {getFromSubject(selectedDeclaration) && (
+                      <p style={{margin: '5px 0 0 0', color: '#856404'}}>
+                        Changing from <strong>{getFromSubject(selectedDeclaration)}</strong> to <strong>{selectedDeclaration.subjectCode}</strong>
+                      </p>
+                    )}
+                  </div>
+                )}
                 <p><strong>Student:</strong> {selectedDeclaration.studentNetId}</p>
                 <p><strong>Declaration:</strong> {selectedDeclaration.subjectCode} {selectedDeclaration.declarationType}</p>
                 <p><strong>Degree Type:</strong> {getDegreeTypeDisplayName(selectedDeclaration.degreeType)}</p>
@@ -553,6 +595,18 @@ const AdvisorApproval: React.FC = () => {
             </div>
             <div className="modal-body">
               <div className="declaration-summary">
+                {isChangeRequest(selectedDeclaration) && (
+                  <div style={{backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', padding: '10px', marginBottom: '15px'}}>
+                    <p style={{margin: 0, fontWeight: 'bold', color: '#856404'}}>
+                      🔄 CHANGE REQUEST
+                    </p>
+                    {getFromSubject(selectedDeclaration) && (
+                      <p style={{margin: '5px 0 0 0', color: '#856404'}}>
+                        Changing from <strong>{getFromSubject(selectedDeclaration)}</strong> to <strong>{selectedDeclaration.subjectCode}</strong>
+                      </p>
+                    )}
+                  </div>
+                )}
                 <p><strong>Student:</strong> {selectedDeclaration.studentNetId}</p>
                 <p><strong>Declaration:</strong> {selectedDeclaration.subjectCode} {selectedDeclaration.declarationType}</p>
                 <p><strong>Degree Type:</strong> {getDegreeTypeDisplayName(selectedDeclaration.degreeType)}</p>

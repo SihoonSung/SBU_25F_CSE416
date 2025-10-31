@@ -56,6 +56,10 @@ interface PlannedMajor {
 const MajorMinorDeclaration: React.FC = () => {
   const [degreeRequirements, setDegreeRequirements] = useState<DegreeRequirement[]>([]);
   const [myDeclarations, setMyDeclarations] = useState<MajorMinorDeclaration[]>([]);
+  // Current approved majors and minors from User table
+  const [currentApprovedMajors, setCurrentApprovedMajors] = useState<string[]>([]);
+  const [currentApprovedMinors, setCurrentApprovedMinors] = useState<string[]>([]);
+  
   // Load planned majors from localStorage
   // TP Used cursor to load planned majors from localStorage
   const loadPlannedMajorsFromStorage = () => {
@@ -88,11 +92,14 @@ const MajorMinorDeclaration: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [systemDate, setSystemDate] = useState<Date | null>(null);
   
   // Form state
-  const [showDeclarationForm, setShowDeclarationForm] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [showChangeForm, setShowChangeForm] = useState(false);
   const [showPlannedMajorForm, setShowPlannedMajorForm] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedChangeFromSubject, setSelectedChangeFromSubject] = useState('');
   const [selectedDegreeType, setSelectedDegreeType] = useState<'BA' | 'BS' | 'MINOR'>('BA');
   const [selectedDeclarationType, setSelectedDeclarationType] = useState<'MAJOR' | 'MINOR'>('MAJOR');
   const [effectiveTerm, setEffectiveTerm] = useState('');
@@ -100,7 +107,7 @@ const MajorMinorDeclaration: React.FC = () => {
 
   // Available terms and subjects based on academic calendar
   const getAvailableTerms = () => {
-    const currentDate = new Date();
+    const currentDate = systemDate || new Date();
     const allTerms = [
       { value: 'FALL 2025', label: 'Fall 2025 (Mar 31 - Aug 29, 2025)', start: '2025-03-31', end: '2025-08-29' },
       { value: 'SPRING 2026', label: 'Spring 2026 (Oct 27, 2025 - Jan 30, 2026)', start: '2025-10-27', end: '2026-01-30' }
@@ -125,6 +132,28 @@ const MajorMinorDeclaration: React.FC = () => {
     try {
       setLoading(true);
       console.log('Starting to fetch data...');
+      
+      // Fetch system date from backend
+      try {
+        const systemDateResponse = await fetch('/api/admin/system-date', {
+          credentials: 'include',
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        if (systemDateResponse.ok) {
+          const systemDateData = await systemDateResponse.json();
+          if (systemDateData.currentDate) {
+            setSystemDate(new Date(systemDateData.currentDate));
+            console.log('System date loaded:', systemDateData.currentDate);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch system date, using local date:', err);
+      }
       
       // Fetch available subjects dynamically
       try {
@@ -194,6 +223,32 @@ const MajorMinorDeclaration: React.FC = () => {
         console.warn('Failed to fetch my declarations:', err);
       }
       
+      // Fetch current approved majors and minors from User profile
+      try {
+        const profileResponse = await fetch('/api/profile/me/details', {
+          credentials: 'include',
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          if (profileData.majors) {
+            setCurrentApprovedMajors(profileData.majors || []);
+            console.log('Current approved majors loaded:', profileData.majors?.length || 0);
+          }
+          if (profileData.minors) {
+            setCurrentApprovedMinors(profileData.minors || []);
+            console.log('Current approved minors loaded:', profileData.minors?.length || 0);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch current approved majors/minors:', err);
+      }
+      
       // Planned majors are now loaded from localStorage in useEffect
       
       console.log('Data fetch completed');
@@ -214,8 +269,16 @@ const MajorMinorDeclaration: React.FC = () => {
       return;
     }
 
+    // Check if user can declare more
+    if (!canDeclareMore(selectedDeclarationType)) {
+      const maxAllowed = selectedDeclarationType === 'MAJOR' ? 2 : 3;
+      const typeName = selectedDeclarationType === 'MAJOR' ? 'majors' : 'minors';
+      setError(`You have reached the maximum limit of ${maxAllowed} ${typeName}. You cannot add more ${typeName}.`);
+      return;
+    }
+
     // Check if current date is within the declaration period
-    const currentDate = new Date();
+    const currentDate = systemDate || new Date();
     const isWithinDeclarationPeriod = checkDeclarationPeriod(effectiveTerm, currentDate);
     
     if (!isWithinDeclarationPeriod) {
@@ -246,7 +309,7 @@ const MajorMinorDeclaration: React.FC = () => {
 
       if (data.success) {
         setSuccess('Declaration submitted successfully!');
-        setShowDeclarationForm(false);
+        setShowAddForm(false);
         
         // Reset form
         setSelectedSubject('');
@@ -263,6 +326,71 @@ const MajorMinorDeclaration: React.FC = () => {
     } catch (err) {
       console.error('Error submitting declaration:', err);
       setError('Failed to submit declaration. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle change declaration submission
+  const handleChangeDeclaration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedSubject || !effectiveTerm || !selectedChangeFromSubject) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+
+    // Check if current date is within the declaration period
+    const currentDate = systemDate || new Date();
+    const isWithinDeclarationPeriod = checkDeclarationPeriod(effectiveTerm, currentDate);
+    
+    if (!isWithinDeclarationPeriod) {
+      setError('Declaration period has ended. Please check the academic calendar for available terms.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch('/api/major-minor-declarations/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          subjectCode: selectedSubject,
+          fromSubjectCode: selectedChangeFromSubject, // Specify this is a change
+          degreeType: selectedDegreeType,
+          declarationType: selectedDeclarationType,
+          effectiveTerm: effectiveTerm
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccess('Change request submitted successfully!');
+        setShowChangeForm(false);
+        
+        // Reset form
+        setSelectedSubject('');
+        setSelectedChangeFromSubject('');
+        setSelectedDegreeType('BA');
+        setSelectedDeclarationType('MAJOR');
+        setEffectiveTerm('');
+        
+        // Refresh data
+        fetchData();
+      } else {
+        setError(data.error || 'Failed to submit change request. Please try again.');
+      }
+      
+    } catch (err) {
+      console.error('Error submitting change request:', err);
+      setError('Failed to submit change request. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -516,10 +644,6 @@ const MajorMinorDeclaration: React.FC = () => {
     return currentCount < maxAllowed;
   };
 
-  // Check if user has reached maximum majors
-  const hasReachedMaxMajors = !canDeclareMore('MAJOR');
-  const hasReachedMaxMinors = !canDeclareMore('MINOR');
-
   if (loading) {
     return (
       <div className="major-minor-declaration">
@@ -562,34 +686,6 @@ const MajorMinorDeclaration: React.FC = () => {
         </div>
       </div>
 
-      {/* Alerts Section - Only show when user has reached limits */}
-      {(hasReachedMaxMajors || hasReachedMaxMinors) && (
-        <div className="alerts-section">
-          <div className="alerts-grid">
-            {hasReachedMaxMajors && (
-              <div className="alert alert-error">
-                <div className="alert-icon">i</div>
-                <div className="alert-content">
-                  <div className="alert-text">
-                    Maximum Majors Reached: You have reached the maximum limit of 2 majors. Please withdraw an existing major before declaring a new one.
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {hasReachedMaxMinors && (
-              <div className="alert alert-warning">
-                <div className="alert-icon">i</div>
-                <div className="alert-content">
-                  <div className="alert-text">
-                    Maximum Minors Reached: You have reached the maximum limit of 3 minors. Please withdraw an existing minor before declaring a new one.
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Error and Success Messages */}
       {error && (
@@ -608,15 +704,153 @@ const MajorMinorDeclaration: React.FC = () => {
         </div>
       )}
 
-      {/* Declaration Form */}
+      {/* Declaration Forms */}
+      <div className="declaration-forms-section">
+        <h2>Declaration Forms</h2>
+        <p className="section-description">
+          Manage your major/minor declarations: change existing declarations or add new ones.
+        </p>
+        
+        <div style={{display: 'flex', gap: '20px', marginTop: '10px'}}>
+          <div className="current-info">
+            <strong>My Current Majors:</strong> {currentApprovedMajors.length > 0 ? currentApprovedMajors.join(', ') : 'None'}
+          </div>
+          <div className="current-info">
+            <strong>My Current Minors:</strong> {currentApprovedMinors.length > 0 ? currentApprovedMinors.join(', ') : 'None'}
+          </div>
+        </div>
+      </div>
+
+      {/* Change Declaration Form */}
+      {(currentApprovedMajors.length > 0 || currentApprovedMinors.length > 0) && (
+        <div className="declaration-form-section">
+          <div className="section-header">
+            <h2>Change Declaration</h2>
+            <button 
+              className="toggle-form-button"
+              onClick={() => setShowChangeForm(!showChangeForm)}
+            >
+              {showChangeForm ? 'Cancel' : 'Change Declaration'}
+            </button>
+          </div>
+
+          {showChangeForm && (
+            <form onSubmit={handleChangeDeclaration} className="declaration-form">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Term:</label>
+                  <select
+                    value={effectiveTerm}
+                    onChange={(e) => setEffectiveTerm(e.target.value)}
+                    required
+                  >
+                    <option value="">Select Term</option>
+                    {getAvailableTerms().map(term => (
+                      <option key={term.value} value={term.value}>{term.label}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label>Declaration Type:</label>
+                  <select
+                    value={selectedDeclarationType}
+                    onChange={(e) => {
+                      setSelectedDeclarationType(e.target.value as 'MAJOR' | 'MINOR');
+                      setSelectedChangeFromSubject('');
+                    }}
+                    required
+                  >
+                    <option value="MAJOR">Major</option>
+                    <option value="MINOR">Minor</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Change From:</label>
+                  <select
+                    value={selectedChangeFromSubject}
+                    onChange={(e) => setSelectedChangeFromSubject(e.target.value)}
+                    required
+                  >
+                    <option value="">Select Current {selectedDeclarationType}</option>
+                    {(selectedDeclarationType === 'MAJOR' ? currentApprovedMajors : currentApprovedMinors).map(subject => (
+                      <option key={subject} value={subject}>{subject}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label>Change To:</label>
+                  <select
+                    value={selectedSubject}
+                    onChange={(e) => {
+                      setSelectedSubject(e.target.value);
+                      if (e.target.value) {
+                        loadDegreeTypesForSubject(e.target.value);
+                      }
+                    }}
+                    required
+                  >
+                    <option value="">Select New {selectedDeclarationType}</option>
+                    {availableSubjects
+                      .filter(subject => selectedChangeFromSubject !== subject)
+                      .map(subject => (
+                        <option key={subject} value={subject}>{subject}</option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              {selectedSubject && availableDegreeTypes.length > 0 && (
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Degree Type:</label>
+                    <select
+                      value={selectedDegreeType}
+                      onChange={(e) => {
+                        setSelectedDegreeType(e.target.value as 'BA' | 'BS' | 'MINOR');
+                        if (selectedSubject) {
+                          loadCourseRequirements(selectedSubject, e.target.value);
+                        }
+                      }}
+                      required
+                    >
+                      {availableDegreeTypes.map(degreeType => (
+                        <option key={degreeType} value={degreeType}>
+                          {degreeType === 'MINOR' ? 'Minor' : degreeType}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-actions">
+                <button 
+                  type="submit" 
+                  className="submit-button"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Submitting...' : 'Submit Change Request'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {/* Add Declaration Form */}
       <div className="declaration-form-section">
         <div className="section-header">
-          <h2>Submit New Declaration</h2>
+          <h2>Add New Declaration</h2>
           <button 
             className="toggle-form-button"
-            onClick={() => setShowDeclarationForm(!showDeclarationForm)}
+            onClick={() => setShowAddForm(!showAddForm)}
           >
-            {showDeclarationForm ? 'Cancel' : 'New Declaration'}
+            {showAddForm ? 'Cancel' : 'Add Declaration'}
           </button>
         </div>
 
@@ -631,7 +865,7 @@ const MajorMinorDeclaration: React.FC = () => {
           </div>
         )}
 
-        {showDeclarationForm && (
+        {showAddForm && (
           <form onSubmit={handleSubmitDeclaration} className="declaration-form">
             <div className="form-row">
               <div className="form-group">

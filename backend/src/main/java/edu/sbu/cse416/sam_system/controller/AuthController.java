@@ -132,6 +132,8 @@ public class AuthController {
         userData.put("officeLocation", user.getOfficeLocation());
         userData.put("officeHours", user.getOfficeHours());
         userData.put("sbuId", user.getSbuId()); // Add SBU ID for debugging
+        userData.put("level", user.getLevel()); // Add level for advisors
+        userData.put("academic_unit", user.getAcademicUnit()); // Add academic_unit for advisors
 
         return ResponseEntity.ok(Map.of("user", userData));
     }
