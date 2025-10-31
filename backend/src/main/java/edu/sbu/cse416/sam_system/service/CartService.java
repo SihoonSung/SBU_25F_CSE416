@@ -529,7 +529,7 @@ public class CartService {
                     userClass.setYear(classEntity.getYear());
                     userClass.setCredits(classEntity.getMinCredits());
                     userClass.setGpnc(null); // Default to null for new registrations
-                    userClass.setGrade(null); // Default to null for new registrations
+                    userClass.setGrade("I"); // Default to "I" (Incomplete) for new registrations
                     
                     // Create ClassRoster entry
                     ClassRoster roster = new ClassRoster(classEntity, user);

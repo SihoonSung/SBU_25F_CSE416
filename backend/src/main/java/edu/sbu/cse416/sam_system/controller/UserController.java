@@ -449,7 +449,7 @@ public class UserController {
                     userClass.setYear(classEntity.getYear());
                     userClass.setCredits(classEntity.getMinCredits());
                     userClass.setGpnc(null);
-                    userClass.setGrade(null);
+                    userClass.setGrade("I"); // Default to "I" (Incomplete) for new registrations
 
                     // Create roster
                     ClassRoster roster = new ClassRoster(classEntity, nextUser);
