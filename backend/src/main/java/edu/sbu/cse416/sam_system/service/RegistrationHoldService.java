@@ -67,10 +67,6 @@ public class RegistrationHoldService {
         RegistrationHold hold = holdRepository.findById(holdId)
             .orElseThrow(() -> new RuntimeException("Hold not found"));
         
-        if (!hold.getIsActive()) {
-            throw new RuntimeException("Hold is already removed");
-        }
-        
         User removedBy = userRepository.findById(removedById)
             .orElseThrow(() -> new RuntimeException("User removing hold not found"));
         
@@ -79,8 +75,9 @@ public class RegistrationHoldService {
             throw new RuntimeException("User does not have permission to remove this hold");
         }
         
-        hold.remove(removedBy);
-        return holdRepository.save(hold);
+        // Physically delete the hold record instead of soft-deleting
+        holdRepository.delete(hold);
+        return hold; // return the deleted entity snapshot for controller response
     }
     
     /**

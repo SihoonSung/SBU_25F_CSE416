@@ -19,10 +19,9 @@ public interface RegistrationHoldRepository extends JpaRepository<RegistrationHo
     
     /**
      * Find all active holds for a specific student
-     * @param student The student
-     * @return List of active registration holds
+     * (Active = existing record)
      */
-    @Query("SELECT h FROM RegistrationHold h WHERE h.student = :student AND h.isActive = true")
+    @Query("SELECT h FROM RegistrationHold h WHERE h.student = :student")
     List<RegistrationHold> findActiveHoldsByStudent(@Param("student") User student);
     
     /**
@@ -34,19 +33,15 @@ public interface RegistrationHoldRepository extends JpaRepository<RegistrationHo
     List<RegistrationHold> findAllHoldsByStudent(@Param("student") User student);
     
     /**
-     * Check if student has any active holds
-     * @param studentId Student ID
-     * @return true if student has active holds, false otherwise
+     * Check if student has any active holds (Active = existing record)
      */
-    @Query("SELECT COUNT(h) > 0 FROM RegistrationHold h WHERE h.student.userId = :studentId AND h.isActive = true")
+    @Query("SELECT COUNT(h) > 0 FROM RegistrationHold h WHERE h.student.userId = :studentId")
     boolean hasActiveHolds(@Param("studentId") Long studentId);
     
     /**
-     * Find all active holds by type
-     * @param holdType Hold type
-     * @return List of active registration holds
+     * Find all active holds by type (Active = existing record)
      */
-    @Query("SELECT h FROM RegistrationHold h WHERE h.holdType = :holdType AND h.isActive = true")
+    @Query("SELECT h FROM RegistrationHold h WHERE h.holdType = :holdType")
     List<RegistrationHold> findActiveHoldsByType(@Param("holdType") RegistrationHold.HoldType holdType);
 }
 

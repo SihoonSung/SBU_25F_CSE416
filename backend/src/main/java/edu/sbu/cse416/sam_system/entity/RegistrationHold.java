@@ -33,18 +33,8 @@ public class RegistrationHold {
     @Column(name = "placed_at", nullable = false)
     private LocalDateTime placedAt;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "removed_by_user_id")
-    private User removedBy;
-    
-    @Column(name = "removed_at")
-    private LocalDateTime removedAt;
-    
     @Column(name = "reason", columnDefinition = "TEXT")
     private String reason;
-    
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
     
     public enum HoldType {
         ACADEMIC_ADVISING,  // Placed by advisors
@@ -62,7 +52,6 @@ public class RegistrationHold {
         this.holdType = holdType;
         this.placedBy = placedBy;
         this.reason = reason;
-        this.isActive = true;
     }
     
     // Getters and Setters
@@ -106,22 +95,6 @@ public class RegistrationHold {
         this.placedAt = placedAt;
     }
     
-    public User getRemovedBy() {
-        return removedBy;
-    }
-    
-    public void setRemovedBy(User removedBy) {
-        this.removedBy = removedBy;
-    }
-    
-    public LocalDateTime getRemovedAt() {
-        return removedAt;
-    }
-    
-    public void setRemovedAt(LocalDateTime removedAt) {
-        this.removedAt = removedAt;
-    }
-    
     public String getReason() {
         return reason;
     }
@@ -130,22 +103,5 @@ public class RegistrationHold {
         this.reason = reason;
     }
     
-    public Boolean getIsActive() {
-        return isActive;
-    }
-    
-    public void setIsActive(Boolean isActive) {
-        this.isActive = isActive;
-    }
-    
-    /**
-     * Remove this hold
-     * @param removedBy User who is removing the hold
-     */
-    public void remove(User removedBy) {
-        this.isActive = false;
-        this.removedBy = removedBy;
-        this.removedAt = LocalDateTime.now();
-    }
 }
 

@@ -88,15 +88,13 @@ public class RegistrationHoldController {
             @PathVariable Long holdId,
             @RequestParam Long removedById) {
         try {
-            RegistrationHold hold = holdService.removeHold(holdId, removedById);
+            holdService.removeHold(holdId, removedById);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Hold removed successfully");
-            response.put("hold", Map.of(
-                "holdId", hold.getHoldId(),
-                "removedAt", hold.getRemovedAt()
-            ));
+            response.put("deleted", true);
+            response.put("holdId", holdId);
             
             return ResponseEntity.ok(response);
             
@@ -157,8 +155,6 @@ public class RegistrationHoldController {
                 "holdId", hold.getHoldId(),
                 "holdType", hold.getHoldType().toString(),
                 "placedAt", hold.getPlacedAt(),
-                "removedAt", hold.getRemovedAt(),
-                "isActive", hold.getIsActive(),
                 "reason", hold.getReason() != null ? hold.getReason() : "",
                 "placedBy", Map.of(
                     "userId", hold.getPlacedBy().getUserId(),
