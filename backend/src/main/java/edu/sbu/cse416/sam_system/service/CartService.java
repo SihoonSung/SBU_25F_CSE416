@@ -13,6 +13,7 @@ import edu.sbu.cse416.sam_system.repository.ClassRosterRepository;
 import edu.sbu.cse416.sam_system.service.PrerequisitesValidationService;
 import edu.sbu.cse416.sam_system.entity.WaitlistEntry;
 import edu.sbu.cse416.sam_system.repository.WaitlistRepository;
+import edu.sbu.cse416.sam_system.service.RegistrationHoldService;
 import edu.sbu.cse416.sam_system.util.TimeConflictChecker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -58,6 +59,9 @@ public class CartService {
     
     @Autowired
     private PrerequisitesValidationService prerequisitesValidationService;
+    
+    @Autowired
+    private RegistrationHoldService holdService;
     
     /**
      * Add a class to user's cart
@@ -291,6 +295,28 @@ public class CartService {
             // Get user
             User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Check for active registration holds
+            if (holdService.hasActiveHolds(userId)) {
+                List<edu.sbu.cse416.sam_system.entity.RegistrationHold> activeHolds = holdService.getActiveHolds(userId);
+                StringBuilder holdMessage = new StringBuilder("Registration is blocked due to active holds:\n");
+                for (edu.sbu.cse416.sam_system.entity.RegistrationHold hold : activeHolds) {
+                    holdMessage.append(String.format("- %s hold", hold.getHoldType().toString()));
+                    if (hold.getReason() != null && !hold.getReason().trim().isEmpty()) {
+                        holdMessage.append(": ").append(hold.getReason());
+                    }
+                    holdMessage.append("\n");
+                }
+                
+                result.put("success", false);
+                result.put("message", holdMessage.toString().trim());
+                result.put("hasHolds", true);
+                result.put("holds", activeHolds.stream().map(hold -> Map.of(
+                    "holdType", hold.getHoldType().toString(),
+                    "reason", hold.getReason() != null ? hold.getReason() : ""
+                )).toList());
+                return result;
+            }
             
             // Get all cart items for user
             List<CartEntity> cartItems = cartRepository.findByUserId(userId);
