@@ -64,6 +64,16 @@ public class ClassRosterController {
                     studentInfo.put("email", rosterItem.getUser().getEmail());
                     studentInfo.put("enrollmentDate", rosterItem.getEnrollmentDate());
                     studentInfo.put("status", rosterItem.getStatus());
+                    
+                    // Get grade from UserClasses
+                    java.util.Optional<UserClasses> ucOpt = userClassesRepository
+                        .findByUserIdAndClassIdOptional(rosterItem.getUser().getUserId(), classId);
+                    if (ucOpt.isPresent() && ucOpt.get().getGrade() != null) {
+                        studentInfo.put("grade", ucOpt.get().getGrade());
+                    } else {
+                        studentInfo.put("grade", null);
+                    }
+                    
                     return studentInfo;
                 })
                 .collect(Collectors.toList());
@@ -105,6 +115,16 @@ public class ClassRosterController {
                     classInfo.put("year", classEntity.getYear());
                     classInfo.put("enrollmentDate", enrollment.getEnrollmentDate());
                     classInfo.put("status", enrollment.getStatus());
+                    
+                    // Get grade from UserClasses
+                    java.util.Optional<UserClasses> ucOpt = userClassesRepository
+                        .findByUserIdAndClassIdOptional(userId, classEntity.getClassId());
+                    if (ucOpt.isPresent() && ucOpt.get().getGrade() != null) {
+                        classInfo.put("grade", ucOpt.get().getGrade());
+                    } else {
+                        classInfo.put("grade", null);
+                    }
+                    
                     return classInfo;
                 })
                 .collect(Collectors.toList());
