@@ -29,6 +29,7 @@ public class DatabaseSetup {
     private static final String USER = "root";
     private static final String PASS = "Mm10194105828!21";
 
+    // TP: Used cursor to reset and bootstrap the database via JDBC
     public static void main(String[] args) {
         System.out.println("=".repeat(80));
         System.out.println("SAM DATABASE RESET UTILITY");

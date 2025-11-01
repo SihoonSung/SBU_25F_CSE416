@@ -20,6 +20,7 @@ public class TimeConflictController {
      * GET /api/time-conflict/test?schedule1=MW 05:00-06:20PM&schedule2=MW 05:30-06:50PM
      */
     @GetMapping("/test")
+    // TP: Used cursor to test time conflict between two schedules
     public Map<String, Object> testTimeConflict(
             @RequestParam String schedule1,
             @RequestParam String schedule2) {

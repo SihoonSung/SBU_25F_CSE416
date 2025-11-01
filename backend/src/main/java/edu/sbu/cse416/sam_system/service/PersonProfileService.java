@@ -24,6 +24,7 @@ public class PersonProfileService {
     }
 
     /** Public API used by controller */
+    // TP: Used cursor to build person profile DTO from database user
     public PersonProfileDTO getPersonProfileByEmail(String email) {
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException("email is required");
@@ -84,6 +85,7 @@ public class PersonProfileService {
 
     // ---------- mapping helpers ----------
 
+    // TP: Used cursor to map User entity into FullStudentDetails
     private FullStudentDetails buildStudentDetails(User u) {
         FullStudentDetails details = new FullStudentDetails();
         details.sbuId      = u.getStudentId();
@@ -114,6 +116,7 @@ public class PersonProfileService {
     }
 
     // 🚨 Modified: Changed to public static
+    // TP: Used cursor to parse TermRef from JSON string
     public static TermRef parseTermRef(String jsonString) {
         if (jsonString == null || jsonString.isBlank() || jsonString.equals("null")) {
             return null;
@@ -129,6 +132,7 @@ public class PersonProfileService {
     }
     
     // 🚨 Modified: Changed to public static
+    // TP: Used cursor to parse list of strings from JSON string
     public static List<String> parseStrList(String jsonString) {
         if (jsonString == null || jsonString.isBlank() || jsonString.equals("[]") || jsonString.equals("null")) {
             return Collections.emptyList();
@@ -147,6 +151,7 @@ public class PersonProfileService {
     }
     
     // 🚨 Modified: Changed to public static
+    // TP: Used cursor to parse list of TermRef from JSON string
     public static List<TermRef> parseTermList(String jsonString) {
         if (jsonString == null || jsonString.isBlank() || jsonString.equals("[]") || jsonString.equals("null")) {
             return Collections.emptyList();
@@ -165,6 +170,7 @@ public class PersonProfileService {
     }
 
 
+    // TP: Used cursor to build display name from first/last names
     private String joinNames(String first, String last) {
         String a = (first == null ? "" : first.trim());
         String b = (last  == null ? "" : last.trim());

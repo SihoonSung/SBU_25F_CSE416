@@ -36,6 +36,7 @@ public class DegreeRequirementController {
      * Import degree requirements from YAML file (Registrar only)
      */
     @PostMapping("/import")
+    // TP: Used cursor to import degree requirements via YAML upload
     public ResponseEntity<Map<String, Object>> importRequirements(
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal OAuth2User principal) {
@@ -66,6 +67,7 @@ public class DegreeRequirementController {
      * Get all active degree requirements
      */
     @GetMapping
+    // TP: Used cursor to list all active degree requirements
     public ResponseEntity<Map<String, Object>> getAllRequirements() {
         try {
             List<DegreeRequirement> requirements = degreeRequirementService.getAllActiveRequirements();
@@ -88,6 +90,7 @@ public class DegreeRequirementController {
      * Get degree requirements by subject code
      */
     @GetMapping("/subject/{subjectCode}")
+    // TP: Used cursor to fetch requirements by subject code
     public ResponseEntity<Map<String, Object>> getRequirementsBySubject(@PathVariable String subjectCode) {
         try {
             List<DegreeRequirement> requirements = degreeRequirementService.getRequirementsBySubject(subjectCode);
@@ -110,6 +113,7 @@ public class DegreeRequirementController {
      * Get degree requirements by effective term
      */
     @GetMapping("/term/{effectiveTerm}")
+    // TP: Used cursor to fetch requirements by effective term
     public ResponseEntity<Map<String, Object>> getRequirementsByTerm(@PathVariable String effectiveTerm) {
         try {
             List<DegreeRequirement> requirements = degreeRequirementService.getRequirementsByTerm(effectiveTerm);
@@ -132,6 +136,7 @@ public class DegreeRequirementController {
      * Get specific degree requirement
      */
     @GetMapping("/{subjectCode}/{degreeType}")
+    // TP: Used cursor to fetch a specific requirement by subject and degree type
     public ResponseEntity<Map<String, Object>> getRequirement(
             @PathVariable String subjectCode,
             @PathVariable DegreeType degreeType) {
@@ -161,6 +166,7 @@ public class DegreeRequirementController {
      * Get restricted degree requirements
      */
     @GetMapping("/restricted")
+    // TP: Used cursor to list all restricted requirements
     public ResponseEntity<Map<String, Object>> getRestrictedRequirements() {
         try {
             List<DegreeRequirement> requirements = degreeRequirementService.getRestrictedRequirements();
@@ -183,6 +189,7 @@ public class DegreeRequirementController {
      * Create a new degree requirement (Registrar only)
      */
     @PostMapping
+    // TP: Used cursor to create a new degree requirement
     public ResponseEntity<Map<String, Object>> createRequirement(
             @RequestBody DegreeRequirement requirement,
             @AuthenticationPrincipal OAuth2User principal) {
@@ -214,6 +221,7 @@ public class DegreeRequirementController {
      * Update a degree requirement (Registrar only)
      */
     @PutMapping("/{requirementId}")
+    // TP: Used cursor to update an existing requirement
     public ResponseEntity<Map<String, Object>> updateRequirement(
             @PathVariable Long requirementId,
             @RequestBody DegreeRequirement requirement,
@@ -245,6 +253,7 @@ public class DegreeRequirementController {
      * Deactivate a degree requirement (Registrar only)
      */
     @DeleteMapping("/{requirementId}/deactivate")
+    // TP: Used cursor to deactivate a requirement
     public ResponseEntity<Map<String, Object>> deactivateRequirement(
             @PathVariable Long requirementId,
             @AuthenticationPrincipal OAuth2User principal) {
@@ -274,6 +283,7 @@ public class DegreeRequirementController {
      * Delete a specific degree requirement (Registrar only)
      */
     @DeleteMapping("/{requirementId}")
+    // TP: Used cursor to delete a specific requirement
     public ResponseEntity<Map<String, Object>> deleteRequirement(
             @PathVariable Long requirementId,
             @AuthenticationPrincipal OAuth2User principal) {
@@ -303,6 +313,7 @@ public class DegreeRequirementController {
      * Delete all degree requirements (Registrar only)
      */
     @DeleteMapping("/delete-all")
+    // TP: Used cursor to delete all degree requirements
     public ResponseEntity<Map<String, Object>> deleteAllRequirements(
             @AuthenticationPrincipal OAuth2User principal) {
         

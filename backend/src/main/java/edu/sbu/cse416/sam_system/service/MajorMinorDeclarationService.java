@@ -49,6 +49,7 @@ public class MajorMinorDeclarationService {
     /**
      * Submit a new major/minor declaration request
      */
+    // TP: Used cursor to submit a new declaration (simple overload)
     public MajorMinorDeclaration submitDeclaration(Long studentId, String subjectCode, 
                                                   DeclarationType declarationType,
                                                   String effectiveTerm) {
@@ -58,6 +59,7 @@ public class MajorMinorDeclarationService {
     /**
      * Submit a new major/minor declaration request (with optional fromSubjectCode for change requests)
      */
+    // TP: Used cursor to submit a new declaration (supports change requests)
     public MajorMinorDeclaration submitDeclaration(Long studentId, String subjectCode, 
                                                   DeclarationType declarationType,
                                                   String effectiveTerm, String fromSubjectCode) {
@@ -155,6 +157,7 @@ public class MajorMinorDeclarationService {
     /**
      * Approve a declaration request
      */
+    // TP: Used cursor to approve a declaration and update student records
     public MajorMinorDeclaration approveDeclaration(Long declarationId, Long advisorId, String notes) {
         MajorMinorDeclaration declaration = declarationRepository.findById(declarationId)
                 .orElseThrow(() -> new IllegalArgumentException("Declaration not found"));
@@ -191,6 +194,7 @@ public class MajorMinorDeclarationService {
     /**
      * Reject a declaration request
      */
+    // TP: Used cursor to reject a declaration with advisor notes
     public MajorMinorDeclaration rejectDeclaration(Long declarationId, Long advisorId, String notes) {
         MajorMinorDeclaration declaration = declarationRepository.findById(declarationId)
                 .orElseThrow(() -> new IllegalArgumentException("Declaration not found"));
@@ -210,6 +214,7 @@ public class MajorMinorDeclarationService {
     /**
      * Get all declarations for a student
      */
+    // TP: Used cursor to list all declarations for a student
     public List<MajorMinorDeclaration> getStudentDeclarations(Long studentId) {
         User student = userRepository.findById(studentId)
                 .orElseThrow(() -> new IllegalArgumentException("Student not found"));
@@ -220,6 +225,7 @@ public class MajorMinorDeclarationService {
     /**
      * Get pending declarations for an advisor
      */
+    // TP: Used cursor to list advisor's pending declarations
     public List<MajorMinorDeclaration> getPendingDeclarationsForAdvisor(Long advisorId) {
         User advisor = userRepository.findById(advisorId)
                 .orElseThrow(() -> new IllegalArgumentException("Advisor not found"));
@@ -233,6 +239,7 @@ public class MajorMinorDeclarationService {
     /**
      * Validate that the subject exists in degree requirements
      */
+    // TP: Used cursor to validate subject availability from degree requirements
     private void validateSubjectExists(String subjectCode, DeclarationType declarationType) {
         // Check if subject exists in active degree requirements
         List<DegreeRequirement> requirements = degreeRequirementRepository
@@ -250,6 +257,7 @@ public class MajorMinorDeclarationService {
     /**
      * Validate declaration limits (2 majors, 3 minors)
      */
+    // TP: Used cursor to enforce major/minor count limits
     private void validateDeclarationLimits(User student, DeclarationType declarationType) {
         if (declarationType == DeclarationType.MAJOR) {
             // Just count current majors from User table (already approved declarations)
@@ -275,6 +283,7 @@ public class MajorMinorDeclarationService {
     /**
      * Count current majors from User table (JSON field)
      */
+    // TP: Used cursor to count student's current majors from JSON
     private long countCurrentMajorsFromUser(User student) {
         if (student.getMajors() == null || student.getMajors().trim().isEmpty()) {
             return 0;
@@ -292,6 +301,7 @@ public class MajorMinorDeclarationService {
     /**
      * Count current minors from User table (JSON field)
      */
+    // TP: Used cursor to count student's current minors from JSON
     private long countCurrentMinorsFromUser(User student) {
         if (student.getMinors() == null || student.getMinors().trim().isEmpty()) {
             return 0;
@@ -309,6 +319,7 @@ public class MajorMinorDeclarationService {
     /**
      * Validate academic calendar dates dynamically from AcademicEvents
      */
+    // TP: Used cursor to validate declaration period using academic events
     private void validateAcademicCalendarDates(String effectiveTerm) {
         if (effectiveTerm == null || effectiveTerm.trim().isEmpty()) {
             throw new IllegalArgumentException("Effective term is required");
@@ -361,6 +372,7 @@ public class MajorMinorDeclarationService {
     /**
      * Fallback method with hardcoded dates for backward compatibility
      */
+    // TP: Used cursor to validate dates using fallback hardcoded ranges
     private void validateAcademicCalendarDatesFallback(String effectiveTerm) {
         LocalDate currentDate = systemDateService.today();
         
@@ -487,6 +499,7 @@ public class MajorMinorDeclarationService {
     /**
      * Find department advisor for subject
      */
+    // TP: Used cursor to resolve department advisor for subject
     private User findDepartmentAdvisor(String subjectCode) {
         // Try to find advisor with exact academic_unit match
         List<User> advisors = userRepository.findByRoleAndAcademicUnit(
@@ -573,6 +586,7 @@ public class MajorMinorDeclarationService {
     /**
      * Get all declarations for advisor
      */
+    // TP: Used cursor to list all declarations assigned to an advisor
     public List<MajorMinorDeclaration> getAllDeclarationsForAdvisor(Long advisorId) {
         User advisor = userRepository.findById(advisorId)
                 .orElseThrow(() -> new IllegalArgumentException("Advisor not found"));
@@ -588,6 +602,7 @@ public class MajorMinorDeclarationService {
      * Withdraw a declaration (PENDING only)
      * Once approved, declarations cannot be withdrawn
      */
+    // TP: Used cursor to withdraw a pending declaration owned by the student
     public MajorMinorDeclaration withdrawDeclaration(Long declarationId, Long studentId) {
         MajorMinorDeclaration declaration = declarationRepository.findById(declarationId)
                 .orElseThrow(() -> new IllegalArgumentException("Declaration not found"));
@@ -613,6 +628,7 @@ public class MajorMinorDeclarationService {
     /**
      * Get declaration by ID
      */
+    // TP: Used cursor to fetch a declaration by its ID
     public Optional<MajorMinorDeclaration> getDeclarationById(Long declarationId) {
         return declarationRepository.findById(declarationId);
     }
@@ -620,6 +636,7 @@ public class MajorMinorDeclarationService {
     /**
      * Update student's majors/minors in User table after approval
      */
+    // TP: Used cursor to sync student's majors/minors after approval
     private void updateStudentMajorsMinors(MajorMinorDeclaration declaration) {
         try {
             User student = declaration.getStudent();

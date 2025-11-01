@@ -41,6 +41,7 @@ public class MajorMinorDeclarationController {
      * Test endpoint to check authentication status
      */
     @GetMapping("/debug/auth-test")
+    // TP: Used cursor to verify OAuth2 authentication context
     public ResponseEntity<?> testAuth(@AuthenticationPrincipal OAuth2User principal) {
         if (principal == null) {
             return ResponseEntity.ok(Map.of(
@@ -61,6 +62,7 @@ public class MajorMinorDeclarationController {
      * Simple test endpoint without database
      */
     @GetMapping("/debug/simple")
+    // TP: Used cursor to provide simple debug endpoint
     public ResponseEntity<?> simpleTest() {
         System.out.println("DEBUG: Simple test endpoint called");
         return ResponseEntity.ok(Map.of(
@@ -73,6 +75,7 @@ public class MajorMinorDeclarationController {
      * Submit a new major/minor declaration request (Student only)
      */
     @PostMapping("/submit")
+    // TP: Used cursor to submit a declaration via REST
     public ResponseEntity<?> submitDeclaration(
             @RequestBody Map<String, Object> request,
             @AuthenticationPrincipal OAuth2User principal) {
@@ -183,6 +186,7 @@ public class MajorMinorDeclarationController {
      * Get all declarations for the current student
      */
     @GetMapping("/my-declarations")
+    // TP: Used cursor to list current student's declarations
     public ResponseEntity<?> getMyDeclarations(@AuthenticationPrincipal OAuth2User principal) {
         try {
             Long studentId = getUserIdFromPrincipal(principal);
@@ -205,6 +209,7 @@ public class MajorMinorDeclarationController {
      * Get pending declarations for advisor
      */
     @GetMapping("/pending")
+    // TP: Used cursor to list advisor's pending declarations
     public ResponseEntity<?> getPendingDeclarations(@AuthenticationPrincipal OAuth2User principal) {
         try {
             Long advisorId = getUserIdFromPrincipal(principal);
@@ -227,6 +232,7 @@ public class MajorMinorDeclarationController {
      * Approve a declaration request (Advisor only)
      */
     @PostMapping("/{declarationId}/approve")
+    // TP: Used cursor to approve a declaration request
     public ResponseEntity<?> approveDeclaration(
             @PathVariable Long declarationId,
             @RequestBody Map<String, String> request,
@@ -262,6 +268,7 @@ public class MajorMinorDeclarationController {
      * Reject a declaration request (Advisor only)
      */
     @PostMapping("/{declarationId}/reject")
+    // TP: Used cursor to reject a declaration request
     public ResponseEntity<?> rejectDeclaration(
             @PathVariable Long declarationId,
             @RequestBody Map<String, String> request,
@@ -297,6 +304,7 @@ public class MajorMinorDeclarationController {
      * Get all declarations (for advisors)
      */
     @GetMapping("/all")
+    // TP: Used cursor to list all declarations assigned to advisor
     public ResponseEntity<?> getAllDeclarations(@AuthenticationPrincipal OAuth2User principal) {
         try {
             Long advisorId = getUserIdFromPrincipal(principal);
@@ -319,6 +327,7 @@ public class MajorMinorDeclarationController {
      * Withdraw a declaration (Student only)
      */
     @PostMapping("/{declarationId}/withdraw")
+    // TP: Used cursor to withdraw a student's pending declaration
     public ResponseEntity<?> withdrawDeclaration(@PathVariable Long declarationId,
                                                 @AuthenticationPrincipal OAuth2User principal) {
         try {
@@ -357,6 +366,7 @@ public class MajorMinorDeclarationController {
      * Get declaration details by ID
      */
     @GetMapping("/{declarationId}")
+    // TP: Used cursor to fetch declaration details by ID
     public ResponseEntity<?> getDeclaration(@PathVariable Long declarationId,
                                           @AuthenticationPrincipal OAuth2User principal) {
         try {
@@ -384,6 +394,7 @@ public class MajorMinorDeclarationController {
      * Get student's current major/minor status
      */
     @GetMapping("/my-status")
+    // TP: Used cursor to summarize student's declaration status
     public ResponseEntity<?> getMyStatus(@AuthenticationPrincipal OAuth2User principal) {
         try {
             Long studentId = getUserIdFromPrincipal(principal);
@@ -434,6 +445,7 @@ public class MajorMinorDeclarationController {
      * Extract user ID from OAuth2 principal
      */
     private Long getUserIdFromPrincipal(OAuth2User principal) {
+        // TP: Used cursor to resolve user id from OAuth2 principal
         if (principal == null) {
             throw new IllegalArgumentException("User not authenticated");
         }

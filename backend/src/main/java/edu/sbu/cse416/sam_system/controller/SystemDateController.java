@@ -20,6 +20,7 @@ public class SystemDateController {
     }
 
     @GetMapping
+    // TP: Used cursor to read current (or overridden) system date
     public Map<String, Object> get() {
         return Map.of(
                 "currentDate", systemDateService.today().toString(),
@@ -28,6 +29,7 @@ public class SystemDateController {
     }
 
     @PutMapping
+    // TP: Used cursor to set an override system date
     public Map<String, Object> set(@RequestParam("date") String date) {
         LocalDate d = LocalDate.parse(date);
         systemDateService.set(d);
@@ -38,6 +40,7 @@ public class SystemDateController {
     }
 
     @DeleteMapping
+    // TP: Used cursor to clear system date override
     public Map<String, Object> clear() {
         systemDateService.clear();
         return Map.of(

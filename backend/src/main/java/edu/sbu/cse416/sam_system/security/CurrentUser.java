@@ -15,10 +15,12 @@ public class CurrentUser {
     private final HttpServletRequest request;
     private static final String DEFAULT_NETID = "jsyoon";
 
+    // TP: Used cursor to construct helper for accessing current user from request/context
     public CurrentUser(HttpServletRequest request) {
         this.request = request;
     }
 
+    // TP: Used cursor to get current user's email from OAuth2 or headers
     public String getEmail() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof OAuth2User o2User) {
@@ -29,6 +31,7 @@ public class CurrentUser {
         return (emailHeader != null && !emailHeader.isBlank()) ? emailHeader.trim() : null;
     }
 
+    // TP: Used cursor to derive current user's NetID from OAuth2 or headers
     public String getNetId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof OAuth2User o2User) {

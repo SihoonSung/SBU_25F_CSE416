@@ -26,11 +26,13 @@ public class OAuth2LoginSuccessHandler
 
     private final UserService userService;
 
+    // TP: Used cursor to construct OAuth2 success handler with UserService
     public OAuth2LoginSuccessHandler(UserService userService) {
         this.userService = userService;
     }
 
     @Override
+    // TP: Used cursor to handle OAuth2 authentication success and redirect
     public void onAuthenticationSuccess(
             HttpServletRequest request,
             HttpServletResponse response,

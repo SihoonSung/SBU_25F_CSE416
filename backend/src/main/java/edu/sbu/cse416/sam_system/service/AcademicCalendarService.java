@@ -21,6 +21,7 @@ public class AcademicCalendarService {
     private final AcademicEventRepository repo;
     private final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
 
+    // TP: Used cursor to construct service with repository dependency
     public AcademicCalendarService(AcademicEventRepository repo) {
         this.repo = repo;
     }
@@ -38,6 +39,7 @@ public class AcademicCalendarService {
      *      waitlist: 2025-08-29
      *    -> title will be prettified from key, type defaults to "DEADLINE"
      */
+    // TP: Used cursor to import academic calendar events from YAML file
     public Map<String, Object> importYaml(MultipartFile file) throws Exception {
         int imported = 0;
         int skipped = 0;
@@ -149,16 +151,19 @@ public class AcademicCalendarService {
         return result;
     }
 
+    // TP: Used cursor to list all academic events
     public List<AcademicEvent> list() {
         return repo.findAll();
     }
 
+    // TP: Used cursor to delete all academic events
     public void clearAll() {
         repo.deleteAll();
     }
 
     // ---------- helpers ----------
 
+    // TP: Used cursor to save one event parsed from list-style YAML node
     private int saveFromListNode(Map<?, ?> n) {
         String dateStr = getAsString(n, "date", true);
         String title   = getAsString(n, "title", true);
@@ -175,6 +180,7 @@ public class AcademicCalendarService {
         return 1;
     }
 
+    // TP: Used cursor to extract required/optional string field from map
     private static String getAsString(Map<?, ?> m, String key, boolean required) {
         Object v = m.get(key);
         if (v == null) {
@@ -188,6 +194,7 @@ public class AcademicCalendarService {
         return s;
     }
 
+    // TP: Used cursor to parse ISO date string (yyyy-MM-dd)
     private static LocalDate parseIsoDate(String s) {
         try {
             return LocalDate.parse(s);
@@ -197,6 +204,7 @@ public class AcademicCalendarService {
     }
 
     /** Convert "major_and_minor_changes_end" -> "Major And Minor Changes End" */
+    // TP: Used cursor to prettify key into title case words
     private static String prettifyKey(String key) {
         String[] parts = key.replace('-', ' ').replace('_', ' ').trim().split("\\s+");
         StringBuilder sb = new StringBuilder();

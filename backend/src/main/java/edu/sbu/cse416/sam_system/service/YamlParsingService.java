@@ -29,31 +29,42 @@ public class YamlParsingService {
     /**
      * Parse YAML file and create degree requirements
      */
-    // TP Used cursor to parse YAML file and create degree requirements
+    // TP: Used cursor to parse YAML file and create degree requirements
     public List<DegreeRequirement> parseAndCreateRequirements(MultipartFile file, String createdBy) throws IOException {
         try (InputStream inputStream = file.getInputStream()) {
             Map<String, Object> yamlData = yaml.load(inputStream);
             
             List<DegreeRequirement> requirements = new ArrayList<>();
             
-            // Parse degree requirements
+            // Parse all subjects from degree_requirements and from root level
             if (yamlData.containsKey("degree_requirements")) {
-                List<Map<String, Object>> degreeReqs = (List<Map<String, Object>>) yamlData.get("degree_requirements");
-                for (Map<String, Object> reqData : degreeReqs) {
-                    DegreeRequirement requirement = parseDegreeRequirement(reqData, yamlData, createdBy);
-                    if (requirement != null) {
-                        requirements.add(requirement);
-                    }
-                }
-            }
-            
-            // Parse minor requirements
-            if (yamlData.containsKey("minor_requirements")) {
-                List<Map<String, Object>> minorReqs = (List<Map<String, Object>>) yamlData.get("minor_requirements");
-                for (Map<String, Object> reqData : minorReqs) {
-                    DegreeRequirement requirement = parseDegreeRequirement(reqData, yamlData, createdBy);
-                    if (requirement != null) {
-                        requirements.add(requirement);
+                Object degreeReqsObj = yamlData.get("degree_requirements");
+                
+                // New format: degree_requirements is a list of subjects
+                if (degreeReqsObj instanceof List) {
+                    List<Map<String, Object>> subjects = (List<Map<String, Object>>) degreeReqsObj;
+                    for (Map<String, Object> subjectData : subjects) {
+                        // Each subject has subject_code, is_active, and entries
+                        if (subjectData.containsKey("entries") && subjectData.containsKey("subject_code")) {
+                            String subjectCode = (String) subjectData.get("subject_code");
+                            Object entriesObj = subjectData.get("entries");
+                            
+                            if (entriesObj instanceof List) {
+                                List<Map<String, Object>> entries = (List<Map<String, Object>>) entriesObj;
+                                
+                                for (Map<String, Object> entryData : entries) {
+                                    // Add subject_code to each entry if not present
+                                    if (!entryData.containsKey("subject_code")) {
+                                        entryData.put("subject_code", subjectCode);
+                                    }
+                                    
+                                    DegreeRequirement requirement = parseDegreeRequirement(entryData, yamlData, createdBy);
+                                    if (requirement != null) {
+                                        requirements.add(requirement);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -65,13 +76,18 @@ public class YamlParsingService {
     /**
      * Parse individual degree requirement from YAML data
      */
-    // TP Used cursor to parse individual degree requirement from YAML data
+    // TP: Used cursor to parse individual degree requirement from YAML data
     private DegreeRequirement parseDegreeRequirement(Map<String, Object> reqData, Map<String, Object> yamlData, String createdBy) {
         try {
             // Extract basic information
             String subjectCode = (String) reqData.get("subject_code");
             String degreeTypeStr = (String) reqData.get("degree_type");
+            
+            // Try to get total_credits_required first, fallback to degree_credits_required if not present
             Integer totalCredits = (Integer) reqData.get("total_credits_required");
+            if (totalCredits == null) {
+                totalCredits = (Integer) reqData.get("degree_credits_required");
+            }
             
             // Debug logging
             System.out.println("DEBUG: Parsing degree requirement for subject: " + subjectCode);
@@ -93,7 +109,7 @@ public class YamlParsingService {
             
             // Validate required fields
             if (subjectCode == null || degreeTypeStr == null || totalCredits == null) {
-                throw new IllegalArgumentException("Missing required fields: subject_code, degree_type, or total_credits_required");
+                throw new IllegalArgumentException("Missing required fields: subject_code, degree_type, or total_credits_required/degree_credits_required");
             }
             
             // Parse degree type
@@ -115,8 +131,12 @@ public class YamlParsingService {
             requirement.setIsRestricted(isRestricted);
             requirement.setGpaRequirement(gpaRequirement);
             
-            // Parse and set admission requirements
-            if (reqData.containsKey("admission_requirements")) {
+            // Parse and set admission requirements (check both "admission" and "admission_requirements" for compatibility)
+            if (reqData.containsKey("admission")) {
+                Object admissionReqs = reqData.get("admission");
+                String admissionReqsJson = convertToJson(admissionReqs);
+                requirement.setAdmissionRequirements(admissionReqsJson);
+            } else if (reqData.containsKey("admission_requirements")) {
                 Object admissionReqs = reqData.get("admission_requirements");
                 String admissionReqsJson = convertToJson(admissionReqs);
                 requirement.setAdmissionRequirements(admissionReqsJson);
@@ -129,20 +149,21 @@ public class YamlParsingService {
                 requirement.setCourseRequirements(courseReqsJson);
             }
             
-            // Parse and set prerequisite courses
+            // Parse and set prerequisite courses (optional field)
             if (reqData.containsKey("prerequisite_courses")) {
                 Object prereqCourses = reqData.get("prerequisite_courses");
                 String prereqCoursesJson = convertToJson(prereqCourses);
                 requirement.setPrerequisiteCourses(prereqCoursesJson);
             }
             
-            // Parse and set SBC requirements
-            if (reqData.containsKey("sbc_requirements")) {
-                Object sbcReqs = reqData.get("sbc_requirements");
-                System.out.println("DEBUG: SBC Requirements raw data: " + sbcReqs);
-                System.out.println("DEBUG: SBC Requirements type: " + (sbcReqs != null ? sbcReqs.getClass().getName() : "null"));
+            // Parse and set SBC requirements (check both "sbc_categories" and "sbc_requirements" for compatibility)
+            if (reqData.containsKey("sbc_categories")) {
+                Object sbcReqs = reqData.get("sbc_categories");
                 String sbcReqsJson = convertToJson(sbcReqs);
-                System.out.println("DEBUG: SBC Requirements JSON: " + sbcReqsJson);
+                requirement.setSbcRequirements(sbcReqsJson);
+            } else if (reqData.containsKey("sbc_requirements")) {
+                Object sbcReqs = reqData.get("sbc_requirements");
+                String sbcReqsJson = convertToJson(sbcReqs);
                 requirement.setSbcRequirements(sbcReqsJson);
             }
             
@@ -156,7 +177,7 @@ public class YamlParsingService {
     /**
      * Convert object to JSON string with proper formatting
      */
-    // TP Used cursor to convert object to JSON string with proper formatting
+    // TP: Used cursor to convert object to JSON string with proper formatting
     private String convertToJson(Object obj) {
         if (obj == null) {
             return null;
@@ -175,6 +196,7 @@ public class YamlParsingService {
     /**
      * Validate YAML file structure
      */
+    // TP: Used cursor to validate top-level YAML structure
     public void validateYamlStructure(Map<String, Object> yamlData) {
         // Check for required top-level fields
         if (!yamlData.containsKey("requirements_version")) {
@@ -206,6 +228,7 @@ public class YamlParsingService {
     /**
      * Validate requirements list structure
      */
+    // TP: Used cursor to validate list of requirement objects
     private void validateRequirementsList(List<Map<String, Object>> requirements, String sectionName) {
         if (requirements == null || requirements.isEmpty()) {
             throw new IllegalArgumentException(sectionName + " section is empty");
@@ -220,6 +243,7 @@ public class YamlParsingService {
     /**
      * Validate individual requirement structure
      */
+    // TP: Used cursor to validate a single requirement object shape
     private void validateRequirementStructure(Map<String, Object> req, String sectionName, int index) {
         String prefix = sectionName + "[" + index + "]";
         

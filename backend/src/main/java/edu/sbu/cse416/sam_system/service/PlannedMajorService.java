@@ -37,7 +37,7 @@ public class PlannedMajorService {
     /**
      * Add a major to student's planned list
      */
-    // TP Used cursor to add a major to student's planned list
+    // TP: Used cursor to add a major to student's planned list
     public PlannedMajor planMajor(Long studentId, String subjectCode, DegreeType degreeType) {
         // Validate student exists
         User student = userRepository.findById(studentId)
@@ -74,7 +74,7 @@ public class PlannedMajorService {
     /**
      * Remove a major from student's planned list
      */
-    // TP Used cursor to remove a major from student's planned list
+    // TP: Used cursor to remove a major from student's planned list
     public void unplanMajor(Long studentId, String subjectCode, DegreeType degreeType) {
         Optional<PlannedMajor> plannedMajor = plannedMajorRepository
                 .findByStudentIdAndSubjectAndDegreeType(studentId, subjectCode, degreeType);
@@ -91,7 +91,7 @@ public class PlannedMajorService {
     /**
      * Get all active planned majors for a student
      */
-    // TP Used cursor to get all active planned majors for a student
+    // TP: Used cursor to get all active planned majors for a student
     @Transactional(readOnly = true)
     public List<PlannedMajor> getStudentPlannedMajors(Long studentId) {
         return plannedMajorRepository.findActiveByStudentId(studentId);
@@ -100,6 +100,7 @@ public class PlannedMajorService {
     /**
      * Get planned major status with requirement information
      */
+    // TP: Used cursor to compute planned major status and attach requirements
     @Transactional(readOnly = true)
     public Map<String, Object> getPlannedMajorStatus(Long studentId, String subjectCode, DegreeType degreeType) {
         Map<String, Object> status = new HashMap<>();
@@ -141,6 +142,7 @@ public class PlannedMajorService {
     /**
      * Get all planned majors with their status for a student
      */
+    // TP: Used cursor to list all planned majors with requirement details
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getAllPlannedMajorsWithStatus(Long studentId) {
         List<PlannedMajor> plannedMajors = plannedMajorRepository.findActiveByStudentId(studentId);
@@ -179,6 +181,7 @@ public class PlannedMajorService {
     /**
      * Check if student can plan a major (basic validation)
      */
+    // TP: Used cursor to validate whether planning a major is allowed
     @Transactional(readOnly = true)
     public boolean canPlanMajor(Long studentId, String subjectCode, DegreeType degreeType) {
         // Check if degree requirement exists

@@ -36,7 +36,7 @@ public class PlannedMajorController {
     /**
      * Plan a major (add to planned list)
      */
-    // TP Used cursor to plan a major (add to planned list)
+    // TP: Used cursor to plan a major (add to planned list)
     @PostMapping("/plan")
     public ResponseEntity<?> planMajor(
             @RequestBody Map<String, Object> request,
@@ -86,7 +86,7 @@ public class PlannedMajorController {
     /**
      * Unplan a major (remove from planned list)
      */
-    // TP Used cursor to unplan a major (remove from planned list)
+    // TP: Used cursor to unplan a major (remove from planned list)
     @PostMapping("/unplan")
     public ResponseEntity<?> unplanMajor(
             @RequestBody Map<String, Object> request,
@@ -135,7 +135,7 @@ public class PlannedMajorController {
     /**
      * Get all planned majors for the current student
      */
-    // TP Used cursor to get all planned majors for the current student
+    // TP: Used cursor to get all planned majors for the current student
     @GetMapping("/my-planned")
     public ResponseEntity<?> getMyPlannedMajors(@AuthenticationPrincipal OAuth2User principal) {
         try {

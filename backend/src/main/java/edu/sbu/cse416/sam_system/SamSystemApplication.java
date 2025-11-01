@@ -23,23 +23,27 @@ import javax.sql.DataSource;
 public class SamSystemApplication {
 
 	public static void main(String[] args) {
+		// TP: Used cursor to launch Spring Boot application
 		SpringApplication.run(SamSystemApplication.class, args);
 	}
 
 	@CrossOrigin(origins = "http://localhost:5173")
 	@GetMapping("/home")
 	public String home() {
+		// TP: Used cursor to provide simple connectivity endpoint
 		return "Spring Boot";
 	}
 	
 	@CrossOrigin(origins = "http://localhost:5173")
 	@GetMapping("/api/test")
 	public String apiTest() {
+		// TP: Used cursor to provide simple API test endpoint
 		return "API is working!";
 	}
 
     @Bean
 	public CommandLineRunner databaseConnectionChecker(DataSource dataSource) {
+		// TP: Used cursor to validate database connectivity at startup
         return unused -> {
             try (Connection connection = dataSource.getConnection()) {
                 if (connection != null) {

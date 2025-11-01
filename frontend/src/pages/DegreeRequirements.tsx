@@ -426,30 +426,40 @@ const DegreeRequirements: React.FC = () => {
                         if (admissionReqs) {
                           return (
                             <div>
-                              {admissionReqs.required_courses && (
+                              {admissionReqs.core_courses && (
                                 <div>
-                                  <strong>Required Courses:</strong>
-                                  <ul>
-                                    {admissionReqs.required_courses.map((course: any, index: number) => (
-                                      <li key={index}>
-                                        {course.course_code} (Min Grade: {course.min_grade})
-                                      </li>
+                                  <strong>Core Courses:</strong>
+                                  <div className="course-list">
+                                    {admissionReqs.core_courses.map((course: any, index: number) => (
+                                      <span key={index} className="course-tag">{course.code}</span>
                                     ))}
-                                  </ul>
+                                  </div>
                                 </div>
                               )}
-                              {admissionReqs.minimum_gpa && (
-                                <p><strong>Minimum GPA:</strong> {admissionReqs.minimum_gpa}</p>
+                              {admissionReqs.minimum_cumulative_gpa && (
+                                <p><strong>Minimum Cumulative GPA:</strong> {admissionReqs.minimum_cumulative_gpa}</p>
                               )}
-                              {admissionReqs.additional_requirements && (
+                              {admissionReqs.minimum_core_avg_gpa && (
+                                <p><strong>Minimum Core Avg GPA:</strong> {admissionReqs.minimum_core_avg_gpa}</p>
+                              )}
+                              {admissionReqs.minimum_core_grade && (
+                                <p><strong>Minimum Core Grade:</strong> {admissionReqs.minimum_core_grade}</p>
+                              )}
+                              {admissionReqs.retake_in_core !== undefined && (
+                                <p><strong>Retake Allowed:</strong> {admissionReqs.retake_in_core}</p>
+                              )}
+                              {admissionReqs.excluded_majors && (
                                 <div>
-                                  <strong>Additional Requirements:</strong>
-                                  <ul>
-                                    {admissionReqs.additional_requirements.map((req: string, index: number) => (
-                                      <li key={index}>{req}</li>
+                                  <strong>Excluded Majors:</strong>
+                                  <div className="course-list">
+                                    {admissionReqs.excluded_majors.map((maj: any, index: number) => (
+                                      <span key={index} className="course-tag">{maj.subject_code}</span>
                                     ))}
-                                  </ul>
+                                  </div>
                                 </div>
+                              )}
+                              {admissionReqs.note && (
+                                <p><em>{admissionReqs.note}</em></p>
                               )}
                             </div>
                           );
@@ -467,28 +477,67 @@ const DegreeRequirements: React.FC = () => {
                     <div className="requirement-content">
                       {(() => {
                         const courseReqs = parseJsonField(requirement.courseRequirements);
-                        if (courseReqs) {
+                        if (courseReqs && courseReqs.groups) {
                           return (
-                            <div>
-                              {courseReqs.core_courses && (
-                                <div>
-                                  <strong>Core Courses:</strong>
-                                  <div className="course-list">
-                                    {courseReqs.core_courses.map((course: string, index: number) => (
-                                      <span key={index} className="course-tag">{course}</span>
-                                    ))}
+                            <div className="groups-container">
+                              {courseReqs.groups.map((group: any, groupIndex: number) => (
+                                <div key={groupIndex} className="course-group">
+                                  <div className="group-header">
+                                    <strong>{group.id?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</strong>
+                                    <span className="group-type">{group.type?.replace(/_/g, ' ')}</span>
+                                    {group.credits_required && (
+                                      <span className="credits-badge">{group.credits_required} credits</span>
+                                    )}
                                   </div>
-                                </div>
-                              )}
-                              {courseReqs.elective_courses && (
-                                <div>
-                                  <strong>Elective Courses:</strong>
-                                  <p>{courseReqs.elective_courses.credits_required} credits required</p>
-                                  {courseReqs.elective_courses.min_300_level && (
-                                    <p>Minimum {courseReqs.elective_courses.min_300_level} credits at 300+ level</p>
+                                  
+                                  {group.courses && (
+                                    <div className="course-list">
+                                      {group.courses.map((course: any, courseIndex: number) => (
+                                        <span key={courseIndex} className="course-tag">{course.code}</span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {group.sequences && (
+                                    <div className="sequences-container">
+                                      {group.sequences.map((sequence: any[], seqIndex: number) => (
+                                        <div key={seqIndex} className="sequence">
+                                          {sequence.map((course: any, courseIndex: number) => (
+                                            <span key={courseIndex} className="course-tag">
+                                              {course.code}
+                                              {courseIndex < sequence.length - 1 && ' → '}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {group.additional_courses && (
+                                    <div>
+                                      <strong>Additional Options:</strong>
+                                      <div className="course-list">
+                                        {group.additional_courses.map((course: any, courseIndex: number) => (
+                                          <span key={courseIndex} className="course-tag">{course.code}</span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {group.excluded_courses && (
+                                    <div className="excluded-courses">
+                                      <em>Excluded: </em>
+                                      {group.excluded_courses.map((course: any, courseIndex: number) => (
+                                        <span key={courseIndex} className="excluded-tag">{course.code}</span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {group.note && (
+                                    <p className="group-note"><em>{group.note}</em></p>
                                   )}
                                 </div>
-                              )}
+                              ))}
                             </div>
                           );
                         }
@@ -501,59 +550,73 @@ const DegreeRequirements: React.FC = () => {
                 {/* SBC Requirements */}
                 {requirement.sbcRequirements && (
                   <div className="requirement-section">
-                    <h4>SBC Requirements</h4>
+                    <h4>SBC Categories</h4>
                     <div className="requirement-content">
                       {(() => {
                         const sbcReqs = parseJsonField(requirement.sbcRequirements);
-                        if (sbcReqs) {
-                          // Check if it's an array of strings (simple format)
-                          if (Array.isArray(sbcReqs) && sbcReqs.length > 0 && typeof sbcReqs[0] === 'string') {
-                            return (
-                              <div className="sbc-grid">
-                                {sbcReqs.map((sbc: string, index: number) => (
-                                  <div key={index} className="sbc-item">
-                                    <span className="sbc-code">{sbc}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          }
-                          // Check if it's an array of objects (complex format)
-                          else if (Array.isArray(sbcReqs) && sbcReqs.length > 0 && typeof sbcReqs[0] === 'object') {
-                            return (
-                              <div className="sbc-grid">
-                                {sbcReqs.map((sbc: any, index: number) => (
-                                  <div key={index} className="sbc-item">
-                                    <span className="sbc-code">{sbc.category}</span>
-                                    <span className="sbc-credits">{sbc.credits_required} credits</span>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          }
-                          // Check if it's an object with categories
-                          else if (typeof sbcReqs === 'object' && sbcReqs !== null) {
-                            return (
-                              <div className="sbc-details">
-                                {Object.entries(sbcReqs).map(([category, details]: [string, any]) => (
-                                  <div key={category} className="sbc-category">
-                                    <h5>{category.replace(/_/g, ' ').toUpperCase()}:</h5>
-                                    {typeof details === 'string' ? (
-                                      <p>{details}</p>
-                                    ) : (
-                                      <ul>
-                                        {Array.isArray(details) ? details.map((item: any, index: number) => (
-                                          <li key={index}>{item}</li>
-                                        )) : Object.entries(details).map(([key, value]: [string, any]) => (
-                                          <li key={key}><strong>{key}:</strong> {value}</li>
-                                        ))}
-                                      </ul>
+                        if (sbcReqs && Array.isArray(sbcReqs)) {
+                          return (
+                            <div className="sbc-container">
+                              {sbcReqs.map((sbc: any, index: number) => {
+                                const hasCourses = sbc.required_major_courses || sbc.optional_major_courses || 
+                                                  sbc.required_major_courses_partial || sbc.optional_major_courses_partial;
+                                
+                                if (!hasCourses) {
+                                  return (
+                                    <div key={index} className="sbc-item-simple">
+                                      <span className="sbc-code">{sbc.sbc}</span>
+                                    </div>
+                                  );
+                                }
+                                
+                                return (
+                                  <div key={index} className="sbc-item-detail">
+                                    <strong className="sbc-code">{sbc.sbc}</strong>
+                                    {sbc.required_major_courses && (
+                                      <div className="sbc-courses-section">
+                                        <em>Required:</em>
+                                        <div className="course-list">
+                                          {sbc.required_major_courses.map((course: any, courseIndex: number) => (
+                                            <span key={courseIndex} className="course-tag">{course.code}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {sbc.optional_major_courses && (
+                                      <div className="sbc-courses-section">
+                                        <em>Optional:</em>
+                                        <div className="course-list">
+                                          {sbc.optional_major_courses.map((course: any, courseIndex: number) => (
+                                            <span key={courseIndex} className="course-tag optional">{course.code}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {sbc.required_major_courses_partial && (
+                                      <div className="sbc-courses-section">
+                                        <em>Required (Partial):</em>
+                                        <div className="course-list">
+                                          {sbc.required_major_courses_partial.map((course: any, courseIndex: number) => (
+                                            <span key={courseIndex} className="course-tag partial">{course.code}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {sbc.optional_major_courses_partial && (
+                                      <div className="sbc-courses-section">
+                                        <em>Optional (Partial):</em>
+                                        <div className="course-list">
+                                          {sbc.optional_major_courses_partial.map((course: any, courseIndex: number) => (
+                                            <span key={courseIndex} className="course-tag optional partial">{course.code}</span>
+                                          ))}
+                                        </div>
+                                      </div>
                                     )}
                                   </div>
-                                ))}
-                              </div>
-                            );
-                          }
+                                );
+                              })}
+                            </div>
+                          );
                         }
                         return <p>{requirement.sbcRequirements}</p>;
                       })()}

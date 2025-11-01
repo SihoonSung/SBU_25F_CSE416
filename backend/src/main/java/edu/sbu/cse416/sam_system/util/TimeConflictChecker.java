@@ -16,6 +16,7 @@ public class TimeConflictChecker {
     /**
      * Check if two schedule strings have time conflicts
      */
+    // TP: Used cursor to detect conflicts between two schedule strings
     public static boolean hasTimeConflict(String schedule1, String schedule2) {
         if (schedule1 == null || schedule2 == null || schedule1.trim().isEmpty() || schedule2.trim().isEmpty()) {
             return false;
@@ -54,6 +55,7 @@ public class TimeConflictChecker {
      * @param schedule Schedule string like "MW 05:00-06:20PM, TR 02:00-03:20PM"
      * @return List of ScheduleInfo objects
      */
+    // TP: Used cursor to parse multiple time slots from a schedule string
     private static List<ScheduleInfo> parseAllTimeSlots(String schedule) {
         List<ScheduleInfo> timeSlots = new ArrayList<>();
         
@@ -78,6 +80,7 @@ public class TimeConflictChecker {
     /**
      * Parse a single time slot like "MW 05:00-06:20PM" or "RECT 03:30-04:25PM"
      */
+    // TP: Used cursor to parse a single time slot segment
     private static ScheduleInfo parseSingleTimeSlot(String timeSlot) {
         String[] parts = timeSlot.trim().split("\\s+");
         if (parts.length != 2) {
@@ -124,6 +127,7 @@ public class TimeConflictChecker {
     /**
      * Parse days string like "MW", "RECT", "RECR", "TR"
      */
+    // TP: Used cursor to parse day codes (e.g., MW, TR, RECT)
     private static Set<DayOfWeek> parseDaysString(String daysStr) {
         Set<DayOfWeek> days = new HashSet<>();
         
@@ -151,6 +155,7 @@ public class TimeConflictChecker {
     /**
      * Parse single day character
      */
+    // TP: Used cursor to map a single day character to DayOfWeek
     private static DayOfWeek parseDay(char dayChar) {
         switch (Character.toUpperCase(dayChar)) {
             case 'M': return DayOfWeek.MONDAY;
@@ -165,6 +170,7 @@ public class TimeConflictChecker {
     /**
      * Parse time string like "05:00PM" or "06:20PM"
      */
+    // TP: Used cursor to parse time with AM/PM into 24-hour LocalTime
     private static LocalTime parseTime(String timeStr) {
         boolean isPM = timeStr.toUpperCase().endsWith("PM");
         boolean isAM = timeStr.toUpperCase().endsWith("AM");
@@ -202,6 +208,7 @@ public class TimeConflictChecker {
         final LocalTime startTime;
         final LocalTime endTime;
         
+        // TP: Used cursor to construct schedule info value object
         ScheduleInfo(Set<DayOfWeek> days, LocalTime startTime, LocalTime endTime) {
             this.days = days;
             this.startTime = startTime;

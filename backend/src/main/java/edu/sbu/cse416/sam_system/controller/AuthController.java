@@ -36,6 +36,7 @@ public class AuthController {
      * OAuth2 login success endpoint
      */
     @GetMapping("/success")
+    // TP: Used cursor to handle OAuth2 login success and return user payload
     public ResponseEntity<Map<String, Object>> loginSuccess(
             @AuthenticationPrincipal OidcUser principal,
             HttpServletRequest request) {
@@ -67,6 +68,7 @@ public class AuthController {
      * OAuth2 login failure endpoint
      */
     @GetMapping("/failure")
+    // TP: Used cursor to report OAuth2 login failure
     public ResponseEntity<Map<String, Object>> loginFailure() {
         return ResponseEntity.badRequest().body(Map.of(
                 "success", false,
@@ -79,6 +81,7 @@ public class AuthController {
      */
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/me")
+    // TP: Used cursor to return current authenticated user's info
     public ResponseEntity<Map<String, Object>> getCurrentUser(
             @AuthenticationPrincipal OidcUser principal) {
 
@@ -142,6 +145,7 @@ public class AuthController {
      * Logout endpoint (session invalidation)
      */
     @PostMapping("/logout")
+    // TP: Used cursor to invalidate session and logout
     public ResponseEntity<Map<String, Object>> logout(
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
@@ -157,6 +161,7 @@ public class AuthController {
      * Logout success redirect endpoint
      */
     @GetMapping("/logout-success")
+    // TP: Used cursor to acknowledge logout success
     public ResponseEntity<Map<String, Object>> logoutSuccess() {
         return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -168,6 +173,7 @@ public class AuthController {
      * Check authentication status
      */
     @GetMapping("/status")
+    // TP: Used cursor to check authentication status
     public ResponseEntity<Map<String, Object>> checkAuthStatus(
             @AuthenticationPrincipal OidcUser principal) {
 

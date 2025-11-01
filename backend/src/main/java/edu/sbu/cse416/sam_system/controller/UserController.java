@@ -73,6 +73,7 @@ public class UserController {
 
     /** Test endpoint to verify controller is loaded */
     @GetMapping("/test")
+    // TP: Used cursor to verify user controller is active
     public ResponseEntity<String> test() {
         return ResponseEntity.ok("UserController is working!");
     }
@@ -86,6 +87,7 @@ public class UserController {
      */
     @GetMapping("/student-lookup")
     @PreAuthorize("permitAll()")
+    // TP: Used cursor to lookup student by email or studentId
     public StudentProfileDto lookupStudent(
             @RequestParam(value = "email", required = false) String email,
             @RequestParam(value = "studentId", required = false) String studentId
@@ -106,6 +108,7 @@ public class UserController {
     }
 
     // ---------- mapper ----------
+    // TP: Used cursor to map User to StudentProfileDto
     private static StudentProfileDto toStudentProfileDto(User u) {
         StudentProfileDto d = new StudentProfileDto();
 
@@ -130,6 +133,7 @@ public class UserController {
     }
 
     // ---------- helpers (no dependency on missing getters) ----------
+    // TP: Used cursor to safely derive internal id from various getter names
     private static Long safeInternalId(User u) {
         Long v = callLong(u, "getId");
         if (v != null) return v;
@@ -140,10 +144,12 @@ public class UserController {
         return 0L;
     }
 
+    // TP: Used cursor to provide null/blank default value helper
     private static String nvl(String v, String def) {
         return (v == null || v.isBlank()) ? def : v;
     }
 
+    // TP: Used cursor to reflectively call string getter
     private static String callString(Object target, String getter) {
         try {
             Method m = target.getClass().getMethod(getter);
@@ -154,6 +160,7 @@ public class UserController {
         }
     }
 
+    // TP: Used cursor to reflectively call long/number getter
     private static Long callLong(Object target, String getter) {
         try {
             Method m = target.getClass().getMethod(getter);
@@ -174,6 +181,7 @@ public class UserController {
      * Get all users (for registrar)
      */
     @GetMapping
+    // TP: Used cursor to list all users (registrar)
     public ResponseEntity<List<User>> getAllUsers(
             @AuthenticationPrincipal OAuth2User principal) {
         
@@ -188,6 +196,7 @@ public class UserController {
 
     /** Activate user */
     @PutMapping("/{userId}/activate")
+    // TP: Used cursor to activate a user
     public ResponseEntity<User> activateUser(
             @PathVariable Long userId,
             @AuthenticationPrincipal OAuth2User principal) {
@@ -206,6 +215,7 @@ public class UserController {
 
     /** Import users from YAML file */
     @PostMapping("/import")
+    // TP: Used cursor to import users from YAML upload
     public ResponseEntity<Map<String, Object>> importUsers(
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal OAuth2User principal) {
@@ -233,6 +243,7 @@ public class UserController {
 
     /** Get user statistics */
     @GetMapping("/statistics")
+    // TP: Used cursor to provide user statistics
     public ResponseEntity<Map<String, Object>> getUserStatistics(
             @AuthenticationPrincipal OAuth2User principal) {
 
@@ -246,6 +257,7 @@ public class UserController {
 
     /** Search users with multiple filters (for registrars and advisors) */
     @GetMapping("/search")
+    // TP: Used cursor to search users with multiple filters
     public ResponseEntity<List<User>> searchUsers(
             @RequestParam(value = "name", required = false) String name,
             @RequestParam(value = "role", required = false) String role,
@@ -268,6 +280,7 @@ public class UserController {
 
     /** Export user data as YAML (for registrars only) */
     @GetMapping("/{userId}/export")
+    // TP: Used cursor to export a user's data in YAML-like structure
     public ResponseEntity<Map<String, Object>> exportUserData(
             @PathVariable Long userId,
             @AuthenticationPrincipal OAuth2User principal) {
@@ -288,6 +301,7 @@ public class UserController {
     }
 
     /** Check if current user is registrar */
+    // TP: Used cursor to check registrar role
     private boolean isRegistrar(OAuth2User principal) {
         if (principal == null) return false;
         String googleId = principal.getName();
@@ -296,6 +310,7 @@ public class UserController {
     }
 
     /** Check if current user is advisor */
+    // TP: Used cursor to check advisor role
     private boolean isAdvisor(OAuth2User principal) {
         if (principal == null) return false;
         String googleId = principal.getName();
@@ -307,6 +322,7 @@ public class UserController {
 
     /** Get user's classes */
     @GetMapping("/{userId}/classes")
+    // TP: Used cursor to fetch user's classes
     public ResponseEntity<List<UserClasses>> getUserClasses(@PathVariable Long userId) {
         try {
             List<UserClasses> classes = userClassesRepository.findByUserId(userId);
@@ -318,6 +334,7 @@ public class UserController {
 
     /** Get user's transfer courses */
     @GetMapping("/{userId}/transfer-courses")
+    // TP: Used cursor to fetch user's transfer courses
     public ResponseEntity<List<UserTransferCourses>> getUserTransferCourses(@PathVariable Long userId) {
         try {
             List<UserTransferCourses> transferCourses = userTransferCoursesRepository.findByUserId(userId);
@@ -329,6 +346,7 @@ public class UserController {
 
     /** Get user's course plan */
     @GetMapping("/{userId}/course-plan")
+    // TP: Used cursor to fetch user's course plan
     public ResponseEntity<List<UserCoursePlan>> getUserCoursePlan(@PathVariable Long userId) {
         try {
             List<UserCoursePlan> coursePlan = userCoursePlanRepository.findByUserId(userId);
@@ -340,6 +358,7 @@ public class UserController {
 
     /** Get user's classes by semester and year */
     @GetMapping("/{userId}/classes/{semester}/{year}")
+    // TP: Used cursor to fetch user's classes by semester/year
     public ResponseEntity<List<UserClasses>> getUserClassesBySemesterAndYear(
             @PathVariable Long userId, 
             @PathVariable String semester, @PathVariable Integer year) {
@@ -354,6 +373,7 @@ public class UserController {
 
     /** Get user's completed classes (with grades) */
     @GetMapping("/{userId}/classes/completed")
+    // TP: Used cursor to fetch user's completed classes
     public ResponseEntity<List<UserClasses>> getCompletedClasses(@PathVariable Long userId) {
         try {
             List<UserClasses> completedClasses = userClassesRepository.findCompletedClassesByUserId(userId);
@@ -365,6 +385,7 @@ public class UserController {
 
     /** Get user's future classes (without grades) */
     @GetMapping("/{userId}/classes/future")
+    // TP: Used cursor to fetch user's future classes
     public ResponseEntity<List<UserClasses>> getFutureClasses(@PathVariable Long userId) {
         try {
             List<UserClasses> futureClasses = userClassesRepository.findFutureClassesByUserId(userId);
@@ -377,6 +398,7 @@ public class UserController {
     /** Drop a class for a user (delete from UserClasses and ClassRoster) */
     @PostMapping("/{userId}/classes/{classId}/drop")
     @Transactional
+    // TP: Used cursor to drop a class and process waitlist
     public ResponseEntity<Map<String, Object>> dropClass(@PathVariable Long userId, @PathVariable Long classId) {
         try {
             // Check if user exists
@@ -491,6 +513,7 @@ public class UserController {
     /** Cancel waitlist for a class (remove from waitlist without affecting enrollment) */
     @PostMapping("/{userId}/classes/{classId}/waitlist/cancel")
     @Transactional
+    // TP: Used cursor to cancel a waitlist entry for a class
     public ResponseEntity<Map<String, Object>> cancelWaitlist(
             @PathVariable Long userId,
             @PathVariable Long classId

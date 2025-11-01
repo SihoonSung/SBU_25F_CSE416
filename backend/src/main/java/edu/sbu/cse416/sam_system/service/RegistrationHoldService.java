@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
+ * TP: Used Cursor to implement registration hold service
  * Service for managing registration holds.
  * 
  * Features:
@@ -19,7 +20,7 @@ import java.util.List;
  * - Verify advisor permissions based on level and academic unit
  * - Check if student has active holds
  * 
- * TP: Used Cursor to implement registration hold service
+ * 
  */
 @Service
 @Transactional

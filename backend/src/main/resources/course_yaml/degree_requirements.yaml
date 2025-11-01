@@ -1,410 +1,1273 @@
 effective_term: "Fall 2025"
-
+requirements_version: "1.0"
+# TP: Used Cursor to implement degree requirements management system: divided major, minor degree requirements
 degree_requirements:
-  - subject_code: "CSE"
-    degree_type: "BS"
-    total_credits_required: 120
-    is_restricted: true
-    gpa_requirement: 2.0
-    admission_requirements:
-      - "CSE 114"
-      - "CSE 214"
-      - "CSE 215"
-      - "CSE 216"
-      - "CSE 220"
-    course_requirements:
-      required_courses:
-        - "CSE 114"
-        - "CSE 214"
-        - "CSE 215"
-        - "CSE 216"
-        - "CSE 220"
-        - "CSE 303"
-        - "CSE 310"
-        - "CSE 316"
-        - "CSE 320"
-        - "CSE 373"
-        - "CSE 416"
-      elective_courses:
-        credits_required: 12
-        courses:
-          - "CSE 300+"
-          - "CSE 400+"
-    sbc_requirements:
-      - "ARTS"
-      - "GLO"
-      - "HUM"
-      - "LANG"
-      - "QPS"
-      - "SBS"
-      - "SNW"
-      - "TECH"
-      - "USA"
-      - "WRT"
-      - "EXP+"
-      - "HFA+"
-      - "SBS+"
-      - "STEM+"
-      - "CER"
-      - "DIV"
-      - "ESI"
-      - "SPK"
-      - "WRTD"
+  - subject_code: CSE
+    is_active: true
+    entries:
+    - degree_type: BS
+      title: "CSE MAJOR"
+      is_restricted: true
+      degree_credits_required: 80
+      total_credits_required: 120
 
-  - subject_code: "PSY"
-    degree_type: "BA"
-    total_credits_required: 120
-    is_restricted: false
-    gpa_requirement: 2.0
-    admission_requirements:
-      - "PSY 103"
-    course_requirements:
-      required_courses:
-        - "PSY 103"
-        - "PSY 201"
-        - "PSY 310"
-        - "PSY 220"
-        - "PSY 230"
-        - "PSY 240"
-        - "PSY 250"
-        - "PSY 260"
-        - "PSY 301"
-        - "PSY 325"
-      elective_courses:
-        credits_required: 15
-        courses:
-          - "PSY 300+"
-          - "PSY 400+"
-    sbc_requirements:
-      - "ARTS"
-      - "GLO"
-      - "HUM"
-      - "LANG"
-      - "QPS"
-      - "SBS"
-      - "SNW"
-      - "TECH"
-      - "USA"
-      - "WRT"
-      - "EXP+"
-      - "HFA+"
-      - "SBS+"
-      - "STEM+"
-      - "CER"
-      - "DIV"
-      - "ESI"
-      - "SPK"
-      - "WRTD"
+      admission:
+        minimum_cumulative_gpa: 3.0
+        minimum_core_avg_gpa: 3.2
+        minimum_core_grade: "B-"
+        retake_in_core: 1
+        core_courses:
+          - { code: "CSE 114" }
+          - { code: "CSE 214" }
+          - { code: "CSE 215" }
 
-  - subject_code: "BIO"
-    degree_type: "BA"
-    total_credits_required: 120
-    is_restricted: false
-    gpa_requirement: 2.0
-    admission_requirements:
-      - "BIO 201"
-      - "BIO 202"
-    course_requirements:
-      required_courses:
-        - "BIO 203"
-        - "BIO 204"
-        - "BIO 205"
-        - "BIO 320"
-        - "BIO 321"
-        - "BIO 325"
-        - "BIO 350"
-        - "BIO 360"
-      elective_courses:
-        credits_required: 6
-        courses:
-          - "BIO 300+"
-          - "BIO 400+"
-    sbc_requirements:
-      - "ARTS"
-      - "GLO"
-      - "HUM"
-      - "LANG"
-      - "QPS"
-      - "SBS"
-      - "SNW"
-      - "TECH"
-      - "USA"
-      - "WRT"
-      - "EXP+"
-      - "HFA+"
-      - "SBS+"
-      - "STEM+"
-      - "CER"
-      - "DIV"
-      - "ESI"
-      - "SPK"
-      - "WRTD"
-
-  - subject_code: "AMS"
-    degree_type: "BS"
-    total_credits_required: 120
-    is_restricted: false
-    gpa_requirement: 2.0
-    admission_requirements:
-      - "AMS 21O"
-      - "AMS 261"
-    course_requirements:
-      required_courses:
-        - "AMS 151"
-        - "AMS 161"
-        - "AMS 210"
-        - "AMS 261"
-        - "AMS 301"
-        - "AMS 310"
-        - "AMS 315"
-        - "AMS 361"
-      elective_courses:
-        credits_required: 27
-        courses:
-          - "AMS 300+"
-          - "AMS 400+"
-    sbc_requirements:
-      - "ARTS"
-      - "GLO"
-      - "HUM"
-      - "LANG"
-      - "QPS"
-      - "SBS"
-      - "SNW"
-      - "TECH"
-      - "USA"
-      - "WRT"
-      - "EXP+"
-      - "HFA+"
-      - "SBS+"
-      - "STEM+"
-      - "CER"
-      - "DIV"
-      - "ESI"
-      - "SPK"
-      - "WRTD"
-
-  - subject_code: "POL"
-    degree_type: "BA"
-    total_credits_required: 121
-    is_restricted: false
-    gpa_requirement: 2.0
-    admission_requirements:
-      - "POL 101"
-    course_requirements:
-      required_courses:
-        - "POL 101"
-        - "POL 102"
-        - "POL 103"
-      concentration_requirements:
-        credits_required: 12
-        concentrations:
-          comparative_politics_international_relations:
+      course_requirements:
+        groups:
+          # Required Introductory Courses
+          - id: intro_courses
+            type: all_of
             courses:
-              - "POL 214"
-              - "POL 216"
-              - "POL 302"
-              - "POL 303"
-              - "POL 304"
-              - "POL 305"
-              - "POL 308"
-              - "POL 309"
-              - "POL 310"
-              - "POL 311"
-              - "POL 313"
-              - "POL 334"
-              - "POL 336"
-              - "POL 337"
-              - "POL 338"
-              - "POL 339"
-              - "POL 350"
-              - "POL 365"
-              - "POL 371"
-              - "POL 374"
-              - "POL 380"
-              - "PHI 367"
-              - "POL 390"
-              - "POL 401"
-          american_government_law_public_policy:
+              - { code: "CSE 114" }
+              - { code: "CSE 214" }
+              - { code: "CSE 215" }
+              - { code: "CSE 216" }
+              - { code: "CSE 220" }
+
+          # Required Advanced Courses
+          - id: advanced_fixed
+            type: all_of
             courses:
-              - "POL 317"
-              - "POL 318"
-              - "POL 319"
-              - "POL 320"
-              - "POL 322"
-              - "POL 323"
-              - "POL 324"
-              - "POL 325"
-              - "POL 327"
-              - "POL 328"
-              - "POL 330"
-              - "POL 332"
-              - "POL 333"
-              - "POL 336"
-              - "POL 344"
-              - "POL 347"
-              - "POL 349"
-              - "POL 350"
-              - "POL 351"
-              - "POL 352"
-              - "POL 353"
-              - "POL 359"
-              - "POL 365"
-              - "POL 366"
-              - "POL 367"
-              - "POL 368"
-              - "POL 369"
-              - "POL 371"
-              - "PHI 277"
-              - "PHI 375"
-              - "PHI 377"
-              - "POL 390"
-              - "POL 401"
-          political_behavior_psychology:
+              - { code: "CSE 303" }
+              - { code: "CSE 310" }
+              - { code: "CSE 316" }
+              - { code: "CSE 320" }
+              - { code: "CSE 373" }
+              - { code: "CSE 416" }
+
+          # Calculus sequence (choose one full sequence)
+          - id: calculus_sequence
+            type: one_of_sequences
+            sequences:
+              - [ { code: "AMS 151" }, { code: "AMS 161" } ]
+              - [ { code: "MAT 125" }, { code: "MAT 126" }, { code: "MAT 127" } ]
+              - [ { code: "MAT 131" }, { code: "MAT 132" } ]
+
+          # Linear algebra choice
+          - id: linear_algebra
+            type: one_of
             courses:
-              - "POL 270"
-              - "POL 303"
-              - "POL 317"
-              - "POL 318"
-              - "POL 323"
-              - "POL 344"
-              - "POL 346"
-              - "POL 347"
-              - "POL 348"
-              - "POL 349"
-              - "POL 350"
-              - "POL 351"
-              - "POL 352"
-              - "POL 353"
-              - "POL 367"
-              - "POL 368"
-              - "POL 369"
-              - "POL 371"
-              - "POL 373"
-              - "POL 375"
-              - "PHI 379"
-              - "POL 390"
-              - "POL 401"
-      elective_courses:
-        credits_required: 12
-        courses:
-          - "POL 200+"
-          - "POL 300+"
-          - "POL 400+"
-    sbc_requirements:
-      - "ARTS"
-      - "GLO"
-      - "HUM"
-      - "LANG"
-      - "QPS"
-      - "SBS"
-      - "SNW"
-      - "TECH"
-      - "USA"
-      - "WRT"
-      - "STAS"
-      - "EXP+"
-      - "HFA+"
-      - "SBS+"
-      - "STEM+"
-      - "CER"
-      - "DIV"
-      - "ESI"
-      - "SPK"
-      - "WRTD"
+              - { code: "MAT 211" }
+              - { code: "AMS 210" }
 
-  - subject_code: "ECO"
-    degree_type: "BA"
-    total_credits_required: 121
-    is_restricted: false
-    gpa_requirement: 2.0
-    admission_requirements:
-      - "ECO 110"
-      - "ECO 111"
-    course_requirements:
-      required_courses:
-        - "ECO 110"
-        - "ECO 111"
-        - "ECO 303"
-        - "ECO 305"
-        - "ECO 320"
-        - "ECO 321"
-      mathematics_requirements:
-        credits_required: 3
-        options:
-          - "MAT 125"
-          - "MAT 130 + MAT 125"
-          - "AMS 151"
-          - "Math placement level 6+"
-          - "Higher level calculus"
-      elective_courses:
-        credits_required: 15
-        courses:
-          - "ECO 300+"
-          - "ECO 400+"
-          - "Pre-approved electives"
-    sbc_requirements:
-      - "ARTS"
-      - "GLO"
-      - "HUM"
-      - "LANG"
-      - "QPS"
-      - "SBS"
-      - "SNW"
-      - "TECH"
-      - "USA"
-      - "WRT"
-      - "EXP+"
-      - "HFA+"
-      - "SBS+"
-      - "STEM+"
-      - "CER"
-      - "DIV"
-      - "ESI"
-      - "SPK"
-      - "WRTD"
+          # Statistics requirement (both courses required)
+          - id: statistics
+            type: all_of
+            courses:
+              - { code: "AMS 301" }
+              - { code: "AMS 310" }
 
+          # Natural Science Requirements (items 7 and 8: at least 9 credits total)
+          # Must include at least one lab sequence from item 7, plus additional courses from items 7 and 8
+          - id: natural_science_requirement
+            type: electives
+            credits_required: 9
+            sequences:
+              - [ { code: "BIO 201" }, { code: "BIO 204" } ]
+              - [ { code: "BIO 202" }, { code: "BIO 204" } ]
+              - [ { code: "BIO 203" }, { code: "BIO 204" } ]
+              - [ { code: "CHE 131" }, { code: "CHE 133" } ]
+              - [ { code: "CHE 152" }, { code: "CHE 154" } ]
+              - [ { code: "PHY 126" }, { code: "PHY 133" } ]
+              - [ { code: "PHY 131" }, { code: "PHY 133" } ]
+              - [ { code: "PHY 141" }, { code: "PHY 133" } ]
+            additional_courses:
+              - { code: "AST 203" }
+              - { code: "AST 205" }
+              - { code: "CHE 132" }
+              - { code: "CHE 321" }
+              - { code: "CHE 322" }
+              - { code: "CHE 331" }
+              - { code: "CHE 332" }
+              - { code: "GEO 102" }
+              - { code: "GEO 103" }
+              - { code: "GEO 112" }
+              - { code: "GEO 113" }
+              - { code: "GEO 122" }
+              - { code: "PHY 125" }
+              - { code: "PHY 127" }
+              - { code: "PHY 132" }
+              - { code: "PHY 134" }
+              - { code: "PHY 142" }
+              - { code: "PHY 251" }
+              - { code: "PHY 252" }
 
-  - subject_code: "BIO"
-    degree_type: "BA"
-    total_credits_required: 120
-    is_restricted: false
-    gpa_requirement: 2.0
-    admission_requirements:
-      - "BIO 201"
-      - "BIO 202"
-    course_requirements:
-      required_courses:
-        - "BIO 203"
-        - "BIO 204"
-        - "BIO 205"
-        - "BIO 320"
-        - "BIO 321"
-        - "BIO 325"
-        - "BIO 350"
-        - "BIO 360"
-      elective_courses:
-        credits_required: 6
-        courses:
-          - "BIO 300+"
-          - "BIO 400+"
-    sbc_requirements:
-      - "ARTS"
-      - "GLO"
-      - "HUM"
-      - "LANG"
-      - "QPS"
-      - "SBS"
-      - "SNW"
-      - "TECH"
-      - "USA"
-      - "WRT"
-      - "EXP+"
-      - "HFA+"
-      - "SBS+"
-      - "STEM+"
-      - "CER"
-      - "DIV"
-      - "ESI"
-      - "SPK"
-      - "WRTD"
+          # Professional Ethics (item 9)
+          - id: professional_ethics
+            type: all_of
+            courses:
+              - { code: "CSE 312" }
+
+          # Upper-Division Writing Requirement (item 10)
+          - id: upper_division_writing
+            type: all_of
+            courses:
+              - { code: "CSE 300" }
+
+          # Upper-division CSE electives
+          - id: cse_upper_electives
+            type: electives
+            credits_required: 12   # four upper-division technical CSE electives
+            courses:
+              - { code: "CSE 3xx+" }  # placeholder rule for frontend filtering
+            excluded_courses:
+              - { code: "CSE 301" }  # non-technical course
+              - { code: "CSE 475" }  # teaching practica
+    
+      sbc_categories:
+        - sbc: "ARTS"
+        - sbc: "GLO"
+        - sbc: "HUM"
+        - sbc: "LANG"
+        - sbc: "USA"
+        - sbc: "WRT"
+        - sbc: "HFA+"
+        - sbc: "CER"
+        - sbc: "DIV"
+
+        - sbc: "QPS"
+          required_major_courses:
+            - { code: "AMS 151" }
+            - { code: "AMS 161" }
+
+        - sbc: "SNW"
+          optional_major_courses:
+            - { code: "BIO 201" }
+            - { code: "CHE 131" }
+            - { code: "CHE 132" }
+            - { code: "CHE 152" }
+            - { code: "PHY 125" }
+            - { code: "PHY 126" }
+            - { code: "PHY 127" }
+            - { code: "PHY 131" }
+            - { code: "PHY 132" }
+            - { code: "PHY 141" }
+            - { code: "PHY 142" }
+
+        - sbc: "TECH"
+          required_major_courses:
+            - { code: "CSE 114" }
+          optional_major_courses:
+            - { code: "CSE 160" }
+
+        - sbc: "STAS"
+          required_major_courses:
+            - { code: "CSE 312" }
+
+        - sbc: "EXP+"
+          required_major_courses_partial:
+            - { code: "CSE 316" }
+            - { code: "CSE 356" }
+            - { code: "CSE 416" }
+          optional_major_courses_partial:
+            - { code: "CSE 306" }
+
+        - sbc: "SBS+"
+          required_major_courses_partial:
+            - { code: "CSE 316" }
+            - { code: "CSE 416" }
+          optional_major_courses_partial:
+            - { code: "CSE 306" }
+
+        - sbc: "STEM+"
+          required_major_courses_partial:
+            - { code: "AMS 310" }
+            - { code: "CSE 316" }
+            - { code: "CSE 416" }
+          optional_major_courses_partial:
+            - { code: "AMS 210" }
+            - { code: "AST 203" }
+            - { code: "AST 205" }
+            - { code: "BIO 202" }
+            - { code: "BIO 203" }
+            - { code: "CHE 321" }
+            - { code: "CHE 331" }
+            - { code: "CSE 306" }
+            - { code: "MAT 211" }
+            - { code: "PHY 251" }
+            - { code: "PSY 260" }
+
+        - sbc: "ESI"
+          required_major_courses:
+            - { code: "CSE 312" }
+          required_major_courses_partial:
+            - { code: "CSE 316" }
+            - { code: "CSE 416" }
+          optional_major_courses_partial:
+            - { code: "CSE 306" }
+
+        - sbc: "SPK"
+          required_major_courses:
+            - { code: "CSE 300" }
+
+        - sbc: "WRTD"
+          required_major_courses:
+            - { code: "CSE 300" }
+
+    - degree_type: MINOR
+      title: "CSE MINOR"
+      is_restricted: true
+      degree_credits_required: 21
+
+      admission:
+        minimum_cumulative_gpa: 3.0
+        minimum_core_avg_gpa: 3.2
+        minimum_core_grade: "B-"
+        retake_in_core: 1
+        core_courses:
+          - { code: "CSE 114" }
+          - { code: "CSE 214" }
+          - { code: "CSE 215" }
+
+      course_requirements:
+        groups:
+          # Required courses
+          - id: minor_core
+            type: all_of
+            courses:
+              - { code: "CSE 114" }
+              - { code: "CSE 214" }
+              - { code: "CSE 216" }
+
+          # Upper-division CSE electives (four additional courses, at least 9 credits total)
+          - id: minor_electives
+            type: electives
+            credits_required: 9
+            courses:
+              - { code: "CSE 3xx+" }  # placeholder rule for frontend filtering
+            excluded_courses:
+              - { code: "CSE 301" }  # non-technical course (Note: CSE 301 cannot be used)
+              - { code: "CSE 312" } 
+              - { code: "CSE 475" }  # teaching practica
+              - { code: "CSE 487" }  # cannot be used for minor
+              - { code: "CSE 488" }  # cannot be used for minor
+
+  - subject_code: BIO
+    is_active: true
+    entries:
+    - degree_type: BA
+      title: "BIO MAJOR"
+      is_restricted: true
+      degree_credits_required: 55
+      total_credits_required: 120
+
+      course_requirements:
+        groups:
+          # Chemistry Sequence Lecture Options
+          - id: chemistry_lecture_sequence
+            type: one_of_sequences
+            sequences:
+              - [ { code: "CHE 129" }, { code: "CHE 130" }, { code: "CHE 132" } ]
+              - [ { code: "CHE 131" }, { code: "CHE 132" } ]
+              - [ { code: "CHE 152" } ]
+
+          # Chemistry Sequence Laboratory Options
+          - id: chemistry_lab_sequence
+            type: one_of_sequences
+            sequences:
+              - [ { code: "CHE 133" }, { code: "CHE 134" } ]
+              - [ { code: "CHE 154" } ]
+
+          # Organic Chemistry Lecture Options
+          - id: organic_chemistry_lecture_sequence
+            type: one_of_sequences
+            sequences:
+              - [ { code: "CHE 321" }, { code: "CHE 322" } ]
+              - [ { code: "CHE 321" }, { code: "CHE 326" } ]
+              - [ { code: "CHE 331" }, { code: "CHE 332" } ]
+
+          # Organic Chemistry Lab Options
+          - id: organic_chemistry_lab
+            type: one_of
+            courses:
+              - { code: "CHE 327" }
+              - { code: "CHE 383" }
+
+          # Calculus Course Options
+          - id: calculus_requirement
+            type: one_of
+            courses:
+              - { code: "MAT 125" }
+              - { code: "MAT 130" }
+              - { code: "MAT 131" }
+              - { code: "MAT 141" }
+              - { code: "MAT 171" }
+              - { code: "AMS 151" }
+
+          # Physics Sequence Options (Note: Classical Physics options require Calculus B or higher)
+          - id: physics_sequence_life_sciences
+            type: one_of_sequences
+            sequences:
+              - [ { code: "PHY 121" }, { code: "PHY 122" } ]
+              - [ { code: "PHY 125" }, { code: "PHY 126" }, { code: "PHY 127" }, { code: "PHY 133" }, { code: "PHY 134" } ]
+              - [ { code: "PHY 131" }, { code: "PHY 133" }, { code: "PHY 132" }, { code: "PHY 134" } ]
+
+          # Statistics Course Options
+          - id: statistics_requirement
+            type: one_of
+            courses:
+              - { code: "BIO 211" }
+              - { code: "AMS 110" }
+              - { code: "AMS 310" }
+              - { code: "EBH 230" }
+
+          # Core Courses in Biology
+          - id: bio_core_lectures
+            type: all_of
+            courses:
+              - { code: "BIO 201" }
+              - { code: "BIO 202" }
+              - { code: "BIO 203" }
+
+          # Core Biology Lab Sequence
+          - id: bio_core_lab_sequence
+            type: one_of_sequences
+            sequences:
+              - [ { code: "BIO 204" }, { code: "BIO 205" } ]
+              - [ { code: "BIO 204" }, { code: "BIO 207" } ]
+
+          # Advanced Courses in Biology (at least one)
+          - id: advanced_bio_requirement
+            type: one_of
+            courses:
+              - { code: "BIO 320" }
+              - { code: "BIO 321" }
+              - { code: "BIO 354" }
+              - { code: "EBH 302" }
+
+          # Advanced Biology Electives (two additional)
+          - id: advanced_bio_electives
+            type: electives
+            credits_required: 6
+            courses:
+              - { code: "BIO 3xx+" }
+            excluded_courses:
+              - { code: "BIO 320" }
+              - { code: "BIO 321" }
+              - { code: "BIO 484" }
+              - { code: "BIO 486" }
+              - { code: "BIO 487" }
+              - { code: "BIO 488" }
+              - { code: "BIO 489" }
+              - { code: "MAR 487" }
+              - { code: "MAR 488" }
+              - { code: "ATM 487" }
+              - { code: "BME 499" }
+
+      sbc_categories:
+        - sbc: "ARTS"
+        - sbc: "GLO"
+        - sbc: "HUM"
+        - sbc: "LANG"
+        - sbc: "SBS"
+        - sbc: "USA"
+        - sbc: "WRT"
+        - sbc: "HFA+"
+        - sbc: "CER"
+        - sbc: "DIV"
+
+        - sbc: "QPS"
+          optional_major_courses:
+            - { code: "AMS 110" }
+            - { code: "AMS 151" }
+            - { code: "EBH 230" }
+            - { code: "MAT 125" }
+            - { code: "MAT 131" }
+
+        - sbc: "SNW"
+          required_major_courses:
+            - { code: "BIO 201" }
+          optional_major_courses:
+            - { code: "CHE 129" }
+            - { code: "CHE 131" }
+            - { code: "CHE 132" }
+            - { code: "CHE 152" }
+            - { code: "PHY 121" }
+            - { code: "PHY 122" }
+            - { code: "PHY 125" }
+            - { code: "PHY 126" }
+            - { code: "PHY 127" }
+            - { code: "PHY 131" }
+            - { code: "PHY 132" }
+            - { code: "PHY 141" }
+            - { code: "PHY 142" }
+
+        - sbc: "TECH"
+          optional_major_courses:
+            - { code: "BIO 312" }
+
+        - sbc: "STAS"
+          optional_major_courses:
+            - { code: "BIO 336" }
+            - { code: "BIO 358" }
+            - { code: "BIO 371" }
+            - { code: "BIO 385" }
+            - { code: "BIO 386" }
+
+        - sbc: "EXP+"
+          optional_major_courses:
+            - { code: "BIO 444" }
+            - { code: "BIO 475" }
+            - { code: "BIO 477" }
+            - { code: "BIO 484" }
+            - { code: "BIO 486" }
+            - { code: "BIO 487" }
+            - { code: "BIO 488" }
+            - { code: "BIO 489" }
+
+        - sbc: "STEM+"
+          required_major_courses:
+            - { code: "BIO 202" }
+            - { code: "BIO 203" }
+          optional_major_courses:
+            - { code: "AMS 310" }
+            - { code: "BIO 211" }
+            - { code: "BIO 342" }
+            - { code: "BIO 347" }
+            - { code: "BIO 351" }
+            - { code: "BIO 353" }
+            - { code: "BIO 356" }
+            - { code: "BIO 383" }
+            - { code: "BIO 384" }
+            - { code: "CHE 321" }
+            - { code: "CHE 331" }
+
+        - sbc: "ESI"
+          optional_major_courses:
+            - { code: "BIO 312" }
+            - { code: "BIO 319" }
+            - { code: "BIO 327" }
+            - { code: "BIO 335" }
+            - { code: "BIO 352" }
+            - { code: "BIO 358" }
+            - { code: "BIO 365" }
+            - { code: "BIO 446" }
+            - { code: "BIO 447" }
+            - { code: "BIO 449" }
+            - { code: "CHE 383" }
+
+        - sbc: "SPK"
+          optional_major_courses:
+            - { code: "BIO 458" }
+
+        - sbc: "WRTD"
+          optional_major_courses:
+            - { code: "BIO 459" }
+
+    - degree_type: MINOR
+      title: "BIO MINOR"
+      is_restricted: true
+      degree_credits_required: 20
+
+      admission:
+        excluded_majors:
+          - subject_code: "BIO"
+          - subject_code: "BCH"
+          - subject_code: "EBH"
+          - subject_code: "BCP"
+          - subject_code: "MAR"
+          - subject_code: "MVB"
+
+      course_requirements:
+        groups:
+          # At least two of BIO 201, 202, 203
+          - id: minor_fundamentals
+            type: two_of
+            courses:
+              - { code: "BIO 201" }
+              - { code: "BIO 202" }
+              - { code: "BIO 203" }
+
+          # BIO 204 and BIO 205/BIO 207
+          - id: minor_lab_sequence
+            type: one_of_sequences
+            sequences:
+              - [ { code: "BIO 204" }, { code: "BIO 205" } ]
+              - [ { code: "BIO 204" }, { code: "BIO 207" } ]
+
+          # At least 9 credits of 300-level BIO or EBH courses
+          - id: minor_advanced_courses
+            type: electives
+            credits_required: 9
+            courses:
+              - { code: "BIO 3xx+" }
+              - { code: "EBH 3xx+" }
+
+  - subject_code: PSY
+    is_active: true
+    entries:
+    - degree_type: BA
+      title: "PSY MAJOR"
+      is_restricted: false
+      degree_credits_required: 34
+      total_credits_required: 120
+
+      course_requirements:
+        groups:
+          # Core Program
+          - id: psy_core_intro
+            type: all_of
+            courses:
+              - { code: "PSY 103" }
+
+          # Statistics requirement
+          - id: psy_statistics
+            type: one_of
+            courses:
+              - { code: "PSY 201" }
+              - { code: "AMS 102" }
+              - { code: "AMS 110" }
+              - { code: "AMS 310" }
+              - { code: "BUS 215" }
+              - { code: "ECO 320" }
+              - { code: "POL 201" }
+              - { code: "SOC 202" }
+
+          # Research and Writing
+          - id: psy_research_writing
+            type: all_of
+            courses:
+              - { code: "PSY 310" }
+
+          # Survey Courses - Group A
+          - id: psy_survey_a
+            type: one_of
+            courses:
+              - { code: "PSY 220" }
+              - { code: "PSY 230" }
+              - { code: "PSY 240" }
+
+          # Survey Courses - Group B
+          - id: psy_survey_b
+            type: one_of
+            courses:
+              - { code: "PSY 250" }
+              - { code: "PSY 260" }
+
+          # Third Survey Course from A or B
+          - id: psy_survey_third
+            type: one_of
+            courses:
+              - { code: "PSY 220" }
+              - { code: "PSY 230" }
+              - { code: "PSY 240" }
+              - { code: "PSY 250" }
+              - { code: "PSY 260" }
+
+          # One course numbered 200 or higher (excluding specified courses)
+          - id: psy_advanced_one
+            type: electives
+            credits_required: 3
+            courses:
+              - { code: "PSY 2xx+" }
+              - { code: "PSY 3xx+" }
+            excluded_courses:
+              - { code: "PSY 201" }
+              - { code: "PSY 273" }
+              - { code: "PSY 283" }
+              - { code: "PSY 310" }
+              - { code: "PSY 399" }
+              - { code: "PSY 447" }
+              - { code: "PSY 475" }
+              - { code: "PSY 476" }
+              - { code: "PSY 487" }
+              - { code: "PSY 488" }
+              - { code: "PSY 495" }
+              - { code: "PSY 496" }
+
+          # Four more courses from 301-383
+          - id: psy_advanced_four
+            type: electives
+            credits_required: 12
+            courses:
+              - { code: "PSY 3xx+" }
+            excluded_courses:
+              - { code: "PSY 310" }
+
+      sbc_categories:
+        - sbc: "ARTS"
+        - sbc: "GLO"
+        - sbc: "HUM"
+        - sbc: "LANG"
+        - sbc: "SBS"
+        - sbc: "USA"
+        - sbc: "WRT"
+        - sbc: "HFA+"
+        - sbc: "CER"
+        - sbc: "DIV"
+
+        - sbc: "QPS"
+          optional_major_courses:
+            - { code: "AMS 102" }
+            - { code: "AMS 110" }
+            - { code: "MAT 118" }
+            - { code: "MAT 122" }
+            - { code: "MAT 123" }
+            - { code: "MAT 125" }
+            - { code: "MAT 126" }
+            - { code: "MAT 131" }
+            - { code: "MAT 132" }
+            - { code: "POL 201" }
+            - { code: "PSY 201" }
+            - { code: "SOC 202" }
+
+        - sbc: "SNW"
+          optional_major_courses:
+            - { code: "ANT 101" }
+
+        - sbc: "STAS"
+          required_major_courses:
+            - { code: "PSY 103" }
+
+        - sbc: "EXP+"
+          optional_major_courses:
+            - { code: "PSY 444" }
+            - { code: "PSY 273" }
+            - { code: "BUS 487" }
+
+        - sbc: "SBS+"
+          required_major_courses:
+            - { code: "PSY 103" }
+          optional_major_courses:
+            - { code: "PSY 220" }
+            - { code: "PSY 230" }
+            - { code: "PSY 240" }
+            - { code: "PSY 250" }
+            - { code: "PSY 260" }
+            - { code: "PSY 334" }
+            - { code: "PSY 347" }
+
+        - sbc: "STEM+"
+          optional_major_courses:
+            - { code: "AMS 310" }
+            - { code: "PSY 250" }
+            - { code: "PSY 260" }
+
+        - sbc: "CER"
+          required_major_courses:
+            - { code: "PSY 103" }
+
+        - sbc: "DIV"
+          optional_major_courses:
+            - { code: "PSY 240" }
+            - { code: "PSY 342" }
+
+        - sbc: "ESI"
+          required_major_courses:
+            - { code: "PSY 310" }
+          optional_major_courses:
+            - { code: "BUS 358" }
+            - { code: "PSY 382" }
+            - { code: "WRT 305" }
+            - { code: "WRT 380" }
+
+        - sbc: "SPK"
+          required_major_courses:
+            - { code: "PSY 310" }
+
+        - sbc: "WRTD"
+          required_major_courses:
+            - { code: "PSY 310" }
+          optional_major_courses:
+            - { code: "PSY 382" }
+            - { code: "PSY 459" }
+
+  - subject_code: ECO
+    is_active: true
+    entries:
+    - degree_type: BA
+      title: "ECO MAJOR"
+      is_restricted: false
+      degree_credits_required: 46
+      total_credits_required: 120
+
+      course_requirements:
+        groups:
+          # Introduction to Economics
+          - id: eco_intro
+            type: all_of
+            courses:
+              - { code: "ECO 110" }
+              - { code: "ECO 111" }
+
+          # Intermediate Economics
+          - id: eco_intermediate
+            type: all_of
+            courses:
+              - { code: "ECO 303" }
+              - { code: "ECO 305" }
+              - { code: "ECO 320" }
+              - { code: "ECO 321" }
+
+          # Five additional courses at 300+ level (with one from specified list)
+          - id: eco_advanced_five
+            type: electives
+            credits_required: 15
+            courses:
+              - { code: "ECO 3xx+" }
+            excluded_courses:
+              - { code: "ECO 359" }
+              - { code: "ECO 459" }
+
+          # One additional course in economics or pre-approved electives
+          - id: eco_additional_one
+            type: electives
+            credits_required: 3
+            courses:
+              - { code: "ECO 3xx+" }
+              - { code: "ECO 4xx+" }
+            excluded_courses:
+              - { code: "ECO 359" }
+              - { code: "ECO 459" }
+
+          # Mathematics requirement
+          - id: eco_mathematics
+            type: one_of
+            courses:
+              - { code: "MAT 125" }
+              - { code: "MAT 130" }
+              - { code: "AMS 151" }
+
+      sbc_categories:
+        - sbc: "ARTS"
+        - sbc: "GLO"
+        - sbc: "HUM"
+        - sbc: "LANG"
+        - sbc: "SBS"
+          required_major_courses:
+            - { code: "ECO 110" }
+            - { code: "ECO 111" }
+
+        - sbc: "SNW"
+        - sbc: "TECH"
+        - sbc: "USA"
+        - sbc: "WRT"
+        - sbc: "STAS"
+          optional_major_courses:
+            - { code: "ECO 373" }
+
+        - sbc: "EXP+"
+          optional_major_courses_partial:
+            - { code: "ECO 475" }
+            - { code: "ECO 476" }
+            - { code: "ECO 488" }
+
+        - sbc: "HFA+"
+        - sbc: "SBS+"
+          required_major_courses:
+            - { code: "ECO 303" }
+            - { code: "ECO 305" }
+          optional_major_courses:
+            - { code: "ECO 327" }
+            - { code: "ECO 334" }
+            - { code: "ECO 355" }
+
+        - sbc: "STEM+"
+        - sbc: "CER"
+        - sbc: "DIV"
+        - sbc: "ESI"
+        - sbc: "SPK"
+
+        - sbc: "QPS"
+          optional_major_courses:
+            - { code: "AMS 151" }
+            - { code: "MAT 125" }
+
+        - sbc: "WRTD"
+          required_major_courses:
+            - { code: "ECO 359" }
+          optional_major_courses:
+            - { code: "ECO 459" }
+
+  - subject_code: AMS
+    is_active: true
+    entries:
+    - degree_type: BS
+      title: "AMS MAJOR"
+      is_restricted: true
+      degree_credits_required: 46
+      total_credits_required: 120
+
+      admission:
+        minimum_cumulative_gpa: 2.8
+        minimum_core_avg_gpa: 2.8
+        minimum_core_grade: "B-"
+        retake_in_core: 1
+        core_courses:
+          - { code: "AMS 261" }
+          - { code: "MAT 203" }
+        alternative_core_courses:
+          - { code: "AMS 210" }
+          - { code: "MAT 211" }
+
+      course_requirements:
+        groups:
+          # Calculus sequence
+          - id: ams_calculus_sequence
+            type: one_of_sequences
+            sequences:
+              - [ { code: "AMS 151" }, { code: "AMS 161" } ]
+              - [ { code: "MAT 125" }, { code: "MAT 126" }, { code: "MAT 127" } ]
+              - [ { code: "MAT 131" }, { code: "MAT 132" } ]
+
+          # Linear Algebra
+          - id: ams_linear_algebra
+            type: one_of
+            courses:
+              - { code: "AMS 210" }
+              - { code: "MAT 211" }
+
+          # Calculus III
+          - id: ams_calculus_iii
+            type: one_of
+            courses:
+              - { code: "AMS 261" }
+              - { code: "MAT 203" }
+
+          # Computing course
+          - id: ams_computing
+            type: one_of
+            courses:
+              - { code: "AMS 325" }
+              - { code: "CSE 101" }
+              - { code: "CSE 114" }
+              - { code: "ESG 111" }
+
+          # AMS 301 required
+          - id: ams_301_required
+            type: all_of
+            courses:
+              - { code: "AMS 301" }
+
+          # Probability and Statistics
+          - id: ams_probability_stats
+            type: one_of
+            courses:
+              - { code: "AMS 310" }
+              - { code: "AMS 311" }
+
+          # Differential Equations
+          - id: ams_differential_eq
+            type: one_of
+            courses:
+              - { code: "AMS 315" }
+              - { code: "AMS 361" }
+              - { code: "MAT 303" }
+
+          # Additional 27 credits of 300+ level courses
+          - id: ams_advanced_courses
+            type: electives
+            credits_required: 18
+            courses:
+              - { code: "AMS 3xx+" }
+              - { code: "AMS 4xx+" }
+              - { code: "ECO 321" }
+              - { code: "ECO 348" }
+              - { code: "CSE 302+" }
+              - { code: "MAT 310+" }
+
+      sbc_categories:
+        - sbc: "ARTS"
+        - sbc: "GLO"
+        - sbc: "HUM"
+        - sbc: "LANG"
+        - sbc: "SBS"
+        - sbc: "SNW"
+        - sbc: "USA"
+        - sbc: "WRT"
+        - sbc: "STAS"
+          optional_major_courses:
+            - { code: "MAT 336" }
+
+        - sbc: "EXP+"
+          optional_major_courses:
+            - { code: "AMS 333" }
+            - { code: "AMS 394" }
+            - { code: "AMS 412" }
+            - { code: "AMS 475" }
+            - { code: "AMS 476" }
+            - { code: "AMS 487" }
+            - { code: "AMS 488" }
+
+        - sbc: "HFA+"
+        - sbc: "SBS+"
+          optional_major_courses:
+            - { code: "AMS 316" }
+            - { code: "AMS 335" }
+            - { code: "AMS 341" }
+            - { code: "AMS 342" }
+
+        - sbc: "STEM+"
+          required_major_courses:
+            - { code: "AMS 301" }
+          optional_major_courses:
+            - { code: "AMS 210" }
+            - { code: "AMS 261" }
+            - { code: "MAT 211" }
+            - { code: "MAT 203" }
+            - { code: "AMS 310" }
+            - { code: "AMS 361" }
+            - { code: "MAT 303" }
+
+        - sbc: "CER"
+          optional_major_courses:
+            - { code: "AMS 315" }
+            - { code: "AMS 394" }
+            - { code: "AMS 412" }
+
+        - sbc: "DIV"
+        - sbc: "ESI"
+          optional_major_courses:
+            - { code: "AMS 315" }
+            - { code: "AMS 394" }
+            - { code: "AMS 412" }
+
+        - sbc: "SPK"
+          optional_major_courses:
+            - { code: "AMS 300" }
+            - { code: "AMS 313" }
+            - { code: "AMS 458" }
+            - { code: "AMS 475" }
+            - { code: "AMS 476" }
+            - { code: "MAT 336" }
+
+        - sbc: "QPS"
+          required_major_courses:
+            - { code: "AMS 151" }
+            - { code: "AMS 161" }
+
+        - sbc: "TECH"
+          optional_major_courses:
+            - { code: "CSE 101" }
+            - { code: "CSE 114" }
+            - { code: "MAT 331" }
+
+        - sbc: "WRTD"
+          optional_major_courses:
+            - { code: "AMS 300" }
+            - { code: "AMS 313" }
+            - { code: "AMS 318" }
+            - { code: "AMS 333" }
+            - { code: "AMS 459" }
+            - { code: "AMS 487" }
+            - { code: "AMS 488" }
+            - { code: "MAT 336" }
+
+    - degree_type: MINOR
+      title: "AMS MINOR"
+      is_restricted: true
+      degree_credits_required: 18
+
+      course_requirements:
+        groups:
+          # Calculus sequence
+          - id: ams_minor_calculus
+            type: one_of_sequences
+            sequences:
+              - [ { code: "AMS 151" }, { code: "AMS 161" } ]
+              - [ { code: "MAT 125" }, { code: "MAT 126" }, { code: "MAT 127" } ]
+              - [ { code: "MAT 131" }, { code: "MAT 132" } ]
+              - [ { code: "MAT 141" }, { code: "MAT 142" } ]
+
+          # Linear Algebra
+          - id: ams_minor_linear_algebra
+            type: one_of
+            courses:
+              - { code: "AMS 210" }
+              - { code: "MAT 211" }
+
+          # Core AMS courses
+          - id: ams_minor_core
+            type: all_of
+            courses:
+              - { code: "AMS 301" }
+
+          # Probability and Statistics
+          - id: ams_minor_case_probability
+            type: one_of
+            courses:
+              - { code: "AMS 310" }
+              - { code: "AMS 311" }
+
+          # Three additional 300+ level AMS courses
+          - id: ams_minor_electives
+            type: electives
+            credits_required: 9
+            courses:
+              - { code: "AMS 3xx+" }
+              - { code: "AMS 4xx+" }
+            excluded_courses:
+              - { code: "AMS 300" }
+              - { code: "AMS 301" }
+              - { code: "AMS 310" }
+              - { code: "AMS 311" }
+
+  - subject_code: POL
+    is_active: true
+    entries:
+    - degree_type: BA
+      title: "POL MAJOR"
+      is_restricted: false
+      degree_credits_required: 42
+      total_credits_required: 120
+
+      course_requirements:
+        groups:
+          # Required courses
+          - id: pol_required
+            type: all_of
+            courses:
+              - { code: "POL 101" }
+              - { code: "POL 102" }
+              - { code: "POL 103" }
+
+          # Concentration (12 credits from one of three concentrations)
+          - id: pol_concentration
+            type: electives
+            credits_required: 12
+            courses:
+              - { code: "POL 2xx+" }
+              - { code: "POL 3xx+" }
+              - { code: "POL 4xx+" }
+
+          # Political Science electives
+          - id: pol_electives
+            type: electives
+            credits_required: 12
+            courses:
+              - { code: "POL 2xx+" }
+              - { code: "POL 3xx+" }
+              - { code: "POL 4xx+" }
+            excluded_courses:
+              - { code: "POL 201" }
+              - { code: "POL 475" }
+              - { code: "POL 476" }
+
+          # Methodology requirement
+          - id: pol_methodology
+            type: one_of
+            courses:
+              - { code: "POL 201" }
+              - { code: "AMS 102" }
+              - { code: "AMS 110" }
+              - { code: "BIO 211" }
+              - { code: "BUS 215" }
+              - { code: "ECO 320" }
+              - { code: "PSY 201" }
+              - { code: "SOC 202" }
+
+          # Related areas (6 credits from 300+ level)
+          - id: pol_related_areas
+            type: electives
+            credits_required: 6
+            courses:
+              - { code: "AAS 3xx+" }
+              - { code: "AFS 3xx+" }
+              - { code: "ANT 3xx+" }
+              - { code: "BUS 3xx+" }
+              - { code: "ECO 3xx+" }
+              - { code: "GLI 3xx+" }
+              - { code: "HIS 3xx+" }
+              - { code: "JRN 3xx+" }
+              - { code: "PHI 3xx+" }
+              - { code: "PSY 3xx+" }
+              - { code: "SOC 3xx+" }
+              - { code: "WST 3xx+" }
+
+      sbc_categories:
+        - sbc: "ARTS"
+        - sbc: "GLO"
+          required_major_courses:
+            - { code: "POL 101" }
+          optional_major_courses:
+            - { code: "POL 214" }
+            - { code: "POL 216" }
+            - { code: "POL 302" }
+            - { code: "POL 303" }
+            - { code: "POL 304" }
+            - { code: "POL 308" }
+            - { code: "POL 338" }
+            - { code: "POL 339" }
+
+        - sbc: "HUM"
+          optional_major_courses:
+            - { code: "PHI 277" }
+
+        - sbc: "LANG"
+        - sbc: "QPS"
+          optional_major_courses:
+            - { code: "AMS 102" }
+            - { code: "AMS 110" }
+            - { code: "POL 201" }
+            - { code: "PSY 201" }
+            - { code: "SOC 202" }
+
+        - sbc: "SBS"
+          required_major_courses:
+            - { code: "POL 101" }
+            - { code: "POL 102" }
+            - { code: "POL 103" }
+          optional_major_courses:
+            - { code: "POL 214" }
+            - { code: "POL 216" }
+
+        - sbc: "SNW"
+          optional_major_courses:
+            - { code: "POL 373" }
+            - { code: "POL 375" }
+
+        - sbc: "TECH"
+          optional_major_courses:
+            - { code: "POL 369" }
+
+        - sbc: "USA"
+          required_major_courses:
+            - { code: "POL 102" }
+
+        - sbc: "WRT"
+        - sbc: "STAS"
+          optional_major_courses:
+            - { code: "POL 371" }
+
+        - sbc: "EXP+"
+        - sbc: "HFA+"
+          optional_major_courses:
+            - { code: "PHI 363" }
+            - { code: "PHI 366" }
+            - { code: "PHI 367" }
+            - { code: "PHI 373" }
+            - { code: "PHI 375" }
+            - { code: "PHI 377" }
+            - { code: "PHI 379" }
+            - { code: "PHI 384" }
+
+        - sbc: "SBS+"
+          optional_major_courses:
+            - { code: "PHI 363" }
+            - { code: "POL 302" }
+            - { code: "POL 305" }
+            - { code: "POL 308" }
+            - { code: "POL 309" }
+            - { code: "POL 313" }
+            - { code: "POL 317" }
+            - { code: "POL 318" }
+            - { code: "POL 320" }
+            - { code: "POL 322" }
+            - { code: "POL 323" }
+            - { code: "POL 324" }
+            - { code: "POL 325" }
+            - { code: "POL 327" }
+            - { code: "POL 328" }
+            - { code: "POL 330" }
+            - { code: "POL 332" }
+            - { code: "POL 334" }
+            - { code: "POL 336" }
+            - { code: "POL 337" }
+            - { code: "POL 338" }
+            - { code: "POL 339" }
+            - { code: "POL 344" }
+            - { code: "POL 347" }
+            - { code: "POL 348" }
+            - { code: "POL 349" }
+            - { code: "POL 350" }
+            - { code: "POL 352" }
+            - { code: "POL 353" }
+            - { code: "POL 359" }
+            - { code: "POL 365" }
+            - { code: "POL 367" }
+            - { code: "POL 368" }
+            - { code: "POL 369" }
+            - { code: "POL 373" }
+            - { code: "POL 374" }
+            - { code: "POL 375" }
+            - { code: "POL 378" }
+            - { code: "POL 379" }
+
+        - sbc: "STEM+"
+          optional_major_courses:
+            - { code: "BIO 211" }
+
+        - sbc: "CER"
+          optional_major_courses:
+            - { code: "PHI 277" }
+            - { code: "PHI 366" }
+            - { code: "PHI 367" }
+            - { code: "PHI 372" }
+            - { code: "PHI 375" }
+            - { code: "PHI 377" }
+            - { code: "PHI 379" }
+            - { code: "PHI 384" }
+            - { code: "POL 378" }
+            - { code: "POL 379" }
+
+        - sbc: "DIV"
+          optional_major_courses:
+            - { code: "POL 303" }
+            - { code: "POL 330" }
+            - { code: "POL 347" }
+            - { code: "POL 353" }
+
+        - sbc: "ESI"
+          optional_major_courses:
+            - { code: "POL 287" }
+
+        - sbc: "SPK"
+        - sbc: "WRTD"
+          optional_major_courses:
+            - { code: "POL 368" }
+            - { code: "POL 459" }
+
+    - degree_type: MINOR
+      title: "POL MINOR"
+      is_restricted: false
+      degree_credits_required: 21
+
+      course_requirements:
+        groups:
+          # Introductory courses (2 courses)
+          - id: pol_minor_intro
+            type: two_of
+            courses:
+              - { code: "POL 101" }
+              - { code: "POL 102" }
+              - { code: "POL 103" }
+              - { code: "POL 201" }
+              - { code: "AMS 102" }
+              - { code: "AMS 110" }
+              - { code: "BIO 211" }
+              - { code: "BUS 215" }
+              - { code: "ECO 320" }
+              - { code: "PSY 201" }
+              - { code: "SOC 202" }
+
+          # Concentration (9 credits, 3 courses)
+          - id: pol_minor_concentration
+            type: electives
+            credits_required: 9
+            courses:
+              - { code: "POL 2xx+" }
+              - { code: "POL 3xx+" }
+              - { code: "POL 4xx+" }
+
+          # Political Science electives (6 credits, 2 courses)
+          - id: pol_minor_electives
+            type: electives
+            credits_required: 6
+            courses:
+              - { code: "POL 2xx+" }
+              - { code: "POL 3xx+" }
+              - { code: "POL 4xx+" }
+            excluded_courses:
+              - { code: "POL 201" }
+              - { code: "POL 475" }
+              - { code: "POL 476" }
+
