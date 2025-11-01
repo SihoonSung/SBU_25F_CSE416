@@ -5,10 +5,6 @@ import './Login.css'
 /**
  * Login page component with Google OAuth2 integration.
  * Handles OAuth callback processing and user authentication flow.
- * 
- * Note: Google OAuth2 integration and authentication flow were implemented 
- * with assistance from Cursor AI and ChatGPT for proper OAuth handling 
- * and secure authentication patterns.
  */
 function Login() {
   const navigate = useNavigate()
@@ -55,7 +51,7 @@ function Login() {
           {/* Error Message Display */}
           {errorMessage && (
             <div className="error-message">
-              <div className="error-icon">⚠️</div>
+              <div className="error-icon"></div>
               <div className="error-content">
                 <h3>Access Denied</h3>
                 <p>{errorMessage}</p>

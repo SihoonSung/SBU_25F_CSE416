@@ -278,7 +278,7 @@ const DegreeRequirements: React.FC = () => {
 
       {error && (
         <div className="message error">
-          <span className="message-icon">⚠️</span>
+          <span className="message-icon"></span>
           {error}
         </div>
       )}

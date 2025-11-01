@@ -9,13 +9,14 @@ import Profile from './pages/Profile'
 import CourseSearch from './pages/CourseSearch'
 import CourseRegistration from './pages/CourseRegistration'
 import UserManagement from './pages/UserManagement'
-import PdfUpload from './pages/PdfUpload'
-import CourseCatalogManagement from './pages/CourseCatalogManagement'
-import DegreeRequirementsImport from './pages/DegreeRequirementsImport'
+import DataImport from './pages/DataImport'
 import DegreeRequirements from './pages/DegreeRequirements'
 import DegreeAudit from './pages/DegreeAudit'
 import MajorMinorDeclaration from './pages/MajorMinorDeclaration'
 import AdvisorApproval from './pages/AdvisorApproval'
+import PdfUpload from './pages/PdfUpload'
+import Roster from './pages/Roster'
+import Grades from './pages/Grades'
 
 function App() {
   const location = useLocation()
@@ -35,13 +36,14 @@ function App() {
           <Route path="/registration" element={<ProtectedRoute><CourseRegistration/></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile/></ProtectedRoute>}/>
           <Route path="/user-management" element={<ProtectedRoute><UserManagement/></ProtectedRoute>} />
-          <Route path="/pdf-upload" element={<ProtectedRoute><PdfUpload/></ProtectedRoute>} />
-          <Route path="/course-catalog-management" element={<ProtectedRoute><CourseCatalogManagement/></ProtectedRoute>} />
-          <Route path="/degree-requirements-import" element={<ProtectedRoute><DegreeRequirementsImport/></ProtectedRoute>} />
+          <Route path="/data-import" element={<ProtectedRoute><DataImport/></ProtectedRoute>} />
           <Route path="/degree-requirements" element={<ProtectedRoute><DegreeRequirements/></ProtectedRoute>} />
           <Route path="/degree-audit" element={<ProtectedRoute><DegreeAudit/></ProtectedRoute>} />
           <Route path="/major-minor-declaration" element={<ProtectedRoute><MajorMinorDeclaration/></ProtectedRoute>} />
           <Route path="/advisor-approval" element={<ProtectedRoute><AdvisorApproval/></ProtectedRoute>} />
+          <Route path="/pdf-upload" element={<ProtectedRoute><PdfUpload/></ProtectedRoute>} />
+          <Route path="/roster" element={<ProtectedRoute><Roster/></ProtectedRoute>} />
+          <Route path="/grades" element={<ProtectedRoute><Grades/></ProtectedRoute>} />
         </Routes>
       </main>
     </div>

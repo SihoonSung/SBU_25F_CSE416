@@ -16,7 +16,6 @@ export default function DegreeAudit() {
         const u = me?.user
         setStudentName(u?.fullName || '')
         if (u?.gpa) setGpa(u.gpa)
-        // TODO: 나중에 백엔드 연결 시 실제 총이수학점/카탈로그 텀 연동
       } catch {}
     })()
   }, [])

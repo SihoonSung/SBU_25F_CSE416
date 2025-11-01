@@ -12,6 +12,7 @@ import { getCurrentUser } from '../utils/auth'
  */
 
 function CourseRegistration() {
+  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCourse, setSelectedCourse] = useState<any>(null)
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -22,7 +23,8 @@ function CourseRegistration() {
   const [selectedYear, setSelectedYear] = useState<number | string>('')
   const [cart, setCart] = useState<any[]>([])
   const [userId, setUserId] = useState<number | null>(null)
-  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+  const [registrationEligibility, setRegistrationEligibility] = useState<any>(null)
+  const [showRegistrationAlert, setShowRegistrationAlert] = useState(false)
 
   /**
    * Fetch available terms and classes on component mount
@@ -42,6 +44,15 @@ function CourseRegistration() {
     initializeUser()
     fetchAvailableTerms()
   }, [])
+
+  /**
+   * Check registration eligibility when term is selected
+   */
+  useEffect(() => {
+    if (userId && selectedSemester && selectedYear) {
+      checkRegistrationEligibility()
+    }
+  }, [userId, selectedSemester, selectedYear])
 
   /**
    * Load cart when userId is available
@@ -119,11 +130,15 @@ function CourseRegistration() {
     }
     
     try {
-      const response = await fetch(`http://localhost:8080/api/cart/items?userId=${userId}`)
+      const response = await fetch(`${backendBase}/api/cart/items?userId=${userId}`, {
+        credentials: 'include'
+      })
       const data = await response.json()
       
       if (data.success) {
         setCart(data.items)
+        // Update conflict status after loading
+        await updateCartConflicts()
       } else {
         console.error('Error loading cart:', data.message)
         setCart([])
@@ -134,13 +149,77 @@ function CourseRegistration() {
     }
   }
 
+  /**
+   * Update conflict status for all cart items via backend API
+   */
+  const updateCartConflicts = async () => {
+    if (!userId) return
+    
+    try {
+      const response = await fetch(`${backendBase}/api/cart/update-conflicts?userId=${userId}`, {
+        method: 'POST',
+        credentials: 'include'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Reload cart to get updated conflict statuses
+        await loadCartFromDB()
+      } else {
+        console.error('Error updating conflicts:', data.message)
+      }
+    } catch (error) {
+      console.error('Error updating cart conflicts:', error)
+    }
+  }
+
+  /**
+   * Check registration eligibility for the selected term
+   */
+  const checkRegistrationEligibility = async () => {
+    if (!userId || !selectedSemester || !selectedYear) return
+    
+    try {
+      const response = await fetch(
+        `${backendBase}/api/admin/registration-schedules/check/${userId}?semester=${selectedSemester}&year=${selectedYear}`,
+        {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      )
+      
+      if (response.ok) {
+        const data = await response.json()
+        // Only show alert if registration is explicitly available
+        // If schedule doesn't exist, silently allow registration (for testing)
+        if (data.canRegister) {
+          setRegistrationEligibility(data)
+          setShowRegistrationAlert(true)
+        } else {
+          // Don't show alert for unavailable registration - just log it
+          console.log('Registration schedule not available:', data.reason || 'No schedule set for this term')
+          // Optionally set to show info message (not blocking)
+          // setRegistrationEligibility(data)
+          // setShowRegistrationAlert(true)
+        }
+      }
+    } catch (error) {
+      // Silently ignore errors - allow registration to proceed
+      console.log('Registration schedule check failed (continuing anyway):', error)
+    }
+  }
+
 
   /**
    * Fetch available semester/year combinations from backend
    */
   const fetchAvailableTerms = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/classes/terms')
+      const response = await fetch(`${backendBase}/api/classes/terms`, {
+        credentials: 'include'
+      })
       const data = await response.json()
 
       setAvailableTerms(data)
@@ -161,7 +240,9 @@ function CourseRegistration() {
    */
   const fetchClassesByTerm = async (semester: string, year: number | string) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/classes/by-term?semester=${semester}&year=${year}`)
+      const response = await fetch(`${backendBase}/api/classes/by-term?semester=${semester}&year=${year}`, {
+        credentials: 'include'
+      })
       const data = await response.json()
       
       // Transform and sort data
@@ -188,7 +269,9 @@ function CourseRegistration() {
     }
     
     try {
-      const response = await fetch(`http://localhost:8080/api/classes/search?q=${encodeURIComponent(term)}`)
+      const response = await fetch(`${backendBase}/api/classes/search?q=${encodeURIComponent(term)}`, {
+        credentials: 'include'
+      })
       const data = await response.json()
       
       // Transform, filter, and sort data
@@ -337,8 +420,8 @@ function CourseRegistration() {
     
     try {
       const response = await fetch(`${backendBase}/api/cart/remove?userId=${userId}&classId=${courseId}`, {
-        method: 'DELETE',
-        credentials: 'include'
+        credentials: 'include',
+        method: 'DELETE'
       })
       
       const data = await response.json()
@@ -381,7 +464,8 @@ function CourseRegistration() {
     if (!confirmed) return
 
     try {
-      const response = await fetch(`http://localhost:8080/api/cart/submit-registration?userId=${userId}`, {
+      const response = await fetch(`${backendBase}/api/cart/submit-registration?userId=${userId}`, {
+        credentials: 'include',
         method: 'POST'
       })
       
@@ -484,6 +568,28 @@ function CourseRegistration() {
 
   return (
     <div className="course-registration-page">
+      {/* Registration Eligibility Alert */}
+      {showRegistrationAlert && registrationEligibility && (
+        <div className={`registration-alert ${registrationEligibility.canRegister ? 'alert-success' : 'alert-warning'}`}>
+          <div className="alert-icon"></div>
+          <div className="alert-content">
+            {registrationEligibility.canRegister ? (
+              <>
+                <strong>Registration Open:</strong> You can register for {selectedSemester} {selectedYear}.
+                {registrationEligibility.schedule && registrationEligibility.schedule.endDate && (
+                  <span> Registration ends {new Date(registrationEligibility.schedule.endDate).toLocaleDateString()}.</span>
+                )}
+              </>
+            ) : (
+              <>
+                <strong>Registration Not Available:</strong> {registrationEligibility.reason || 'Registration is not currently open for your class standing.'}
+              </>
+            )}
+          </div>
+          <button className="alert-close" onClick={() => setShowRegistrationAlert(false)}>×</button>
+        </div>
+      )}
+
       {/* Search Section */}
       <div className="search-section">
         <h2>Course Search</h2>
@@ -520,7 +626,7 @@ function CourseRegistration() {
         <div className="search-container">
           {/* Search Bar */}
           <div className="search-bar">
-            <div className="search-icon">🔍</div>
+            <div className="search-icon"></div>
             <input
               type="text"
               placeholder="Search by class ID, course code, title, or instructor..."
@@ -535,10 +641,10 @@ function CourseRegistration() {
           <div className="search-results">
             {searchResults.length === 0 ? (
               <div className="no-data-message">
-                <div className="no-data-icon">📚</div>
+                <div className="no-data-icon"></div>
                 <h3>No Class Data Available</h3>
                 <p>There are no classes in the database for the selected term.</p>
-                <p className="hint-text">💡 Go to PDF Upload & Class Management page to import class schedules</p>
+                <p className="hint-text">Go to PDF Upload & Class Management page to import class schedules</p>
               </div>
             ) : (
               currentItems.map((course) => (
@@ -590,7 +696,7 @@ function CourseRegistration() {
                       {/* Show LEC info first if available (priority) */}
                       {course.lecSchedule && (
                         <div className="detail-section lec-section">
-                          <div className="section-title">📚 Lecture Section (Required)</div>
+                          <div className="section-title">Lecture Section (Required)</div>
                           <div className="detail-row">
                             <span className="detail-label">Schedule:</span>
                             <span className="detail-value">{course.lecSchedule}</span>
@@ -609,9 +715,9 @@ function CourseRegistration() {
                       {/* Show current section (LAB/REC/etc) */}
                       <div className="detail-section">
                         <div className="section-title">
-                          {course.sectionType === 'LAB' && '🔬 Lab Section'}
-                          {course.sectionType === 'REC' && '📝 Recitation Section'}
-                          {course.sectionType === 'LEC' && '📚 Lecture Section'}
+                          {course.sectionType === 'LAB' && 'Lab Section'}
+                          {course.sectionType === 'REC' && 'Recitation Section'}
+                          {course.sectionType === 'LEC' && 'Lecture Section'}
                           {!course.sectionType && 'Section'}
                         </div>
                         <div className="detail-row">
@@ -659,7 +765,7 @@ function CourseRegistration() {
                           className="detail-link"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          📊 View Course Evaluations
+                          View Course Evaluations
                         </a>
                       </div>
                     </div>
@@ -733,7 +839,16 @@ function CourseRegistration() {
               <div className="conflict-details">
                 <div className="conflict-title">Time Conflicts Detected</div>
                 <div className="conflict-message">
-                  Some classes in your cart have scheduling conflicts. Please resolve these before submitting registration.
+                  {(() => {
+                    const conflictPairs = findConflictPairs(cart)
+                    if (conflictPairs.length > 0) {
+                      const conflictMessages = conflictPairs.map(([a, b]) => 
+                        `${a.code || `${a.department}${a.courseNum}.${a.section}`} and ${b.code || `${b.department}${b.courseNum}.${b.section}`}`
+                      )
+                      return `Time conflicts detected: ${conflictMessages.join(', ')}. Please resolve before submitting.`
+                    }
+                    return 'Some classes in your cart have scheduling conflicts. Please resolve these before submitting registration.'
+                  })()}
                 </div>
               </div>
             </div>

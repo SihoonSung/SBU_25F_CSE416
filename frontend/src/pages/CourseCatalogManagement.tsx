@@ -4,10 +4,6 @@ import './CourseCatalogManagement.css';
 /**
  * Course Catalog Management Component
  * Provides interface for managing course catalog scraping and data display.
- * 
- * Note: Course catalog data display and management interface were implemented 
- * with assistance from Cursor AI and ChatGPT for proper UI design 
- * and data visualization.
  */
 
 
@@ -130,7 +126,8 @@ const CourseCatalogManagement: React.FC = () => {
     setMessage(null);
 
     try {
-      const response = await fetch('http://localhost:8080/api/scraping/scrape', {
+      const response = await fetch(`${backendBase}/api/scraping/scrape`, {
+        credentials: 'include',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,17 +164,17 @@ const CourseCatalogManagement: React.FC = () => {
 
   const getTermStatusDisplay = (termName: string) => {
     if (!isValidTermFormat(termName)) {
-      return <span className="status-badge invalid">⚠ Invalid Format</span>;
+      return <span className="status-badge invalid">Invalid Format</span>;
     }
 
     const status = checkTermStatus(termName);
     switch (status) {
       case 'scraped':
-        return <span className="status-badge scraped">✓ Already Scraped</span>;
+        return <span className="status-badge scraped">Already Scraped</span>;
       case 'not_scraped':
-        return <span className="status-badge not-scraped">○ Ready to Scrape</span>;
+        return <span className="status-badge not-scraped">Ready to Scrape</span>;
       case 'not_found':
-        return <span className="status-badge not-found">✓ Valid Term</span>;
+        return <span className="status-badge not-found">Valid Term</span>;
       default:
         return <span className="status-badge unknown">? Unknown</span>;
     }
@@ -194,9 +191,9 @@ const CourseCatalogManagement: React.FC = () => {
       {message && (
         <div className={`message ${message.type}`}>
           <span className="message-icon">
-            {message.type === 'success' && '✓'}
-            {message.type === 'error' && '✗'}
-            {message.type === 'warning' && '⚠'}
+            {message.type === 'success' && 'Success'}
+            {message.type === 'error' && 'Error'}
+            {message.type === 'warning' && 'Warning'}
           </span>
           {message.text}
         </div>
@@ -228,7 +225,7 @@ const CourseCatalogManagement: React.FC = () => {
          
           {/* Supported Subjects (Quick Select) */}
           <div className="subjects-section">
-            <h4>✅ Fully Supported Subjects (All Info Extracted)</h4>
+            <h4>Fully Supported Subjects (All Info Extracted)</h4>
             <div className="subjects-grid">
               {supportedSubjects.map(subject => (
                 <label key={subject} className="subject-checkbox supported">
@@ -238,7 +235,7 @@ const CourseCatalogManagement: React.FC = () => {
                     onChange={() => handleSubjectChange(subject)}
                   />
                   <span className="subject-label">{subject}</span>
-                  <div className="subject-status">✓ Full Support</div>
+                  <div className="subject-status">Full Support</div>
                 </label>
               ))}
             </div>
@@ -249,7 +246,7 @@ const CourseCatalogManagement: React.FC = () => {
 
           {/* Add Custom Subject */}
           <div className="custom-subject-section">
-            <h4>⚠️ Add Other Subjects (Limited Info)</h4>
+            <h4>Add Other Subjects (Limited Info)</h4>
             <div className="custom-subject-input">
               <input
                 type="text"
@@ -274,10 +271,10 @@ const CourseCatalogManagement: React.FC = () => {
               </button>
             </div>
             <div className="custom-subject-help">
-              <strong>⚠️ Warning:</strong> Other subjects will extract <strong>Description, Credits, and SBCs</strong>.
+              <strong>Warning:</strong> Other subjects will extract <strong>Description, Credits, and SBCs</strong>.
               Requisite fields (prerequisites, corequisites, antirequisites, advisory prerequisites) will be marked as "unknown".
               <br/><br/>
-              <strong>📝 Instructions:</strong> Enter <strong>ONE subject at a time</strong> (e.g., MAT, PHY, CHE). 
+              <strong>Instructions:</strong> Enter <strong>ONE subject at a time</strong> (e.g., MAT, PHY, CHE). 
               Do <strong>NOT</strong> use commas or multiple subjects. Add one subject, click "Add Subject", 
               then repeat for additional subjects.
             </div>
@@ -291,7 +288,7 @@ const CourseCatalogManagement: React.FC = () => {
                 {selectedSubjects.map(subject => (
                   <span key={subject} className={`selected-subject ${supportedSubjects.includes(subject) ? 'supported' : 'unsupported'}`}>
                     {subject}
-                    {!supportedSubjects.includes(subject) && <span className="warning-icon" title="Limited support">⚠️</span>}
+                    {!supportedSubjects.includes(subject) && <span className="warning-icon" title="Limited support"></span>}
                     <button
                       type="button"
                       onClick={() => handleRemoveSubject(subject)}

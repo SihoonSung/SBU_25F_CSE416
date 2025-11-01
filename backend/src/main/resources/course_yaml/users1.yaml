@@ -1,11 +1,7 @@
-# sample user data file
+# sample user data file.  version: 2025-10-14
 # CSE416, Software Engineering, Scott D. Stoller
 
 # change log:
-# 2025-10-24 changed type of GPNC field from Boolean to string, to allow specifying a grade threshold.
-# 2025-10-16 changed type of academic_advisor.academic_unit from a singleton to a list.
-# 2025-10-15 changed CSE 220 from Spring 2025 to Spring 2026.
-# 2025-10-15 changed section numbers to match the strings in class schedules, e.g., L01 instead of 1.
 # 2025-10-14 added fields related to planned majors and minor for students
 # 2025-10-13 note that 'department' field in entries for classes should have been named 'subject'
 # 2025-10-13 added 'degrees' field for students
@@ -21,10 +17,6 @@ registrars:
   first_name: Ralph
   last_name: Randall
   email: ralph.randall@stonybrook.edu
-- SBU_ID: 114665643
-  first_name: Minseo1
-  last_name: Registrar1
-  email: minseo.kim@stonybrook.edu
 
 academic_advisors:
 - SBU_ID: 100765431
@@ -32,20 +24,14 @@ academic_advisors:
   last_name: Alda
   email: alan.alda@stonybrook.edu
   level: university # valid values: university, college, department
-  academic_unit: [SBU] # list of acronyms of colleges/schools (e.g., [CAS]) or subjects (e.g., [CSE, ISE]), or [SBU] for university-level advisors
+  academic_unit: SBU # acronym of a college or school (e.g., CAS, SoCJ) or subject (e.g., CSE), or SBU for university-level advisors
 - SBU_ID: 100765430
   first_name: Kevin
   last_name: Kamper
   email: kevin.kamper@stonybrook.edu
   level: department
-  academic_unit: [BIO, ECO]
-- SBU_ID: 114665642
-  first_name: CEAS
-  last_name: Advisor
-  email: minseohappy06@gmail.com
-  level: CEAS
-  academic_unit: [AMS, BME, CME, CIV, ECE, CSE, ESE, ESG, ISE, MEC, TSM]
-  
+  academic_unit: CSE
+
 instructors:
 - SBU_ID: 100987654
   first_name: Scott
@@ -55,23 +41,10 @@ instructors:
   first_name: Alan
   last_name: Turing
   email: alan.turing@stonybrook.edu
-- SBU_ID: 128391345
-  first_name: Anita 
-  last_name: Wasilewska
-  email: aita.wasilewskag@stonybrook.edu
-- SBU_ID: 182674982
-  first_name: Eugene
-  last_name: Stark
-  email: eugene.starkg@stonybrook.edu
-- SBU_ID: 127819329
-  first_name: Richard
-  last_name: Mckenna
-  email: richard.mckenna@stonybrook.edu
-
-
-
-
-
+- SBU_ID: 1008762241
+  first_name: Sihoon
+  last_name: Sung
+  email: sihoonsg0605@gmail.com
 
 students:
 - SBU_ID: 100123456
@@ -98,12 +71,12 @@ students:
     - {class: CSE101, university: SCCC, credits: 3, department: CSE, course_num: 101, grade: A}
     - {class: CSE999, university: SCCC, credits: 3, department: null, course_num: null, grade: null}
   classes:  # list of classes the student took, is taking, or is registered for in a future semester.
-    # GPNC is the selected grade threshold if GPMC option was selected, otherwise null.
-    - {class_id: 12345, department: CSE, course_num: 101, section: 01, semester: Fall, year: 2020, credits: 3, GPNC: null, grade: A}
-    - {class_id: 23456, department: AMS, course_num: 151, section: 01, semester: Spring, year: 2021, credits: 3, GPNC: null, grade: A-}
-    - {class_id: 34567, department: CSE, course_num: 214, section: 02, semester: SummerI, year: 2020, credits: 4, GPNC: B, grade: P}
-    - {class_id: 45678, department: AMS, course_num: 261, section: 01, semester: Fall, year: 2025, credits: 3, GPNC: null, grade: null}
-    - {class_id: 56789, department: CSE, course_num: 220, section: R01, semester: Spring, year: 2026, credits: 4, GPNC: null, grade: null}
+    # GPNC is a boolean flag indicating whether GPMC option was selected.
+    - {class_id: 12345, department: CSE, course_num: 101, section: 2, semester: Fall, year: 2020, credits: 3, GPNC: false, grade: A}
+    - {class_id: 23456, department: AMS, course_num: 151, section: 1, semester: Spring, year: 2021, credits: 3, GPNC: false, grade: A-}
+    - {class_id: 34567, department: CSE, course_num: 214, section: 2, semester: SummerI, year: 2020, credits: 3, GPNC: true, grade: P}
+    - {class_id: 45678, department: AMS, course_num: 261, section: 1, semester: Fall, year: 2025, credits: 3, GPNC: false, grade: null}
+    - {class_id: 56789, department: CSE, course_num: 220, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: null}
   course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
     - {department: CSE, course_num: 216, semester: Fall, year: 2026, credits: 3}
     - {department: CSE, course_num: 320, semester: Spring, year: 2027, credits: 3}
@@ -127,20 +100,16 @@ students:
   planned_minors: [CSE]
   planned_minor_requirement_versions: [{semester: Spring, year: 2025}]
   graduation: null
-  transfer_courses: null 
+  transfer_courses: null
   classes:  # list of classes the student took, is taking, or is registered for in a future semester.
-    # GPNC is the selected grade threshold if GPMC option was selected, otherwise null.
-    - {class_id: 12983, department: AMS, course_num: 210, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: A-}
-    - {class_id: 12973, department: AMS, course_num: 161, section: 03, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: B+}
-    - {class_id: 29384, department: POL, course_num: 102, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: C, grade: P}
-    - {class_id: 38721, department: BIO, course_num: 203, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: B}
-    - {class_id: 12985, department: AMS, course_num: 215, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: A-}
-    - {class_id: 12873, department: AMS, course_num: 301, section: 03, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: B+}
-    - {class_id: 13234, department: PSY, course_num: 102, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: C, grade: P}
-    - {class_id: 48821, department: PHY, course_num: 131, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: C+}
-    - {class_id: 23013, department: BIO, course_num: 204, section: R01, semester: Fall, year: 2026, credits: 4, GPNC: null, grade: null}
-    - {class_id: 48823, department: PHY, course_num: 132, section: R01, semester: Fall, year: 2026, credits: 4, GPNC: null, grade: null}
+    # GPNC is a boolean flag indicating whether GPMC option was selected.
+    - {class_id: 12345, department: CSE, course_num: 101, section: 2, semester: Fall, year: 2020, credits: 3, GPNC: false, grade: A}
+    - {class_id: 23456, department: AMS, course_num: 151, section: 1, semester: Spring, year: 2021, credits: 3, GPNC: false, grade: A-}
+    - {class_id: 34567, department: CSE, course_num: 214, section: 2, semester: SummerI, year: 2020, credits: 3, GPNC: true, grade: P}
+    - {class_id: 45678, department: AMS, course_num: 261, section: 1, semester: Fall, year: 2025, credits: 3, GPNC: false, grade: null}
+    - {class_id: 56789, department: CSE, course_num: 220, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: null}
   course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
+<<<<<<< HEAD
     - {department: CSE, course_num: 101, semester: Spring, year: 2026, credits: 3}
     - {department: CSE, course_num: 114, semester: Spring, year: 2026, credits: 3}
 

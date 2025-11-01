@@ -4,10 +4,6 @@ import './MajorMinorDeclaration.css';
 /**
  * Major/Minor Declaration Component
  * Provides interface for students to declare majors and minors.
- * 
- * Note: Major/minor declaration functionality and user interface were implemented 
- * with assistance from Cursor AI and ChatGPT for proper form handling 
- * and data validation capabilities.
  */
 
 interface DegreeRequirement {
@@ -54,6 +50,7 @@ interface PlannedMajor {
 }
 
 const MajorMinorDeclaration: React.FC = () => {
+  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const [degreeRequirements, setDegreeRequirements] = useState<DegreeRequirement[]>([]);
   const [myDeclarations, setMyDeclarations] = useState<MajorMinorDeclaration[]>([]);
   // Current approved majors and minors from User table
@@ -291,12 +288,12 @@ const MajorMinorDeclaration: React.FC = () => {
     setSuccess(null);
 
     try {
-      const response = await fetch('/api/major-minor-declarations/submit', {
+      const response = await fetch(`${backendBase}/api/declarations/submit`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           subjectCode: selectedSubject,
           degreeType: selectedDegreeType,
@@ -472,11 +469,8 @@ const MajorMinorDeclaration: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`/api/major-minor-declarations/${declarationId}/withdraw`, {
+      const response = await fetch(`${backendBase}/api/declarations/${declarationId}/withdraw`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         credentials: 'include'
       });
 

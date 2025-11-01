@@ -4,10 +4,6 @@ import './UserManagement.css';
 /**
  * User Management Component
  * Provides interface for managing users, importing user data, and user administration.
- * 
- * Note: User management functionality and administrative interface were implemented 
- * with assistance from Cursor AI and ChatGPT for proper data management 
- * and user administration capabilities.
  */
 
 interface User {

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import './NavigationBar.css';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getCurrentUser, isAuthenticated as checkAuth, signOut } from '../utils/auth';
 
 
 function NavigationBar() {
   const navigate = useNavigate();
- 
+  const location = useLocation();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [role, setRole] = useState<string | null>(null);
@@ -14,7 +14,7 @@ function NavigationBar() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const fetchRole = async () => {
       try {
         const authed = await checkAuth();
         if (!mounted) return;
@@ -36,6 +36,7 @@ function NavigationBar() {
               setRole('academic_advisor');
               break;
             case 'REGISTRAR':
+            case 'ADMIN':
               setRole('registrar');
               break;
             default:
@@ -44,21 +45,24 @@ function NavigationBar() {
         } else {
           setRole(null);
         }
-      } catch {
+      } catch (error) {
+        console.error('Error fetching user role:', error);
         if (!mounted) return;
         setAuthenticated(false);
         setRole(null);
       }
-    })();
+    };
+    
+    fetchRole();
     return () => { mounted = false; };
-  }, []);
+  }, [location.pathname]); // Re-fetch role when route changes
 
   //Role based navbar menus
    const navbar_menus : Record<string, string[]>  = {
     "student" : ["Course Search", "Registration", "Planner", "Degree Audit", "Sign out"],
-    "professor" :["Course Search", "Registration Overrides", "Roaster", "Grades", "Advisor Approval", "Sign out"],
+    "professor" :["Course Search", "Registration Overrides", "Roaster", "Grades", "Sign out"],
     "academic_advisor" : ["Course Search", "Registration Overrides", "Roaster", "Degree Audit", "Advisor Approval", "Sign out"],
-    "registrar" : ["Course Search", "Registration Management", "User Management", "Course Catalog Management", "Degree Requirements Import", "Degree Requirements", "Roaster", "Grades", "Admin", "Sign out"]
+        "registrar" : ["User Management", "Data Import", "Degree Requirements", "Class Management", "Sign out"]
 
   }
 
@@ -69,6 +73,10 @@ function NavigationBar() {
       'Registration Management': '/course-registration',
       'Degree Requirements': '/degree-requirements',
       'Degree Audit': '/degree-audit',
+      'Data Import': '/data-import',
+      'Class Management': '/pdf-upload',
+      'Roaster': '/roster',
+      'Grades': '/grades',
     };
     return overrides[text] ?? ('/' + text.toLowerCase().replace(/ /g, '-'));
   };

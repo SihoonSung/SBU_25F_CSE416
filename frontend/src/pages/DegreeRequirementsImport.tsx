@@ -4,10 +4,6 @@ import './DegreeRequirementsImport.css';
 /**
  * Degree Requirements Import Component
  * Provides interface for importing degree requirements from YAML files.
- * 
- * Note: YAML file import functionality and user interface were implemented 
- * with assistance from Cursor AI and ChatGPT for proper file handling 
- * and data validation capabilities.
  */
 
 interface ImportResult {
@@ -200,7 +196,7 @@ minor_requirements:
         <h2>Instructions</h2>
         <div className="instructions-content">
           <div className="instruction-item">
-            <h3>📋 File Format</h3>
+            <h3>File Format</h3>
             <p>Upload YAML files (.yaml or .yml) containing degree requirements. The file should include:</p>
             <ul>
               <li><strong>requirements_version</strong>: Version identifier (e.g., "Fall 2025")</li>
@@ -211,7 +207,7 @@ minor_requirements:
           </div>
           
           <div className="instruction-item">
-            <h3>✅ Required Fields</h3>
+            <h3>Required Fields</h3>
             <p>Each requirement must include:</p>
             <ul>
               <li><strong>subject_code</strong>: Department code (e.g., "CSE", "BIO")</li>
@@ -222,7 +218,7 @@ minor_requirements:
           </div>
           
           <div className="instruction-item">
-            <h3>📝 Optional Fields</h3>
+            <h3>Optional Fields</h3>
             <p>Additional information you can include:</p>
             <ul>
               <li><strong>gpa_requirement</strong>: Minimum GPA needed</li>
@@ -235,7 +231,7 @@ minor_requirements:
         
         <div className="sample-file-section">
           <button className="download-sample-button" onClick={downloadSampleFile}>
-            📥 Download Sample YAML File
+            Download Sample YAML File
           </button>
         </div>
       </div>
@@ -254,7 +250,7 @@ minor_requirements:
           <div className="drop-zone-content">
             {file ? (
               <div className="file-selected-content">
-                <div className="file-icon">📄</div>
+                <div className="file-icon"></div>
                 <div className="file-info">
                   <div className="file-name">{file.name}</div>
                   <div className="file-size">{(file.size / 1024).toFixed(1)} KB</div>
@@ -311,7 +307,7 @@ minor_requirements:
           {result.success ? (
             <div className="result-success">
               <div className="result-header">
-                <span className="result-icon">✅</span>
+                <span className="result-icon"></span>
                 <h3>Import Successful!</h3>
               </div>
               <p>{result.message}</p>
@@ -335,7 +331,7 @@ minor_requirements:
           ) : (
             <div className="result-error">
               <div className="result-header">
-                <span className="result-icon">❌</span>
+                <span className="result-icon"></span>
                 <h3>Import Failed</h3>
               </div>
               <p>{result.error}</p>

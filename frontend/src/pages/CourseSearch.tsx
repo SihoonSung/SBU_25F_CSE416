@@ -5,10 +5,6 @@ import './CourseSearch.css'
  * Course Search Page Component
  * Displays course catalog from courses table (scraped data).
  * Shows detailed course information including descriptions, prerequisites, SBCs, etc.
- * 
- * Note: Backend integration and course search functionality were implemented 
- * with assistance from Cursor AI and ChatGPT for proper API integration 
- * and advanced search filtering capabilities.
  */
 
 interface Course {
@@ -27,6 +23,7 @@ interface Course {
 }
 
 function CourseSearch() {
+  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([])
@@ -65,7 +62,9 @@ function CourseSearch() {
    */
   const fetchTerms = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/scraping/terms')
+      const response = await fetch(`${backendBase}/api/scraping/terms`, {
+        credentials: 'include'
+      })
       
       if (!response.ok) {
         console.error('Failed to fetch terms:', response.status)
@@ -108,7 +107,10 @@ function CourseSearch() {
     try {
       // Fetch ALL courses for the selected term (not limited to specific subjects)
       const response = await fetch(
-        `http://localhost:8080/api/scraping/courses/byTerm?term=${encodeURIComponent(selectedTerm)}`
+        `${backendBase}/api/scraping/courses/byTerm?term=${encodeURIComponent(selectedTerm)}`,
+        {
+          credentials: 'include'
+        }
       )
       
       if (!response.ok) {
@@ -174,7 +176,7 @@ function CourseSearch() {
       
       if (!isSupported && upperValue.length >= 2) {
         setWarningMessage(
-          `⚠️ Warning: "${term}" may not be a fully supported subject. ` +
+          `Warning: "${term}" may not be a fully supported subject. ` +
           `Fully supported subjects are: BIO, PSY, CSE, ECO, AMS, POL. ` +
           `Other subjects will have limited information (description, credits, SBCs only).`
         )
@@ -304,7 +306,7 @@ function CourseSearch() {
 
           {/* Info Text */}
           <div className="filter-info">
-            <p>📚 Showing all courses from the database for the selected term</p>
+            <p>Showing all courses from the database for the selected term</p>
           </div>
           
           {/* Subject Search (Letters only) */}
@@ -405,7 +407,7 @@ function CourseSearch() {
               setCurrentPage(1)
             }}
           >
-            🔄 Clear Filters
+            Clear Filters
           </button>
         </div>
 
@@ -432,7 +434,7 @@ function CourseSearch() {
                         <div className="catalog-detail-info">
                           <div className="catalog-code-large">{course.subject} {course.courseNumber}</div>
                           {course.warning && (
-                            <div className="catalog-warning-text">⚠️ Simplified placement exam info</div>
+                            <div className="catalog-warning-text">Simplified placement exam info</div>
                           )}
                         </div>
                       </div>
@@ -495,7 +497,7 @@ function CourseSearch() {
                             target="_blank" rel="noopener noreferrer" className="catalog-detail-link"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            📊 View Course Evaluations
+                            View Course Evaluations
                           </a>
                         </div>
                       </div>
@@ -523,14 +525,14 @@ function CourseSearch() {
           <div className="catalog-results-cards">
             {courses.length === 0 ? (
               <div className="catalog-no-data">
-                <div className="catalog-no-data-icon">📚</div>
+                <div className="catalog-no-data-icon"></div>
                 <h3>No Course Data Available</h3>
                 <p>The course catalog is empty. Please run web scraping to import course information.</p>
-                <p className="catalog-hint">💡 Go to Course Catalog Management page to scrape courses</p>
+                <p className="catalog-hint">Go to Course Catalog Management page to scrape courses</p>
               </div>
             ) : currentItems.length === 0 ? (
               <div className="catalog-no-results">
-                <div className="catalog-no-results-icon">🔍</div>
+                <div className="catalog-no-results-icon"></div>
                 <h3>No Results Found</h3>
                 <p>Try adjusting your filters or search term</p>
               </div>
@@ -546,14 +548,14 @@ function CourseSearch() {
                         <div className="catalog-detail-info">
                           <div className="catalog-code-large">{course.subject} {course.courseNumber}</div>
                           {course.warning && (
-                            <div className="catalog-warning-text">⚠️ Simplified placement exam info</div>
+                            <div className="catalog-warning-text">Simplified placement exam info</div>
                           )}
             </div>
                       </div>
                       <div className="catalog-detail-content">
                         {!supportedSubjects.includes(course.subject) && (
                           <div className="catalog-unsupported-warning">
-                            ⚠️ This subject ({course.subject}) is not fully supported. Some information may be marked as "unknown".
+                            Warning: This subject ({course.subject}) is not fully supported. Some information may be marked as "unknown".
                           </div>
                         )}
                         
@@ -633,7 +635,7 @@ function CourseSearch() {
                             className="catalog-detail-link"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            📊 View Course Evaluations
+                            View Course Evaluations
                           </a>
                         </div>
                       </div>
@@ -646,7 +648,7 @@ function CourseSearch() {
                       <div className="catalog-course-code">
                         {course.subject} {course.courseNumber}
                         {!supportedSubjects.includes(course.subject) && (
-                          <span className="catalog-unsupported-badge">⚠️</span>
+                          <span className="catalog-unsupported-badge"></span>
                         )}
                       </div>
                         <div className="catalog-course-title">{course.courseName}</div>

@@ -4,10 +4,7 @@ import './AdvisorApproval.css';
 /**
  * Advisor Approval Component
  * Provides interface for advisors to approve or reject major/minor declarations.
- * 
- * Note: Advisor approval functionality and administrative interface were implemented 
- * with assistance from Cursor AI and ChatGPT for proper workflow management 
- * and approval processing capabilities.
+ * Also provides interface for instructors to approve or reject time conflict waivers.
  */
 
 interface MajorMinorDeclaration {
@@ -22,27 +19,58 @@ interface MajorMinorDeclaration {
   advisorApprovalDate?: string;
   advisorComments?: string;
   submittedAt: string;
-  // Helper method to detect if this is a change request
-  getIsChangeRequest?: () => boolean;
-  getFromSubject?: () => string | null;
 }
 
-interface StudentInfo {
-  netId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  gpa?: number;
-  currentMajors?: string[];
-  currentMinors?: string[];
+interface TimeConflictWaiver {
+  waiverId: number;
+  studentId: number;
+  studentName: string;
+  enrolledClass: {
+    classId: number;
+    department: string;
+    courseNum: number;
+    section: string;
+    title: string;
+    instructor: string;
+  };
+  conflictingClass: {
+    classId: number;
+    department: string;
+    courseNum: number;
+    section: string;
+    title: string;
+    instructor: string;
+  };
+  enrolledInstructorApproved: boolean | null;
+  enrolledInstructorApprovedBy?: number;
+  enrolledInstructorApprovedByName?: string;
+  enrolledInstructorApprovedAt?: string;
+  conflictingInstructorApproved: boolean | null;
+  conflictingInstructorApprovedBy?: number;
+  conflictingInstructorApprovedByName?: string;
+  conflictingInstructorApprovedAt?: string;
+  advisorApproved: boolean | null;
+  advisorApprovedBy?: number;
+  advisorApprovedByName?: string;
+  advisorApprovedAt?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reason?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 const AdvisorApproval: React.FC = () => {
+  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const [pendingDeclarations, setPendingDeclarations] = useState<MajorMinorDeclaration[]>([]);
   const [allDeclarations, setAllDeclarations] = useState<MajorMinorDeclaration[]>([]);
+  const [pendingWaivers, setPendingWaivers] = useState<TimeConflictWaiver[]>([]);
+  const [allWaivers, setAllWaivers] = useState<TimeConflictWaiver[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  // User role
+  const [userRole, setUserRole] = useState<'ADVISOR' | 'INSTRUCTOR' | null>(null);
   
   // Filter states
   const [selectedStatus, setSelectedStatus] = useState<'PENDING' | 'ALL'>('PENDING');
@@ -51,12 +79,15 @@ const AdvisorApproval: React.FC = () => {
   
   // Action states
   const [selectedDeclaration, setSelectedDeclaration] = useState<MajorMinorDeclaration | null>(null);
+  const [selectedWaiver, setSelectedWaiver] = useState<TimeConflictWaiver | null>(null);
   
   // Advisor type and permissions
   const [advisorType, setAdvisorType] = useState<'CEAS' | 'DEPARTMENT' | 'UNIVERSITY'>('DEPARTMENT');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [showWaiverApprovalModal, setShowWaiverApprovalModal] = useState(false);
+  const [showWaiverRejectionModal, setShowWaiverRejectionModal] = useState(false);
   const [comments, setComments] = useState('');
   const [processing, setProcessing] = useState(false);
 
@@ -66,12 +97,19 @@ const AdvisorApproval: React.FC = () => {
 
   useEffect(() => {
     fetchCurrentUser();
-    fetchDeclarations();
   }, []);
+
+  useEffect(() => {
+    if (userRole === 'ADVISOR') {
+      fetchDeclarations();
+    } else if (userRole === 'INSTRUCTOR') {
+      fetchWaivers();
+    }
+  }, [userRole]);
 
   const fetchCurrentUser = async () => {
     try {
-      const response = await fetch('/api/auth/me', {
+      const response = await fetch(`${backendBase}/api/auth/me`, {
         credentials: 'include',
         cache: 'no-cache',
         headers: {
@@ -81,12 +119,22 @@ const AdvisorApproval: React.FC = () => {
       });
       
       if (response.ok) {
-        const userData = await response.json();
+        const data = await response.json();
+        const userData = data.user || data;
         setCurrentUser(userData);
-        determineAdvisorType(userData);
+        const role = userData.role || '';
+        if (role.toUpperCase() === 'INSTRUCTOR') {
+          setUserRole('INSTRUCTOR');
+        } else if (role.toUpperCase() === 'ADVISOR') {
+          setUserRole('ADVISOR');
+          determineAdvisorType(userData);
+        }
+      } else {
+        setLoading(false);
       }
     } catch (err) {
       console.error('Error fetching current user:', err);
+      setLoading(false);
     }
   };
 
@@ -143,7 +191,7 @@ const AdvisorApproval: React.FC = () => {
   const fetchDeclarations = async () => {
     try {
       // Fetch pending declarations
-      const pendingResponse = await fetch('/api/major-minor-declarations/pending', {
+      const pendingResponse = await fetch(`${backendBase}/api/major-minor-declarations/pending`, {
         credentials: 'include'
       });
       const pendingData = await pendingResponse.json();
@@ -153,7 +201,7 @@ const AdvisorApproval: React.FC = () => {
       }
 
       // Fetch all declarations for filtering
-      const allResponse = await fetch('/api/major-minor-declarations/all', {
+      const allResponse = await fetch(`${backendBase}/api/major-minor-declarations/all`, {
         credentials: 'include'
       });
       const allData = await allResponse.json();
@@ -169,17 +217,47 @@ const AdvisorApproval: React.FC = () => {
     }
   };
 
+  const fetchWaivers = async () => {
+    if (!currentUser?.userId) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${backendBase}/api/waivers/instructor/${currentUser.userId}`, {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const waivers: TimeConflictWaiver[] = await response.json();
+        setAllWaivers(waivers);
+        setPendingWaivers(waivers.filter(w => w.status === 'PENDING'));
+      } else {
+        setError('Failed to fetch waivers');
+        setAllWaivers([]);
+        setPendingWaivers([]);
+      }
+    } catch (err) {
+      setError('Error fetching waivers');
+      console.error('Error:', err);
+      setAllWaivers([]);
+      setPendingWaivers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApprove = async () => {
     if (!selectedDeclaration) return;
     
     setProcessing(true);
     try {
-      const response = await fetch(`/api/major-minor-declarations/${selectedDeclaration.declarationId}/approve`, {
+      const response = await fetch(`${backendBase}/api/major-minor-declarations/${selectedDeclaration.declarationId}/approve`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           comments: comments.trim() || null,
         }),
@@ -209,12 +287,12 @@ const AdvisorApproval: React.FC = () => {
     
     setProcessing(true);
     try {
-      const response = await fetch(`/api/major-minor-declarations/${selectedDeclaration.declarationId}/reject`, {
+      const response = await fetch(`${backendBase}/api/major-minor-declarations/${selectedDeclaration.declarationId}/reject`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           comments: comments.trim() || null,
         }),
@@ -251,10 +329,126 @@ const AdvisorApproval: React.FC = () => {
     setShowRejectionModal(true);
   };
 
+  const canApproveWaiver = (waiver: TimeConflictWaiver): { canApprove: boolean; approvalType: 'enrolled' | 'conflicting' | null } => {
+    if (!currentUser?.userId) return { canApprove: false, approvalType: null };
+    
+    const instructorName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim();
+    
+    if (waiver.enrolledClass.instructor === instructorName && waiver.enrolledInstructorApproved === null) {
+      return { canApprove: true, approvalType: 'enrolled' };
+    }
+    
+    if (waiver.conflictingClass.instructor === instructorName && waiver.conflictingInstructorApproved === null) {
+      return { canApprove: true, approvalType: 'conflicting' };
+    }
+    
+    return { canApprove: false, approvalType: null };
+  };
+
+  const openWaiverApprovalModal = (waiver: TimeConflictWaiver) => {
+    setSelectedWaiver(waiver);
+    setComments('');
+    setShowWaiverApprovalModal(true);
+  };
+
+  const openWaiverRejectionModal = (waiver: TimeConflictWaiver) => {
+    setSelectedWaiver(waiver);
+    setComments('');
+    setShowWaiverRejectionModal(true);
+  };
+
+  const handleWaiverApprove = async () => {
+    if (!selectedWaiver || !currentUser?.userId) return;
+    
+    const approval = canApproveWaiver(selectedWaiver);
+    if (!approval.canApprove || !approval.approvalType) return;
+    
+    setProcessing(true);
+    try {
+      const endpoint = approval.approvalType === 'enrolled' 
+        ? `${backendBase}/api/waivers/${selectedWaiver.waiverId}/approve/enrolled-instructor`
+        : `${backendBase}/api/waivers/${selectedWaiver.waiverId}/approve/conflicting-instructor`;
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instructorId: currentUser.userId
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccess('Waiver approved successfully!');
+        setShowWaiverApprovalModal(false);
+        setComments('');
+        setSelectedWaiver(null);
+        fetchWaivers();
+      } else {
+        setError(data.message || 'Failed to approve waiver');
+      }
+    } catch (err) {
+      setError('Error approving waiver');
+      console.error('Error:', err);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleWaiverReject = async () => {
+    if (!selectedWaiver || !currentUser?.userId) return;
+    
+    const approval = canApproveWaiver(selectedWaiver);
+    if (!approval.canApprove || !approval.approvalType) return;
+    
+    setProcessing(true);
+    try {
+      const endpoint = approval.approvalType === 'enrolled'
+        ? `${backendBase}/api/waivers/${selectedWaiver.waiverId}/reject/enrolled-instructor`
+        : `${backendBase}/api/waivers/${selectedWaiver.waiverId}/reject/conflicting-instructor`;
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instructorId: currentUser.userId,
+          reason: comments.trim() || null
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccess('Waiver rejected');
+        setShowWaiverRejectionModal(false);
+        setComments('');
+        setSelectedWaiver(null);
+        fetchWaivers();
+      } else {
+        setError(data.message || 'Failed to reject waiver');
+      }
+    } catch (err) {
+      setError('Error rejecting waiver');
+      console.error('Error:', err);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const closeModals = () => {
     setShowApprovalModal(false);
     setShowRejectionModal(false);
+    setShowWaiverApprovalModal(false);
+    setShowWaiverRejectionModal(false);
     setSelectedDeclaration(null);
+    setSelectedWaiver(null);
     setComments('');
   };
 
@@ -326,14 +520,219 @@ const AdvisorApproval: React.FC = () => {
     return null;
   };
 
+  const getFilteredWaivers = () => {
+    let filtered = selectedStatus === 'PENDING' ? pendingWaivers : allWaivers;
+    return filtered;
+  };
+
   if (loading) {
     return (
       <div className="advisor-approval">
-        <div className="loading">Loading declarations...</div>
+        <div className="loading">Loading...</div>
       </div>
     );
   }
 
+  if (!userRole) {
+    return (
+      <div className="advisor-approval">
+        <div className="loading">Determining user role...</div>
+      </div>
+    );
+  }
+
+  // Instructor View - Waivers
+  if (userRole === 'INSTRUCTOR') {
+    return (
+      <div className="advisor-approval">
+        <div className="page-header">
+          <h1>Registration Overrides</h1>
+          <p>Review and approve time conflict waivers</p>
+        </div>
+
+        {error && (
+          <div className="message error">
+            <span className="message-icon"></span>
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="message success">
+            <span className="message-icon"></span>
+            {success}
+          </div>
+        )}
+
+        {/* Summary Cards */}
+        <div className="summary-section">
+          <div className="summary-cards">
+            <div className="summary-card pending">
+              <h3>Pending Approval</h3>
+              <div className="count">{pendingWaivers.length}</div>
+              <div className="description">Awaiting your review</div>
+            </div>
+            <div className="summary-card total">
+              <h3>Total Waivers</h3>
+              <div className="count">{allWaivers.length}</div>
+              <div className="description">All time</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Waivers List */}
+        <div className="declarations-section">
+          <div className="section-header">
+            <h2>Time Conflict Waivers</h2>
+            <div className="results-count">
+              {getFilteredWaivers().length} waiver(s) found
+            </div>
+          </div>
+
+          {getFilteredWaivers().length === 0 ? (
+            <div className="no-declarations">
+              <p>No waivers found matching your criteria.</p>
+            </div>
+          ) : (
+            <div className="declarations-table-container">
+              <table className="declarations-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Enrolled Class</th>
+                    <th>Conflicting Class</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getFilteredWaivers().map(waiver => {
+                    const approval = canApproveWaiver(waiver);
+                    return (
+                      <tr key={waiver.waiverId}>
+                        <td>{waiver.studentName}</td>
+                        <td>
+                          {waiver.enrolledClass.department} {waiver.enrolledClass.courseNum}.{waiver.enrolledClass.section}
+                          <br />
+                          <small>{waiver.enrolledClass.title}</small>
+                        </td>
+                        <td>
+                          {waiver.conflictingClass.department} {waiver.conflictingClass.courseNum}.{waiver.conflictingClass.section}
+                          <br />
+                          <small>{waiver.conflictingClass.title}</small>
+                        </td>
+                        <td>{waiver.reason || '—'}</td>
+                        <td>
+                          <span className={`status-badge ${getStatusColor(waiver.status)}`}>
+                            {getStatusText(waiver.status)}
+                          </span>
+                        </td>
+                        <td>{formatDate(waiver.createdAt)}</td>
+                        <td>
+                          {approval.canApprove ? (
+                            <div className="action-buttons">
+                              <button
+                                className="btn-approve"
+                                onClick={() => openWaiverApprovalModal(waiver)}
+                                disabled={processing}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                className="btn-reject"
+                                onClick={() => openWaiverRejectionModal(waiver)}
+                                disabled={processing}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-muted">
+                              {waiver.enrolledInstructorApproved !== null || waiver.conflictingInstructorApproved !== null
+                                ? 'Already processed'
+                                : 'Not your class'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Waiver Approval Modal */}
+        {showWaiverApprovalModal && selectedWaiver && (
+          <div className="modal-overlay" onClick={closeModals}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2>Approve Waiver</h2>
+              <div className="modal-body">
+                <p><strong>Student:</strong> {selectedWaiver.studentName}</p>
+                <p><strong>Enrolled Class:</strong> {selectedWaiver.enrolledClass.department} {selectedWaiver.enrolledClass.courseNum}.{selectedWaiver.enrolledClass.section} - {selectedWaiver.enrolledClass.title}</p>
+                <p><strong>Conflicting Class:</strong> {selectedWaiver.conflictingClass.department} {selectedWaiver.conflictingClass.courseNum}.{selectedWaiver.conflictingClass.section} - {selectedWaiver.conflictingClass.title}</p>
+                {selectedWaiver.reason && <p><strong>Reason:</strong> {selectedWaiver.reason}</p>}
+                <div className="form-group">
+                  <label htmlFor="approvalComments">Comments (optional)</label>
+                  <textarea
+                    id="approvalComments"
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button className="btn-secondary" onClick={closeModals} disabled={processing}>
+                  Cancel
+                </button>
+                <button className="btn-primary" onClick={handleWaiverApprove} disabled={processing}>
+                  {processing ? 'Processing...' : 'Approve'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Waiver Rejection Modal */}
+        {showWaiverRejectionModal && selectedWaiver && (
+          <div className="modal-overlay" onClick={closeModals}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2>Reject Waiver</h2>
+              <div className="modal-body">
+                <p><strong>Student:</strong> {selectedWaiver.studentName}</p>
+                <p><strong>Enrolled Class:</strong> {selectedWaiver.enrolledClass.department} {selectedWaiver.enrolledClass.courseNum}.{selectedWaiver.enrolledClass.section} - {selectedWaiver.enrolledClass.title}</p>
+                <p><strong>Conflicting Class:</strong> {selectedWaiver.conflictingClass.department} {selectedWaiver.conflictingClass.courseNum}.{selectedWaiver.conflictingClass.section} - {selectedWaiver.conflictingClass.title}</p>
+                <div className="form-group">
+                  <label htmlFor="rejectionComments">Rejection Reason (required)</label>
+                  <textarea
+                    id="rejectionComments"
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    rows={4}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button className="btn-secondary" onClick={closeModals} disabled={processing}>
+                  Cancel
+                </button>
+                <button className="btn-danger" onClick={handleWaiverReject} disabled={processing || !comments.trim()}>
+                  {processing ? 'Processing...' : 'Reject'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Advisor View - Declarations
   return (
     <div className="advisor-approval">
       <div className="page-header">
@@ -343,14 +742,14 @@ const AdvisorApproval: React.FC = () => {
 
       {error && (
         <div className="message error">
-          <span className="message-icon">⚠️</span>
+          <span className="message-icon"></span>
           {error}
         </div>
       )}
 
       {success && (
         <div className="message success">
-          <span className="message-icon">✅</span>
+          <span className="message-icon"></span>
           {success}
         </div>
       )}
@@ -461,7 +860,7 @@ const AdvisorApproval: React.FC = () => {
                         <div className="student-id">NetID: {declaration.studentNetId}</div>
                         {isChangeRequest(declaration) && (
                           <div className="change-badge" style={{color: 'orange', fontWeight: 'bold', marginTop: '4px'}}>
-                            🔄 Change Request
+                            Change Request
                           </div>
                         )}
                       </div>
@@ -544,7 +943,7 @@ const AdvisorApproval: React.FC = () => {
                 {isChangeRequest(selectedDeclaration) && (
                   <div style={{backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', padding: '10px', marginBottom: '15px'}}>
                     <p style={{margin: 0, fontWeight: 'bold', color: '#856404'}}>
-                      🔄 CHANGE REQUEST
+                      CHANGE REQUEST
                     </p>
                     {getFromSubject(selectedDeclaration) && (
                       <p style={{margin: '5px 0 0 0', color: '#856404'}}>
@@ -598,7 +997,7 @@ const AdvisorApproval: React.FC = () => {
                 {isChangeRequest(selectedDeclaration) && (
                   <div style={{backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', padding: '10px', marginBottom: '15px'}}>
                     <p style={{margin: 0, fontWeight: 'bold', color: '#856404'}}>
-                      🔄 CHANGE REQUEST
+                      CHANGE REQUEST
                     </p>
                     {getFromSubject(selectedDeclaration) && (
                       <p style={{margin: '5px 0 0 0', color: '#856404'}}>

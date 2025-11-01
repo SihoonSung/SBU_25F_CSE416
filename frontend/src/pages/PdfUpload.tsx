@@ -4,10 +4,6 @@ import './PdfUpload.css'
 /**
  * PDF Upload Page Component
  * Allows registrars to upload PDF schedules and manage class capacities.
- * 
- * Note: File upload and class management functionality were implemented 
- * with assistance from Cursor AI and ChatGPT for proper file handling 
- * and data management capabilities.
  */
 
 interface Class {
@@ -26,6 +22,7 @@ interface Class {
 }
 
 function PdfUpload() {
+  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [semester, setSemester] = useState('Spring')
   const [year, setYear] = useState(2025)
@@ -53,7 +50,9 @@ function PdfUpload() {
    */
   const fetchClasses = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/registrar/classes')
+      const response = await fetch(`${backendBase}/api/registrar/classes`, {
+        credentials: 'include'
+      })
       const data = await response.json()
       setClasses(data)
     } catch (error) {
@@ -70,14 +69,14 @@ function PdfUpload() {
       
       // Check if file is PDF
       if (file.type !== 'application/pdf') {
-        setFormatWarning('⚠️ Warning: Selected file is not a PDF. Please select a valid PDF file.')
+        setFormatWarning('Warning: Selected file is not a PDF. Please select a valid PDF file.')
         setSelectedFile(null)
         return
       }
       
       // Check file size (limit to 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        setFormatWarning('⚠️ Warning: File size is too large. Please select a PDF file smaller than 10MB.')
+        setFormatWarning('Warning: File size is too large. Please select a PDF file smaller than 10MB.')
         setSelectedFile(null)
         return
       }
@@ -109,15 +108,16 @@ function PdfUpload() {
     }
 
     try {
-      const response = await fetch('http://localhost:8080/api/registrar/upload-schedule', {
+      const response = await fetch(`${backendBase}/api/registrar/upload-schedule`, {
         method: 'POST',
+        credentials: 'include',
         body: formData
       })
 
       const data = await response.json()
       
       if (data.success) {
-        setUploadMessage(`✅ ${data.message}`)
+        setUploadMessage(`Success: ${data.message}`)
         setSelectedFile(null)
         setFormatWarning('')
         // Refresh class list
@@ -136,15 +136,15 @@ function PdfUpload() {
           data.message.toLowerCase().includes('not a valid') ||
           data.message.toLowerCase().includes('does not appear')
         )) {
-          setFormatWarning(`⚠️ PDF Format Issue: ${data.message}`)
-          setUploadMessage('❌ Upload failed - Please upload the correct SBU Course Schedule PDF')
+          setFormatWarning(`PDF Format Issue: ${data.message}`)
+          setUploadMessage('Error: Upload failed - Please upload the correct SBU Course Schedule PDF')
         } else {
-          setUploadMessage(`❌ ${data.message}`)
+          setUploadMessage(`Error: ${data.message}`)
         }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      setUploadMessage('❌ Error uploading file: ' + errorMessage)
+      setUploadMessage('Error uploading file: ' + errorMessage)
       setFormatWarning('')
     } finally {
       setUploading(false)
@@ -169,21 +169,22 @@ function PdfUpload() {
     setCapacityMessage('')
 
     try {
-      const response = await fetch('http://localhost:8080/api/rooms/load-and-calculate', {
-        method: 'POST'
+      const response = await fetch(`${backendBase}/api/rooms/load-and-calculate`, {
+        method: 'POST',
+        credentials: 'include'
       })
 
       const data = await response.json()
       
       if (data.success) {
-        setCapacityMessage('✅ ' + data.message)
+        setCapacityMessage('Success: ' + data.message)
         // Refresh class list to show updated capacities
         fetchClasses()
       } else {
-        setCapacityMessage('❌ ' + data.message)
+        setCapacityMessage('Error: ' + data.message)
       }
     } catch (error) {
-      setCapacityMessage('❌ Error loading capacities: ' + error)
+      setCapacityMessage('Error loading capacities: ' + error)
     } finally {
       setLoadingCapacity(false)
     }
@@ -197,7 +198,8 @@ function PdfUpload() {
     if (newCapacity === undefined) return
 
     try {
-      const response = await fetch(`http://localhost:8080/api/registrar/classes/${classId}/capacity`, {
+      const response = await fetch(`${backendBase}/api/registrar/classes/${classId}/capacity`, {
+        credentials: 'include',
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -281,11 +283,11 @@ function PdfUpload() {
 
   return (
     <div className="registrar-page">
-      <h1>📄 PDF Upload & Class Management</h1>
+      <h1>PDF Upload & Class Management</h1>
 
       {/* PDF Upload Section */}
       <div className="upload-section">
-        <h2>📤 Upload Class Schedule PDF</h2>
+        <h2>Upload Class Schedule PDF</h2>
         <p className="section-description">
           Upload a PDF from SBU's Course Offerings by Term page to import class schedules.
         </p>
@@ -332,7 +334,7 @@ function PdfUpload() {
               accept=".pdf"
               onChange={handleFileChange}
             />
-            {selectedFile && <span className="file-name">📎 {selectedFile.name}</span>}
+            {selectedFile && <span className="file-name">{selectedFile.name}</span>}
             {formatWarning && (
               <div className="format-warning">
                 {formatWarning}
@@ -345,11 +347,11 @@ function PdfUpload() {
             onClick={handleUpload}
             disabled={uploading || !selectedFile}
           >
-            {uploading ? '⏳ Uploading...' : '📤 Upload & Import'}
+            {uploading ? 'Uploading...' : 'Upload & Import'}
           </button>
 
           {uploadMessage && (
-            <div className={`upload-message ${uploadMessage.includes('✅') ? 'success' : 'error'}`}>
+            <div className={`upload-message ${uploadMessage.includes('Success') ? 'success' : 'error'}`}>
               {uploadMessage}
             </div>
           )}
@@ -358,7 +360,7 @@ function PdfUpload() {
 
       {/* Room Capacity Section */}
       <div className="capacity-section">
-        <h2>🏢 Load Room Capacities</h2>
+        <h2>Load Room Capacities</h2>
         <p className="section-description">
           Load room capacities from server and automatically calculate class capacities based on room locations.
         </p>
@@ -368,11 +370,11 @@ function PdfUpload() {
           onClick={handleLoadCapacity}
           disabled={loadingCapacity}
         >
-          {loadingCapacity ? '⏳ Loading...' : '🏢 Load Capacity from Server'}
+          {loadingCapacity ? 'Loading...' : 'Load Capacity from Server'}
         </button>
 
         {capacityMessage && (
-          <div className={`capacity-message ${capacityMessage.includes('✅') ? 'success' : 'error'}`}>
+          <div className={`capacity-message ${capacityMessage.includes('Success') ? 'success' : 'error'}`}>
             {capacityMessage}
           </div>
         )}
@@ -380,14 +382,14 @@ function PdfUpload() {
 
       {/* Class Management Section */}
       <div className="management-section">
-        <h2>📊 Manage Class Capacities</h2>
+        <h2>Manage Class Capacities</h2>
         <p className="section-description">
           View and edit the capacity for each class.
         </p>
 
         {/* Search Bar */}
         <div className="class-search-bar">
-          <div className="search-icon">🔍</div>
+          <div className="search-icon"></div>
           <input
             type="text"
             placeholder="Search by course code, title, or instructor..."
@@ -440,7 +442,7 @@ function PdfUpload() {
                         className="save-btn"
                         onClick={() => handleSaveCapacity(cls.classId)}
                       >
-                        ✓ Save
+                        Save
                       </button>
                       <button 
                         className="cancel-btn"
@@ -450,7 +452,7 @@ function PdfUpload() {
                           setEditingCapacity(newEditing)
                         }}
                       >
-                        ✕ Cancel
+                        Cancel
                       </button>
                     </>
                   ) : (
@@ -458,7 +460,7 @@ function PdfUpload() {
                       className="edit-btn"
                       onClick={() => setEditingCapacity({...editingCapacity, [cls.classId]: cls.capacity || 0})}
                     >
-                      ✏️ Edit
+                      Edit
                     </button>
                   )}
                 </div>
