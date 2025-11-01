@@ -1,7 +1,8 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import './App.css'
 import NavigationBar from './components/NavigationBar'
+import ProtectedRoute from './components/ProtectedRoute'
+import Planner from './pages/Planner'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Profile from './pages/Profile'
@@ -12,29 +13,13 @@ import PdfUpload from './pages/PdfUpload'
 import CourseCatalogManagement from './pages/CourseCatalogManagement'
 import DegreeRequirementsImport from './pages/DegreeRequirementsImport'
 import DegreeRequirements from './pages/DegreeRequirements'
+import DegreeAudit from './pages/DegreeAudit'
 import MajorMinorDeclaration from './pages/MajorMinorDeclaration'
 import AdvisorApproval from './pages/AdvisorApproval'
-import { isAuthenticated } from './utils/auth'
-
 
 function App() {
-  const [isAuth, setIsAuth] = useState<boolean | null>(null)
   const location = useLocation()
   const isLoginRoute = location.pathname === '/login'
-
-  // Check authentication status
-  useEffect(() => {
-    const checkAuth = async () => {
-      const authenticated = await isAuthenticated()
-      setIsAuth(authenticated)
-    }
-    checkAuth()
-  }, [])
-
-  // Show loading while checking auth
-  if (isAuth === null) {
-    return <div>Loading...</div>
-  }
 
   return (
     <div>
@@ -42,19 +27,21 @@ function App() {
       <main className="main-content">
         <Routes>
           <Route path="/login" element={<Login/>} />
-          <Route path="/" element={isAuth ? <Dashboard/> : <Navigate to="/login" replace />} />
-          <Route path="/home" element={isAuth ? <Dashboard/> : <Navigate to="/login" replace />} />
-          <Route path="/course-search" element={<CourseSearch/>} />
-          <Route path="/course-registration" element={<CourseRegistration/>} />
-          <Route path="/registration" element={<CourseRegistration/>} />
-          <Route path="/profile" element={<Profile/>}/>
-          <Route path="/user-management" element={<UserManagement/>} />
-          <Route path="/pdf-upload" element={<PdfUpload/>} />
-          <Route path="/course-catalog-management" element={<CourseCatalogManagement/>} />
-          <Route path="/degree-requirements-import" element={<DegreeRequirementsImport/>} />
-          <Route path="/degree-requirements" element={<DegreeRequirements/>} />
-          <Route path="/major-minor-declaration" element={<MajorMinorDeclaration/>} />
-          <Route path="/advisor-approval" element={<AdvisorApproval/>} />
+          <Route path="/" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
+          <Route path="/home" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
+          <Route path="/course-search" element={<ProtectedRoute><CourseSearch/></ProtectedRoute>} />
+          <Route path="/course-registration" element={<ProtectedRoute><CourseRegistration/></ProtectedRoute>} />
+          <Route path="/planner" element={<ProtectedRoute><Planner/></ProtectedRoute>} />
+          <Route path="/registration" element={<ProtectedRoute><CourseRegistration/></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile/></ProtectedRoute>}/>
+          <Route path="/user-management" element={<ProtectedRoute><UserManagement/></ProtectedRoute>} />
+          <Route path="/pdf-upload" element={<ProtectedRoute><PdfUpload/></ProtectedRoute>} />
+          <Route path="/course-catalog-management" element={<ProtectedRoute><CourseCatalogManagement/></ProtectedRoute>} />
+          <Route path="/degree-requirements-import" element={<ProtectedRoute><DegreeRequirementsImport/></ProtectedRoute>} />
+          <Route path="/degree-requirements" element={<ProtectedRoute><DegreeRequirements/></ProtectedRoute>} />
+          <Route path="/degree-audit" element={<ProtectedRoute><DegreeAudit/></ProtectedRoute>} />
+          <Route path="/major-minor-declaration" element={<ProtectedRoute><MajorMinorDeclaration/></ProtectedRoute>} />
+          <Route path="/advisor-approval" element={<ProtectedRoute><AdvisorApproval/></ProtectedRoute>} />
         </Routes>
       </main>
     </div>

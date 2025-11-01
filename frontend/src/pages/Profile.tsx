@@ -500,6 +500,7 @@ export default function ProfilePage() {
   };
 
   /** ===== Render - Modified: Added My Account UI fields and removed NetID ===== */
+  const isAdvisorOrRegistrar = (me?.roles || []).some(r => r === 'ADVISOR' || r === 'REGISTRAR')
   return (
     <div style={{ maxWidth: 1200, margin: "24px auto", padding: "0 16px" }}>
       <h1 style={{ marginBottom: 8 }}>Account & Student Profiles</h1>
@@ -655,7 +656,8 @@ export default function ProfilePage() {
         />
       )}
 
-      {/* ===== Panel 3: Student Search & Target Profile (separate from me) ===== */}
+      {/* ===== Panel 3: Student Search & Target Profile (roles: advisor/registrar 전용) ===== */}
+      {isAdvisorOrRegistrar && (
       <section style={{ background: "#f0f5ff", border: "1px solid #adc6ff", borderRadius: 12, padding: 16, marginTop: 16 }}>
         <h2 style={{ marginTop: 0 }}>Find a Student</h2>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
@@ -687,7 +689,9 @@ export default function ProfilePage() {
           </div>
         )}
       </section>
+      )}
 
+      {isAdvisorOrRegistrar && (
       <StudentBundleView
         title={`Target Student Profile${targetSid ? ` (${targetSid})` : ""}`}
         term={term}
@@ -707,9 +711,10 @@ export default function ProfilePage() {
         coursePlan={coursePlan}
         fmt={fmt}
         busy={busy}
-      />
+      />)}
 
       {/* ===== Admin: Academic calendar + system date (optional) ===== */}
+      {isAdvisorOrRegistrar && (
       <section style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
         <h2 style={{ marginTop: 0 }}>Academic Calendar Import (YAML)</h2>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -727,7 +732,9 @@ export default function ProfilePage() {
           </ul>
         </div>
       </section>
+      )}
 
+      {isAdvisorOrRegistrar && (
       <section style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
         <h2 style={{ marginTop: 0 }}>Test System Date</h2>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -739,6 +746,7 @@ export default function ProfilePage() {
           </span>
         </div>
       </section>
+      )}
     </div>
   );
 

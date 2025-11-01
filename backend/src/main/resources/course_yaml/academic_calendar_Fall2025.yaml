@@ -1,12 +1,9 @@
-<<<<<<< HEAD
-=======
 # sample academic calendar  file.
 # CSE416, Software Engineering, Scott D. Stoller.
 # only the dates needed to support SAM's functionality are included.
 # Change Log
 # 2025-10-16 added 'term' field.  fixed typos in the years in some dates (2055 -> 2025).
 
->>>>>>> 8f0841c (Fixed degree requirements based on major/minor)
 academic_calendar:
   term: {semester: Fall, year: 2025} 
   major_and_minor_changes_end: 2025-08-29

@@ -686,7 +686,6 @@ const MajorMinorDeclaration: React.FC = () => {
         </div>
       </div>
 
-
       {/* Error and Success Messages */}
       {error && (
         <div className="alert alert-error">
@@ -888,7 +887,6 @@ const MajorMinorDeclaration: React.FC = () => {
                   value={selectedSubject}
                   onChange={(e) => {
                     setSelectedSubject(e.target.value);
-                    // Load degree types for selected subject
                     loadDegreeTypesForSubject(e.target.value);
                   }}
                   required
@@ -925,7 +923,6 @@ const MajorMinorDeclaration: React.FC = () => {
                     value={selectedDegreeType}
                     onChange={(e) => {
                       setSelectedDegreeType(e.target.value as 'BA' | 'BS' | 'MINOR');
-                      // Load course requirements for selected subject and degree type
                       loadCourseRequirements(selectedSubject, e.target.value);
                     }}
                     required

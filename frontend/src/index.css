@@ -1,12 +1,11 @@
+@import './styles/theme.css';
+
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
   color-scheme: light;
-  color: #333;
-  background-color: #f5f5f5;
-
+  color: var(--text-primary);
+  background-color: var(--bg-subtle);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -15,18 +14,19 @@
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: var(--color-secondary);
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: var(--color-secondary);
+  opacity: 0.9;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: var(--bg-page);
 }
 
 h1 {
@@ -41,12 +41,12 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #f9f9f9;
+  background-color: var(--bg-elevated);
   cursor: pointer;
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: var(--color-secondary);
 }
 button:focus,
 button:focus-visible {
@@ -55,18 +55,15 @@ button:focus-visible {
 
 @media (prefers-color-scheme: light) {
   :root {
-    color: #333;
-    background-color: #f5f5f5;
-  }
-  a:hover {
-    color: #747bff;
+    color: var(--text-primary);
+    background-color: var(--bg-subtle);
   }
   button {
-    background-color: #f9f9f9;
+    background-color: var(--bg-elevated);
   }
 }
 
 .main-content {
-  background-color: #f5f5f5;
+  background-color: var(--bg-page);
   min-height: calc(100vh - 80px);
 }

@@ -112,23 +112,22 @@ students:
   first_name: Minseo2
   last_name: Student
   email: minseohappy07@gmail.com
-  university_entry: {semester: Spring, year: 2025} # term in which the student entered the university.  valid values for semester: Fall, Spring, SummerI, SummerII
-  direct_admit: null # major to which the student was directly admitted when accepted to the university, if any, otherwise null
-  AOI: null  # major for which the student is AOI if any, otherwise null
-  college: # college or school that the student is in, identified by acronym, e.g., CEAS
-  majors: [PSY] # list of majors, identified by 3-letter codes, e.g., CSE
-  degrees: [BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
-  major_requirement_versions: [{semester: Spring, year: 2025}] # the degree requirements version the student is following for each major.  entry i in this list corresponds to entry i in the majors list.
-  minors: [] # list of minors, identified by 3-letter codes
+  university_entry: {semester: Spring, year: 2025}
+  direct_admit: null
+  AOI: null
+  college:
+  majors: [PSY]
+  degrees: [BS]
+  major_requirement_versions: [{semester: Spring, year: 2025}]
+  minors: []
   minor_requirement_versions: []
-  planned_majors: [] # planned additional majors that are not yet declared.
-  planned_major_requirement_versions: [] # degree requirements version for each planned major
-  planned_degrees: [] # degree types corresponding to planned_majors
-  planned_minors: [CSE] # planned additional minors that are not yet declared.
-  planned_minor_requirement_versions: [{semester: Spring, year: 2025}] # degree requirements version for each planned minor
-  graduation: null # term in which the student graduated (if they did), otherwise null
-  transfer_courses: null # list of transfer courses and transfer credits.
-    # 'class' and 'university' identify the original class.  department and course_num identify the equivalent SBU course, if any, otherwise they are null. 
+  planned_majors: []
+  planned_major_requirement_versions: []
+  planned_degrees: []
+  planned_minors: [CSE]
+  planned_minor_requirement_versions: [{semester: Spring, year: 2025}]
+  graduation: null
+  transfer_courses: null 
   classes:  # list of classes the student took, is taking, or is registered for in a future semester.
     # GPNC is the selected grade threshold if GPMC option was selected, otherwise null.
     - {class_id: 12983, department: AMS, course_num: 210, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: A-}

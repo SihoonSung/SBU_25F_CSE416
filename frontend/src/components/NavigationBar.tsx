@@ -1,7 +1,7 @@
-import { useState} from 'react';
+import { useEffect, useState } from 'react';
 import './NavigationBar.css';
 import { Link, useNavigate } from 'react-router-dom';
-import { isAuthenticated, signOut } from '../utils/auth';
+import { getCurrentUser, isAuthenticated as checkAuth, signOut } from '../utils/auth';
 
 
 function NavigationBar() {
@@ -9,18 +9,69 @@ function NavigationBar() {
  
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [role, setRole] = useState("registrar"); 
+  const [role, setRole] = useState<string | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const authed = await checkAuth();
+        if (!mounted) return;
+        setAuthenticated(authed);
+        if (authed) {
+          const me = await getCurrentUser();
+          if (!mounted) return;
+          const backendRole = me.user?.role ?? '';
+          // Map backend roles to navbar keys
+          const mapped = backendRole.toUpperCase();
+          switch (mapped) {
+            case 'STUDENT':
+              setRole('student');
+              break;
+            case 'INSTRUCTOR':
+              setRole('professor');
+              break;
+            case 'ADVISOR':
+              setRole('academic_advisor');
+              break;
+            case 'REGISTRAR':
+              setRole('registrar');
+              break;
+            default:
+              setRole('student');
+          }
+        } else {
+          setRole(null);
+        }
+      } catch {
+        if (!mounted) return;
+        setAuthenticated(false);
+        setRole(null);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   //Role based navbar menus
    const navbar_menus : Record<string, string[]>  = {
-    "student" : ["Course Search", "Registration", "Planner", "Degree Audit", "Major Minor Declaration", "Sign out"],
-    "professor" :["Course Search", "Roaster", "Grades", "Sign out"],
+    "student" : ["Course Search", "Registration", "Planner", "Degree Audit", "Sign out"],
+    "professor" :["Course Search", "Registration Overrides", "Roaster", "Grades", "Advisor Approval", "Sign out"],
     "academic_advisor" : ["Course Search", "Registration Overrides", "Roaster", "Degree Audit", "Advisor Approval", "Sign out"],
     "registrar" : ["Course Search", "Registration Management", "User Management", "Course Catalog Management", "Degree Requirements Import", "Degree Requirements", "Roaster", "Grades", "Admin", "Sign out"]
 
   }
 
-  const urlConverter = (text: string) => '/' + text.toLowerCase().replace(/ /g, '-');
+  const urlConverter = (text: string) => {
+    const overrides: Record<string, string> = {
+      'Registration Overrides': '/advisor-approval',
+      'Advisor Approval': '/advisor-approval',
+      'Registration Management': '/course-registration',
+      'Degree Requirements': '/degree-requirements',
+      'Degree Audit': '/degree-audit',
+    };
+    return overrides[text] ?? ('/' + text.toLowerCase().replace(/ /g, '-'));
+  };
   return (
     <nav className="navbar">
       <div className="navbar-content">
@@ -47,10 +98,10 @@ function NavigationBar() {
     
         {/* TP : Used Cursor making menus depend on roles */}
         <div className={`navbar-links ${isMenuOpen ? 'is-open' : ''}`}>
-          {navbar_menus[role]?.map((Item : string, idx : number) => {
+          {role && navbar_menus[role]?.map((Item : string, idx : number) => {
             const path = urlConverter(Item);
             if (Item === 'Sign out') {
-              return isAuthenticated() ? (
+              return authenticated ? (
                 <button key={idx} className="nav-link" onClick={() => { signOut(); navigate('/login'); }}>
                   Sign out
                 </button>
@@ -64,12 +115,15 @@ function NavigationBar() {
               </Link>
             );
           })}
+          {!role && (
+            <Link to="/login" className="nav-link">Sign in</Link>
+          )}
         </div>
    
 
         {/* Icons */}
         <div className="navbar-icons">
-          <button className="icon-button" aria-label="Notifications">
+          <button className="icon-button" aria-label="Notifications" onClick={() => navigate('/major-minor-declaration')} title='Alerts & Overrides'>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>

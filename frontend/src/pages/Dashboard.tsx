@@ -93,6 +93,9 @@ function Dashboard() {
     )
   }
 
+  const role = String(me?.role || '').toUpperCase()
+  const isRegistrar = role === 'REGISTRAR' || role === 'ADMIN'
+
   return (
     <div className="dashboard">
       {/* Header */}
@@ -102,6 +105,8 @@ function Dashboard() {
 
       {/* Main Content */}
       <div className="dashboard-content">
+        {!isRegistrar ? (
+        <>
         {/* Left Column */}
         <div className="left-column">
           {/* Alert Message */}
@@ -269,6 +274,128 @@ function Dashboard() {
             </div>
           </div>
         </div>
+        </>
+        ) : (
+        <>
+          {/* Admin/Registrar Dashboard */}
+          <div className="left-column">
+            {/* System Alerts */}
+            <div className="alert-box">
+              <div className="alert-icon">ℹ</div>
+              <div className="alert-text">
+                <span className="alert-title">System notice:</span> 3 pending overrides require review.
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="stats-container">
+              <div className="stat-card">
+                <div className="stat-label">Total Users</div>
+                <div className="stat-value">1,245</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Classes (Active)</div>
+                <div className="stat-value">832</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Pending Overrides</div>
+                <div className="stat-value">3</div>
+              </div>
+            </div>
+
+            {/* Imports / Health */}
+            <div className="progress-section">
+              <div className="progress-header">
+                <div className="progress-label">Data Health</div>
+                <div className="progress-text">OK</div>
+              </div>
+              <div className="progress-bar">
+                <div className="progress-fill" style={{ width: '92%' }}></div>
+              </div>
+            </div>
+
+            <div className="reminder-card">
+              <div className="reminder-title">Quick Links</div>
+              <div className="reminder-content">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <a className="course-btn" href="/course-registration">Registration Mgmt</a>
+                  <a className="course-btn" href="/user-management">User Mgmt</a>
+                  <a className="course-btn" href="/course-catalog-management">Course Catalog</a>
+                  <a className="course-btn" href="/degree-requirements-import">Req Import</a>
+                  <a className="course-btn" href="/degree-requirements">Degree Reqs</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right column: Recent items */}
+          <div className="right-column">
+            <div className="schedule-section">
+              <div className="section-header">
+                <h2>Recent Overrides</h2>
+                <h3>Last 7 days</h3>
+              </div>
+              <table className="schedule-table">
+                <thead>
+                  <tr>
+                    <th className="time-header">Student</th>
+                    <th className="day-header">Type</th>
+                    <th className="day-header">Course</th>
+                    <th className="day-header">Status</th>
+                    <th className="day-header">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="time-cell">SBU123456</td>
+                    <td className="course-cell">Prerequisite</td>
+                    <td className="course-cell">CSE 300</td>
+                    <td className="course-cell">Pending</td>
+                    <td className="course-cell">2025-02-14</td>
+                  </tr>
+                  <tr>
+                    <td className="time-cell">SBU987654</td>
+                    <td className="course-cell">Capacity</td>
+                    <td className="course-cell">CSE 312</td>
+                    <td className="course-cell">Approved</td>
+                    <td className="course-cell">2025-02-13</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="planner-section">
+              <div className="section-header">
+                <h2>Recent Imports</h2>
+              </div>
+              <div className="planner-container">
+                <div className="planner-columns">
+                  <div className="planner-column">
+                    <div className="planner-semester">Classes</div>
+                    <div className="course-buttons">
+                      <button className="course-btn">Fall 2025 • 520 rows</button>
+                      <button className="course-btn">Spring 2025 • 498 rows</button>
+                    </div>
+                  </div>
+                  <div className="planner-column">
+                    <div className="planner-semester">Degree Reqs</div>
+                    <div className="course-buttons">
+                      <button className="course-btn">CSE • v2025</button>
+                      <button className="course-btn">AMS • v2025</button>
+                    </div>
+                  </div>
+                  <div className="planner-column">
+                    <div className="planner-semester">SBC</div>
+                    <div className="course-buttons">
+                      <button className="course-btn">Catalog v2025</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+        )}
       </div>
     </div>
   )

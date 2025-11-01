@@ -35,7 +35,9 @@ function CourseSearch() {
   const [itemsPerPage] = useState(10)
   const [filters, setFilters] = useState({
     courseNumber: '',
-    sbc: 'Any'
+    sbc: 'Any',
+    instructor: '',
+    dayTime: 'Any'
   })
   const [availableTerms, setAvailableTerms] = useState<any[]>([])
   const [selectedTerm, setSelectedTerm] = useState<string>('')
@@ -330,6 +332,18 @@ function CourseSearch() {
               maxLength={5}
             />
           </div>
+          {/* Instructor Filter (text) */}
+          <div className="filter-group">
+            <label htmlFor="instructor">Instructor:</label>
+            <input
+              type="text"
+              id="instructor"
+              value={filters.instructor}
+              onChange={(e) => handleFilterChange('instructor', e.target.value)}
+              placeholder="e.g., alex"
+              maxLength={40}
+            />
+          </div>
           
           <div className="filter-group">
             <label htmlFor="sbc">SBC:</label>
@@ -356,6 +370,20 @@ function CourseSearch() {
               <option value="WRT">WRT</option>
             </select>
           </div>
+          {/* Day/Time Filter (preset) */}
+          <div className="filter-group">
+            <label htmlFor="dayTime">Days/Time:</label>
+            <select
+              id="dayTime"
+              value={filters.dayTime}
+              onChange={(e) => handleFilterChange('dayTime', e.target.value)}
+            >
+              <option value="Any">Any</option>
+              <option value="Morning">Morning</option>
+              <option value="Afternoon">Afternoon</option>
+              <option value="Evening">Evening</option>
+            </select>
+          </div>
           
           <div className="filter-stats">
             <div className="stat-item">
@@ -372,7 +400,7 @@ function CourseSearch() {
           <button 
             className="clear-filters-btn"
             onClick={() => {
-              setFilters({ courseNumber: '', sbc: 'Any' })
+              setFilters({ courseNumber: '', sbc: 'Any', instructor: '', dayTime: 'Any' })
               setSearchTerm('')
               setCurrentPage(1)
             }}
@@ -383,7 +411,115 @@ function CourseSearch() {
 
         {/* Results */}
         <div className="results-main">
-          <h1>Course Catalog</h1>
+          <h1>Course Search Results</h1>
+          <div className="results-shell">
+            <div className="results-header">
+              <div>COURSE CODE</div>
+              <div>TITLE</div>
+              <div>CREDITS</div>
+              <div>PREREQUISITES</div>
+              <div>INSTRUCTOR</div>
+              <div>TIME</div>
+              <div>SEATS OPEN</div>
+              <div></div>
+            </div>
+            <div className="results-body">
+              {currentItems.map((course) => (
+                <div key={course.id}>
+                  {selectedCourse && selectedCourse.id === course.id ? (
+                    <div className="catalog-detail-card" onClick={handleBackToSearch}>
+                      <div className="catalog-detail-header">
+                        <div className="catalog-detail-info">
+                          <div className="catalog-code-large">{course.subject} {course.courseNumber}</div>
+                          {course.warning && (
+                            <div className="catalog-warning-text">⚠️ Simplified placement exam info</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="catalog-detail-content">
+                        <div className="catalog-detail-row">
+                          <span className="catalog-detail-label">Title:</span>
+                          <span className="catalog-detail-value">{course.courseName}</span>
+                        </div>
+                        <div className="catalog-detail-row">
+                          <span className="catalog-detail-label">Credits:</span>
+                          <span className="catalog-detail-value">
+                            {typeof course.credits === 'string' && course.credits.includes('-') 
+                              ? `${course.credits} credits` 
+                              : `${course.credits} credit${course.credits !== 1 ? 's' : ''}`}
+                          </span>
+                        </div>
+                        {course.sbcsSatisfied && course.sbcsSatisfied !== 'None' && (
+                          <div className="catalog-detail-row">
+                            <span className="catalog-detail-label">SBC:</span>
+                            <span className={`catalog-detail-value ${course.sbcsSatisfied === 'unknown' ? 'catalog-unknown-info' : 'catalog-sbc-badges'}`}>
+                              {course.sbcsSatisfied}
+                            </span>
+                          </div>
+                        )}
+                        {course.description && course.description !== 'No description available' && (
+                          <div className="catalog-detail-row">
+                            <span className="catalog-detail-label">Description:</span>
+                            <span className="catalog-detail-value catalog-description-text">{course.description}</span>
+                          </div>
+                        )}
+                        <div className="catalog-requisites-section">
+                          {course.prerequisites && course.prerequisites !== 'None' && (
+                            <div className="catalog-detail-row">
+                              <span className="catalog-detail-label">Prerequisites:</span>
+                              <span className={`catalog-detail-value ${course.prerequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>{course.prerequisites}</span>
+                            </div>
+                          )}
+                          {course.corequisites && course.corequisites !== 'None' && (
+                            <div className="catalog-detail-row">
+                              <span className="catalog-detail-label">Corequisites:</span>
+                              <span className={`catalog-detail-value ${course.corequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>{course.corequisites}</span>
+                            </div>
+                          )}
+                          {course.antirequisites && course.antirequisites !== 'None' && (
+                            <div className="catalog-detail-row">
+                              <span className="catalog-detail-label">Antirequisites:</span>
+                              <span className={`catalog-detail-value ${course.antirequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>{course.antirequisites}</span>
+                            </div>
+                          )}
+                          {course.advisoryPrerequisites && course.advisoryPrerequisites !== 'None' && (
+                            <div className="catalog-detail-row">
+                              <span className="catalog-detail-label">Advisory Prerequisites:</span>
+                              <span className={`catalog-detail-value ${course.advisoryPrerequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>{course.advisoryPrerequisites}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="catalog-detail-row">
+                          <a 
+                            href={`https://classie-evals.stonybrook.edu/?SearchKeyword=${course.subject}${course.courseNumber}&SearchTerm=ALL`}
+                            target="_blank" rel="noopener noreferrer" className="catalog-detail-link"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            📊 View Course Evaluations
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="search-row" onClick={() => handleCourseSelect(course)}>
+                      <div className="cell-code">{course.subject} {course.courseNumber}</div>
+                      <div className="cell-title">{course.courseName}</div>
+                  <div className="cell-credits">{typeof course.credits === 'string' ? course.credits : `${course.credits}`}</div>
+                  <div className="cell-prereq">{course.prerequisites && course.prerequisites !== 'None' ? course.prerequisites : '—'}</div>
+                  <div className="cell-instructor">N/A</div>
+                      <div className="cell-time">View details</div>
+                  <div className="cell-seats">N/A</div>
+                      <div className="add-to-cart">
+                        <button className="add-to-cart-btn" onClick={(e) => { e.stopPropagation(); /* add to cart action */ }}>
+                          Add to Cart
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="catalog-results-cards">
             {courses.length === 0 ? (
               <div className="catalog-no-data">

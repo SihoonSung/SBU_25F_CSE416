@@ -6,11 +6,13 @@
  
 .dashboard {
     min-height: 100vh;
-    background-color: #f8f9fa;
-    padding: 2rem;
+    background-color: var(--bg-page);
+    padding: 2.5rem;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     width: 100%;
     box-sizing: border-box;
+    max-width: min(92vw, 1600px); /* 초대형 화면에서 더 넓게 */
+    margin: 0 auto;
   }
   
   /* Header */
@@ -22,47 +24,49 @@
   .dashboard-header h1 {
     font-size: 2.5rem;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--text-primary);
     margin: 0;
   }
   
   /* Main Content Layout */
   .dashboard-content {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
+    grid-template-columns: 7fr 5fr; /* 동일 비율, 조금 더 여유 있게 */
+    gap: 2.4rem;
     width: 100%;
   }
   
   /* Left Column */
-  .left-column {
+.left-column {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    background-color: white;
-    border-radius: 12px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+  border-radius: 16px; /* 곡률 강화 */
     padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-sm);
   }
   
   /* Alert Message Box */
-  .alert-box {
-    background-color: #fff5f5;
-    border: 1px solid #fed7d7;
-    border-radius: 8px;
-    padding: 1rem;
+.alert-box {
+    background-color: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-left: 6px solid var(--button-danger-bg); /* 와이어프레임 느낌의 강조선 */
+  border-radius: 12px;
+  padding: 12px 14px;
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-sm);
   }
   
-  .alert-icon {
-    background-color: #e53e3e;
-    color: white;
+.alert-icon {
+    background-color: var(--button-danger-bg);
+    color: #ffffff;
     width: 24px;
     height: 24px;
-    border-radius: 50%;
+  border-radius: 9999px; /* 완전한 pill */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -72,34 +76,35 @@
   }
   
   .alert-text {
-    color: #2d3748;
+    color: var(--text-secondary);
     font-size: 14px;
     line-height: 1.5;
   }
   
   .alert-title {
-    color: #e53e3e;
+    color: var(--error-text);
     font-weight: 600;
   }
   
   /* Statistics Cards */
-  .stats-container {
+.stats-container {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
   }
   
   .stat-card {
-    background-color: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+  border-radius: 16px;
+    padding: 1.4rem;
+    box-shadow: var(--shadow-sm);
     text-align: center;
   }
   
   .stat-label {
     font-size: 12px;
-    color: #718096;
+    color: var(--text-muted);
     margin-bottom: 0.5rem;
     font-weight: 500;
   }
@@ -107,15 +112,16 @@
   .stat-value {
     font-size: 2rem;
     font-weight: 700;
-    color: #2d3748;
+    color: var(--text-primary);
   }
   
   /* Progress Section */
   .progress-section {
-    background-color: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+  border-radius: 16px;
+    padding: 1.4rem 1.6rem;
+    box-shadow: var(--shadow-sm);
   }
   
   .progress-header {
@@ -127,48 +133,49 @@
   
   .progress-label {
     font-size: 12px;
-    color: #718096;
+    color: var(--text-muted);
     font-weight: 500;
   }
   
   .progress-text {
     font-size: 12px;
-    color: #718096;
+    color: var(--text-muted);
     font-weight: 500;
   }
   
-  .progress-bar {
-    background-color: #e2e8f0;
-    border-radius: 8px;
-    height: 8px;
+.progress-bar {
+    background-color: var(--border-subtle);
+  border-radius: 9999px;
+  height: 10px;
     position: relative;
     overflow: hidden;
   }
   
-  .progress-fill {
-    background-color: #e53e3e;
+.progress-fill {
+    background-color: var(--button-danger-bg);
     height: 100%;
-    border-radius: 8px;
+  border-radius: 9999px;
     transition: width 0.3s ease;
   }
   
   /* Reminder Card */
   .reminder-card {
-    background-color: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+  border-radius: 16px;
+    padding: 1.4rem 1.6rem;
+    box-shadow: var(--shadow-sm);
   }
   
   .reminder-title {
     font-size: 1.25rem;
     font-weight: 600;
-    color: #2d3748;
+    color: var(--text-primary);
     margin-bottom: 1rem;
   }
   
   .reminder-content {
-    color: #4a5568;
+    color: var(--text-secondary);
     font-size: 14px;
     line-height: 1.6;
   }
@@ -180,7 +187,7 @@
   .reminder-content div:last-child {
     font-weight: 700;
     font-size: 16px;
-    color: #2d3748;
+    color: var(--text-primary);
     margin-bottom: 0;
   }
   
@@ -199,44 +206,45 @@
   .section-header h2 {
     font-size: 1.25rem;
     font-weight: 600;
-    color: #2d3748;
+    color: var(--text-primary);
     margin: 0 0 0.25rem 0;
   }
   
   .section-header h3 {
     font-size: 0.875rem;
-    color: #718096;
+    color: var(--text-muted);
     margin: 0;
     font-weight: 400;
   }
   
   /* Course Schedule - Temporary hardcoded */
   .schedule-section {
-    background-color: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+  border-radius: 16px;
+    padding: 1.4rem 1.6rem;
+    box-shadow: var(--shadow-sm);
     position: relative;
   }
   
-  .schedule-table {
+.schedule-table {
     width: 100%;
     border-collapse: collapse;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+  border-radius: 12px;
     overflow: hidden;
     margin-bottom: 1rem;
-    background: white;
+    background: var(--bg-elevated);
     table-layout: fixed;
   }
   
   .schedule-table thead {
-    background-color: #f7fafc;
+    background-color: var(--bg-page);
   }
   
   .schedule-table th,
   .schedule-table td {
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border-subtle);
     text-align: center;
     vertical-align: middle;
   }
@@ -245,7 +253,7 @@
     padding: 0.75rem 0.5rem;
     font-size: 12px;
     font-weight: 600;
-    color: #4a5568;
+    color: var(--text-secondary);
   }
   
   .time-header {
@@ -261,54 +269,40 @@
     padding: 0.5rem 0.25rem;
     font-size: 11px;
     font-weight: 500;
-    color: #718096;
-    background-color: #f7fafc;
+    color: var(--text-muted);
+    background-color: var(--bg-page);
     width: 60px;
     min-width: 60px;
   }
   
   .course-cell {
     padding: 0.25rem;
-    font-size: 9px;
-    font-weight: 500;
-    color: white;
-    min-height: 35px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #ffffff;
+    min-height: 36px;
     line-height: 1.1;
+    border-radius: 8px;
     width: calc((100% - 60px) / 5);
   }
   
   
-  .course-cell.cse373 {
-    background-color: #48bb78;
-  }
-  
-  .course-cell.cse355 {
-    background-color: #ed8936;
-  }
-  
-  .course-cell.cse312 {
-    background-color: #4299e1;
-  }
-  
-  .course-cell.ams310 {
-    background-color: #9f7aea;
-  }
-  
-  .course-cell.cse300 {
-    background-color: #f56565;
-  }
-  
-  .course-cell.cse416 {
-    background-color: #38b2ac;
-  }
+  /* 개별 과목 색상 유지 */
+  .course-cell.cse373 { background-color: #48bb78; }
+  .course-cell.cse355 { background-color: #ed8936; }
+  .course-cell.cse312 { background-color: #4299e1; }
+  .course-cell.ams310 { background-color: #9f7aea; }
+  .course-cell.cse300 { background-color: #f56565; }
+  .course-cell.cse416 { background-color: #38b2ac; }
   
   
   /* Planner */
   .planner-section {
-    background-color: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+  border-radius: 16px;
+    padding: 1.4rem 1.6rem;
+    box-shadow: var(--shadow-sm);
   }
   
   .planner-container {
@@ -347,7 +341,7 @@
   .planner-semester {
     font-size: 14px;
     font-weight: 600;
-    color: #2d3748;
+    color: var(--text-primary);
     margin-bottom: 1rem;
   }
   
@@ -357,20 +351,39 @@
     gap: 0.5rem;
   }
   
-  .course-btn {
-    background-color: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
+.course-btn {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+  border-radius: 9999px; /* pill 버튼 */
     padding: 0.5rem 0.75rem;
     font-size: 12px;
-    color: #4a5568;
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
   }
+
+/* Ultra-wide (4K 등)에서 요소 스케일 업 */
+@media (min-width: 1800px) {
+  .dashboard {
+    max-width: min(88vw, 1760px);
+    padding: 3rem;
+  }
+  .dashboard-header h1 { font-size: 2.8rem; }
+  .dashboard-content { gap: 2.8rem; }
+  .stat-card { padding: 1.6rem; }
+  .stat-value { font-size: 2.2rem; }
+  .progress-section { padding: 1.6rem 1.8rem; }
+  .progress-bar { height: 12px; }
+  .reminder-card { padding: 1.6rem 1.8rem; }
+  .schedule-section { padding: 1.6rem 1.8rem; }
+  .course-cell { font-size: 11px; min-height: 38px; }
+  .planner-section { padding: 1.6rem 1.8rem; }
+  .course-btn { font-size: 13px; padding: 0.55rem 0.85rem; }
+}
   
   .course-btn:hover {
-    background-color: #f7fafc;
-    border-color: #cbd5e0;
+    background-color: var(--bg-page);
+    border-color: var(--border-default);
   }
   
   /* Responsive Design */

@@ -22,7 +22,7 @@ function CourseRegistration() {
   const [selectedYear, setSelectedYear] = useState<number | string>('')
   const [cart, setCart] = useState<any[]>([])
   const [userId, setUserId] = useState<number | null>(null)
-  
+  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
 
   /**
    * Fetch available terms and classes on component mount
@@ -255,7 +255,6 @@ function CourseRegistration() {
     return schedules.join(', ')
   }
 
-
   /**
    * Add a course to the cart with time conflict checking
    */
@@ -280,7 +279,7 @@ function CourseRegistration() {
             const result = await checkTimeConflict(courseSchedule, cartSchedule)
             if (result.hasConflict) {
               hasConflict = true
-              conflictMessage += `⚠️ Time conflict with ${cartItem.code} (${cartItem.title})\n`
+              conflictMessage += `Time conflict with ${cartItem.code} (${cartItem.title})\n`
             }
           } catch (error) {
             console.error('Error checking time conflict:', error)
@@ -295,8 +294,9 @@ function CourseRegistration() {
 
     // Add to cart regardless of conflicts
     try {
-      const response = await fetch('http://localhost:8080/api/cart/add', {
+      const response = await fetch(`${backendBase}/api/cart/add`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -309,7 +309,6 @@ function CourseRegistration() {
       const data = await response.json()
       
       if (data.success) {
-        // Reload cart from database
         await loadCartFromDB()
         if (!hasConflict) {
           alert('Class added to cart successfully!')
@@ -337,22 +336,22 @@ function CourseRegistration() {
     }
     
     try {
-      const response = await fetch(`http://localhost:8080/api/cart/remove?userId=${userId}&classId=${courseId}`, {
-        method: 'DELETE'
+      const response = await fetch(`${backendBase}/api/cart/remove?userId=${userId}&classId=${courseId}`, {
+        method: 'DELETE',
+        credentials: 'include'
       })
       
       const data = await response.json()
       
       if (data.success) {
-        // Reload cart from database
         await loadCartFromDB()
         alert('Class removed from cart successfully!')
       } else {
-        alert('❌ Error removing class from cart: ' + data.message)
+        alert('Error removing class from cart: ' + data.message)
       }
     } catch (error) {
       console.error('Error removing from cart:', error)
-      alert('❌ Error removing class from cart. Please try again.')
+      alert('Error removing class from cart. Please try again.')
     }
   }
 
@@ -425,6 +424,62 @@ function CourseRegistration() {
         </div>
       </div>
     )
+  }
+
+  // --- Helpers: schedule overlap detection ---
+  const normalizeDays = (s: string) => {
+    const map: Record<string, string> = { Mon: 'M', Tue: 'T', Wed: 'W', Thu: 'R', Fri: 'F' }
+    let days = ''
+    Object.keys(map).forEach(k => { if (s.includes(k)) days += map[k] })
+    if (!days) {
+      // fallback for compact forms like MW, TR
+      if (/M(?!on)/.test(s)) days += 'M'
+      if (/T(?!ue)/.test(s)) days += 'T'
+      if (/W/.test(s)) days += 'W'
+      if (/R|Thu/.test(s)) days += 'R'
+      if (/F/.test(s)) days += 'F'
+    }
+    return days || s
+  }
+
+  const extractStartEnd = (s: string) => {
+    // Supports formats: "9:30 AM", "09:00 AM - 10:20 AM", "09:00-10:20PM"
+    const range = s.match(/(\d{1,2}:\d{2}\s*[AP]M)\s*[-–]\s*(\d{1,2}:\d{2}\s*[AP]M)/i)
+    const single = s.match(/(\d{1,2}:\d{2})\s*([AP]M)/i)
+    if (range) return { start: range[1].replace(/\s+/g, ''), end: range[2].replace(/\s+/g, '') }
+    if (single) return { start: (single[1]+single[2]).replace(/\s+/g, ''), end: null as any }
+    return { start: s, end: null as any }
+  }
+
+  const isOverlap = (a: any, b: any) => {
+    const da = normalizeDays(a.schedule || '')
+    const db = normalizeDays(b.schedule || '')
+    if (![...da].some(d => db.includes(d))) return false
+    const ta = extractStartEnd(a.schedule || '')
+    const tb = extractStartEnd(b.schedule || '')
+    // simplest: if start time text matches, treat as overlap; or full range equality
+    if (ta.start && tb.start && ta.start.toUpperCase() === tb.start.toUpperCase()) return true
+    if (ta.end && tb.end && ta.start.toUpperCase() === tb.start.toUpperCase() && ta.end.toUpperCase() === tb.end.toUpperCase()) return true
+    // fallback: identical schedule string
+    return (a.schedule || '').trim().toUpperCase() === (b.schedule || '').trim().toUpperCase()
+  }
+
+  const updateCartWithConflicts = (list: any[]) => {
+    return list.map((c, i) => {
+      const conflict = list.some((d, j) => j !== i && isOverlap(c, d))
+      const baseStatus = c.status && c.status !== 'Conflict' ? c.status : 'Added'
+      return { ...c, status: conflict ? 'Conflict' : baseStatus }
+    })
+  }
+
+  const findConflictPairs = (list: any[]) => {
+    const pairs: Array<[any, any]> = []
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        if (isOverlap(list[i], list[j])) pairs.push([list[i], list[j]])
+      }
+    }
+    return pairs
   }
 
   return (
@@ -504,13 +559,14 @@ function CourseRegistration() {
                           e.stopPropagation();
                           handleAddToCart(course);
                         }}
+                        disabled={cart.some(c => c.id === course.id)}
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <circle cx="9" cy="21" r="1"></circle>
                           <circle cx="20" cy="21" r="1"></circle>
                           <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                         </svg>
-                        <span className="btn-text">Add to Cart</span>
+                        <span className="btn-text">{cart.some(c => c.id === course.id) ? 'Added' : 'Add to Cart'}</span>
                       </button>
                     </div>
                     <div className="course-detail-content">
@@ -624,13 +680,14 @@ function CourseRegistration() {
                     <button 
                       className="add-to-cart-btn"
                       onClick={() => handleAddToCart(course)}
+                      disabled={cart.some(c => c.id === course.id)}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="9" cy="21" r="1"></circle>
                         <circle cx="20" cy="21" r="1"></circle>
                         <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                       </svg>
-                      <span className="btn-text">Add to Cart</span>
+                      <span className="btn-text">{cart.some(c => c.id === course.id) ? 'Added' : 'Add to Cart'}</span>
                     </button>
                   </div>
                 )}
@@ -672,7 +729,7 @@ function CourseRegistration() {
           {/* Conflict Warning */}
           {cart.some(item => item.status === 'Conflict') && (
             <div className="conflict-warning">
-              <div className="conflict-icon">⚠️</div>
+              <div className="conflict-icon"></div>
               <div className="conflict-details">
                 <div className="conflict-title">Time Conflicts Detected</div>
                 <div className="conflict-message">
