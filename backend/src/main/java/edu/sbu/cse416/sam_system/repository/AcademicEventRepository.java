@@ -18,4 +18,12 @@ public interface AcademicEventRepository extends JpaRepository<AcademicEvent, Lo
     List<AcademicEvent> findByTitleKeyword(@Param("keyword") String keyword);
     
     Optional<AcademicEvent> findByTitleIgnoreCase(String title);
+    
+    /**
+     * Find event by title, semester, and year
+     */
+    @Query("SELECT e FROM AcademicEvent e WHERE LOWER(e.title) = LOWER(:title) AND e.semester = :semester AND e.year = :year")
+    Optional<AcademicEvent> findByTitleAndSemesterAndYear(@Param("title") String title, 
+                                                           @Param("semester") String semester, 
+                                                           @Param("year") Integer year);
 }

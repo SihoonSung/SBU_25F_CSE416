@@ -66,6 +66,9 @@ public class CartService {
     @Autowired
     private TimeConflictWaiverService waiverService;
     
+    @Autowired
+    private RegistrationScheduleService registrationScheduleService;
+    
     /**
      * Add a class to user's cart
      * @param userId User ID
@@ -328,6 +331,23 @@ public class CartService {
                 result.put("success", false);
                 result.put("message", "Cart is empty");
                 return result;
+            }
+            
+            // Check registration schedule - validate that student can register for the term
+            // Get term from first cart item (assuming all items are for the same term)
+            CartEntity firstItem = cartItems.get(0);
+            String semester = firstItem.getClassEntity().getSemester();
+            Integer year = firstItem.getClassEntity().getYear();
+            
+            if (semester != null && year != null) {
+                boolean canRegister = registrationScheduleService.canStudentRegister(userId, semester, year);
+                if (!canRegister) {
+                    Map<String, Object> eligibility = registrationScheduleService.getRegistrationEligibility(userId, semester, year);
+                    result.put("success", false);
+                    result.put("message", "Registration is not open for your student category at this time");
+                    result.put("eligibility", eligibility);
+                    return result;
+                }
             }
             
             // Get already registered classes from UserClasses
