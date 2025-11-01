@@ -63,6 +63,9 @@ public class CartService {
     @Autowired
     private RegistrationHoldService holdService;
     
+    @Autowired
+    private TimeConflictWaiverService waiverService;
+    
     /**
      * Add a class to user's cart
      * @param userId User ID
@@ -411,9 +414,17 @@ public class CartService {
                         if (schedule1 != null && schedule2 != null) {
                             boolean hasConflict = TimeConflictChecker.hasTimeConflict(schedule1, schedule2);
                             if (hasConflict) {
-                                conflicts.add(String.format("Conflict between %s and %s", 
-                                    item1.getClassEntity().getDepartment() + item1.getClassEntity().getCourseNum(),
-                                    item2.getClassEntity().getDepartment() + item2.getClassEntity().getCourseNum()));
+                                // Check if there's an approved waiver for this conflict
+                                boolean hasWaiver = waiverService.hasApprovedWaiver(
+                                    userId, 
+                                    item1.getClassEntity().getClassId(), 
+                                    item2.getClassEntity().getClassId());
+                                
+                                if (!hasWaiver) {
+                                    conflicts.add(String.format("Conflict between %s and %s", 
+                                        item1.getClassEntity().getDepartment() + item1.getClassEntity().getCourseNum(),
+                                        item2.getClassEntity().getDepartment() + item2.getClassEntity().getCourseNum()));
+                                }
                             }
                         }
                     }
@@ -436,10 +447,18 @@ public class CartService {
                                 if (registeredSchedule != null) {
                                     boolean hasConflict = TimeConflictChecker.hasTimeConflict(cartSchedule, registeredSchedule);
                                     if (hasConflict) {
-                                        conflicts.add(String.format("Conflict between cart item %s and already registered %s %s", 
-                                            cartItem.getClassEntity().getDepartment() + cartItem.getClassEntity().getCourseNum(),
-                                            registeredClassEntity.getDepartment(), 
-                                            registeredClassEntity.getCourseNum()));
+                                        // Check if there's an approved waiver for this conflict
+                                        boolean hasWaiver = waiverService.hasApprovedWaiver(
+                                            userId, 
+                                            cartItem.getClassEntity().getClassId(), 
+                                            registeredClassEntity.getClassId());
+                                        
+                                        if (!hasWaiver) {
+                                            conflicts.add(String.format("Conflict between cart item %s and already registered %s %s", 
+                                                cartItem.getClassEntity().getDepartment() + cartItem.getClassEntity().getCourseNum(),
+                                                registeredClassEntity.getDepartment(), 
+                                                registeredClassEntity.getCourseNum()));
+                                        }
                                     }
                                 }
                             }
