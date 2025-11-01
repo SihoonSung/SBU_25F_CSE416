@@ -1,10 +1,7 @@
-# sample academic calendar  file.  version: 2025-09-09
-# CSE416, Software Engineering, Scott D. Stoller.
-# only the dates needed to support SAM's functionality are included.
-
 academic_calendar:
-  major_and_minor_changes_end: 2055-08-29
-  waitlist: 2055-08-29 # last day to waitlist a class
+  term: {semester: Fall, year: 2025} 
+  major_and_minor_changes_end: 2025-08-29
+  waitlist: 2025-08-29 # last day to waitlist a class
   waitlist_process_ends: 2025-09-05
   late_registration_ends: 2025-09-08
   GPNC_selection_ends: 2025-10-24

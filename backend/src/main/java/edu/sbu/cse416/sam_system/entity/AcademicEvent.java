@@ -21,6 +21,12 @@ public class AcademicEvent {
     @Column(nullable = false)
     private String type; // e.g. TERM, DEADLINE
 
+    @Column(name = "semester")
+    private String semester; // Fall, Spring, Summer
+
+    @Column(name = "year")
+    private Integer year; // e.g. 2025
+
     // getters/setters
     public Long getId() { return id; }
     public LocalDate getDate() { return date; }
@@ -29,4 +35,8 @@ public class AcademicEvent {
     public void setTitle(String title) { this.title = title; }
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
+    public String getSemester() { return semester; }
+    public void setSemester(String semester) { this.semester = semester; }
+    public Integer getYear() { return year; }
+    public void setYear(Integer year) { this.year = year; }
 }

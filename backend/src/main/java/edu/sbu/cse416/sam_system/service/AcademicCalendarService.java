@@ -1,6 +1,5 @@
 package edu.sbu.cse416.sam_system.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import edu.sbu.cse416.sam_system.entity.AcademicEvent;
@@ -67,10 +66,34 @@ public class AcademicCalendarService {
                 // case 2: dictionary form (expect academic_calendar -> map OR list)
                 Object calendar = ((Map<?, ?>) root).get("academic_calendar");
                 if (calendar instanceof Map<?, ?> calMap) {
-                    // map of key -> yyyy-MM-dd
+                    // Parse term information first (if present)
+                    String semester = null;
+                    Integer year = null;
+                    Object termObj = calMap.get("term");
+                    if (termObj instanceof Map<?, ?> termMap) {
+                        Object semObj = termMap.get("semester");
+                        Object yearObj = termMap.get("year");
+                        if (semObj != null) {
+                            semester = String.valueOf(semObj).trim();
+                        }
+                        if (yearObj != null) {
+                            try {
+                                year = Integer.parseInt(String.valueOf(yearObj));
+                            } catch (NumberFormatException e) {
+                                errors.add("Invalid year in term: " + yearObj);
+                            }
+                        }
+                    }
+                    
+                    // map of key -> yyyy-MM-dd (skip "term" key)
                     for (Map.Entry<?, ?> entry : calMap.entrySet()) {
+                        String rawKey = String.valueOf(entry.getKey());
+                        // Skip the "term" key as it's not an event
+                        if ("term".equalsIgnoreCase(rawKey)) {
+                            continue;
+                        }
+                        
                         try {
-                            String rawKey = String.valueOf(entry.getKey());
                             String title  = prettifyKey(rawKey);
                             String dateStr = String.valueOf(entry.getValue());
                             LocalDate date = parseIsoDate(dateStr);
@@ -79,6 +102,13 @@ public class AcademicCalendarService {
                             ev.setDate(date);
                             ev.setTitle(title);
                             ev.setType("DEADLINE");
+                            // Set term information if available
+                            if (semester != null) {
+                                ev.setSemester(semester);
+                            }
+                            if (year != null) {
+                                ev.setYear(year);
+                            }
                             repo.save(ev);
                             imported++;
                         } catch (Exception ex) {
