@@ -17,6 +17,7 @@ import AdvisorApproval from './pages/AdvisorApproval'
 import PdfUpload from './pages/PdfUpload'
 import Roster from './pages/Roster'
 import Grades from './pages/Grades'
+import AdminRegistrationSchedule from './pages/AdminRegistrationSchedule'
 
 function App() {
   const location = useLocation()
@@ -44,6 +45,7 @@ function App() {
           <Route path="/pdf-upload" element={<ProtectedRoute><PdfUpload/></ProtectedRoute>} />
           <Route path="/roster" element={<ProtectedRoute><Roster/></ProtectedRoute>} />
           <Route path="/grades" element={<ProtectedRoute><Grades/></ProtectedRoute>} />
+          <Route path="/admin/registration-schedules" element={<ProtectedRoute><AdminRegistrationSchedule /></ProtectedRoute>}/>
         </Routes>
       </main>
     </div>

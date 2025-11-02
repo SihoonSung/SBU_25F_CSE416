@@ -62,7 +62,7 @@ function NavigationBar() {
     "student" : ["Course Search", "Registration", "Planner", "Degree Audit", "Sign out"],
     "professor" :["Course Search", "Registration Overrides", "Roaster", "Grades", "Sign out"],
     "academic_advisor" : ["Course Search", "Registration Overrides", "Roaster", "Degree Audit", "Advisor Approval", "Sign out"],
-        "registrar" : ["User Management", "Data Import", "Degree Requirements", "Class Management", "Sign out"]
+    "registrar" : ["User Management", "Data Import", "Degree Requirements", "Class Management","Registration Schedule", "Sign out"]
 
   }
 
@@ -77,6 +77,7 @@ function NavigationBar() {
       'Class Management': '/pdf-upload',
       'Roaster': '/roster',
       'Grades': '/grades',
+      'Registration Schedule': '/admin/registration-schedules',
     };
     return overrides[text] ?? ('/' + text.toLowerCase().replace(/ /g, '-'));
   };
