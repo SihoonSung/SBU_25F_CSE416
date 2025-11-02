@@ -56,10 +56,29 @@ function CourseRegistration() {
 
   /**
    * Load cart when userId is available
+   * Initial load: fetch cart and update conflicts once
+   * Conflicts will be updated automatically by backend when adding/removing items
    */
   useEffect(() => {
     if (userId) {
-      loadCartFromDB()
+      // Load cart first
+      loadCartFromDB().then(() => {
+        // Update conflicts once after initial load (non-recursive)
+        if (userId) {
+          fetch(`${backendBase}/api/cart/update-conflicts?userId=${userId}`, {
+            method: 'POST',
+            credentials: 'include'
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              // Reload cart once to get updated conflict statuses
+              loadCartFromDB()
+            }
+          })
+          .catch(err => console.error('Error updating conflicts on initial load:', err))
+        }
+      })
     }
   }, [userId])
   
@@ -137,8 +156,6 @@ function CourseRegistration() {
       
       if (data.success) {
         setCart(data.items)
-        // Update conflict status after loading
-        await updateCartConflicts()
       } else {
         console.error('Error loading cart:', data.message)
         setCart([])
@@ -151,6 +168,8 @@ function CourseRegistration() {
 
   /**
    * Update conflict status for all cart items via backend API
+   * Note: This should only be called when explicitly needed, not automatically
+   * to avoid infinite loops. Backend already updates conflicts when adding/removing items.
    */
   const updateCartConflicts = async () => {
     if (!userId) return
@@ -412,14 +431,14 @@ function CourseRegistration() {
   /**
    * Remove a course from the cart
    */
-  const handleDropCourse = async (courseId: string) => {
+  const handleDropCourse = async (classId: number | string) => {
     if (!userId) {
       alert('Please wait for user authentication to complete.')
       return
     }
     
     try {
-      const response = await fetch(`${backendBase}/api/cart/remove?userId=${userId}&classId=${courseId}`, {
+      const response = await fetch(`${backendBase}/api/cart/remove?userId=${userId}&classId=${classId}`, {
         credentials: 'include',
         method: 'DELETE'
       })
@@ -427,6 +446,7 @@ function CourseRegistration() {
       const data = await response.json()
       
       if (data.success) {
+        // Reload cart after removal (conflicts will be updated automatically by backend)
         await loadCartFromDB()
         alert('Class removed from cart successfully!')
       } else {
