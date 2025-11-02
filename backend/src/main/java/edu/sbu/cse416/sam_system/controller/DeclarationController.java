@@ -17,7 +17,6 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,25 +98,14 @@ public class DeclarationController {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing required fields");
             }
 
-            // Check if student can declare more of this type
-            int currentCount = declarationService.getCurrentDeclarationCount(student.getUserId(), 
-                DeclarationType.valueOf(declarationType));
-            int maxAllowed = declarationType.equals("MAJOR") ? 2 : 3;
-            
-            if (currentCount >= maxAllowed) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, 
-                    "Maximum " + declarationType.toLowerCase() + " declarations reached");
-            }
-
-            MajorMinorDeclaration declaration = new MajorMinorDeclaration();
-            declaration.setStudent(student);
-            declaration.setSubjectCode(subjectCode);
-            declaration.setDeclarationType(DeclarationType.valueOf(declarationType));
-            declaration.setEffectiveTerm(effectiveTerm);
-            declaration.setStatus(DeclarationStatus.PENDING);
-            declaration.setSubmittedAt(LocalDateTime.now());
-
-            MajorMinorDeclaration savedDeclaration = declarationRepository.save(declaration);
+            // Use the service to submit the declaration (handles all validation and advisor assignment)
+            MajorMinorDeclaration savedDeclaration = majorMinorDeclarationService.submitDeclaration(
+                student.getUserId(),
+                subjectCode,
+                DeclarationType.valueOf(declarationType),
+                effectiveTerm,
+                null  // fromSubjectCode for change requests
+            );
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);

@@ -109,7 +109,6 @@ students:
     - {class_id: 45678, department: AMS, course_num: 261, section: 1, semester: Fall, year: 2025, credits: 3, GPNC: false, grade: null}
     - {class_id: 56789, department: CSE, course_num: 220, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: null}
   course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
-<<<<<<< HEAD
     - {department: CSE, course_num: 101, semester: Spring, year: 2026, credits: 3}
     - {department: CSE, course_num: 114, semester: Spring, year: 2026, credits: 3}
 

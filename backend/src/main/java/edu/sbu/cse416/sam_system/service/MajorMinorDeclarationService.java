@@ -250,8 +250,23 @@ public class MajorMinorDeclarationService {
                 " '" + subjectCode + "' does not exist or is not available for declaration");
         }
         
-        // Project policy: Any subject present in degree requirements is eligible for both
-        // major and minor declarations. No separate MINOR record required.
+        // Validate that the specific declaration type exists
+        boolean hasMatchingType = false;
+        if (declarationType == DeclarationType.MINOR) {
+            // Check for MINOR degree type
+            hasMatchingType = requirements.stream()
+                .anyMatch(req -> req.getDegreeType() == edu.sbu.cse416.sam_system.entity.DegreeType.MINOR);
+        } else if (declarationType == DeclarationType.MAJOR) {
+            // Check for BA or BS degree types
+            hasMatchingType = requirements.stream()
+                .anyMatch(req -> req.getDegreeType() == edu.sbu.cse416.sam_system.entity.DegreeType.BA ||
+                                req.getDegreeType() == edu.sbu.cse416.sam_system.entity.DegreeType.BS);
+        }
+        
+        if (!hasMatchingType) {
+            throw new IllegalArgumentException("The " + declarationType.toString().toLowerCase() + 
+                " '" + subjectCode + "' is not available for declaration. Please check degree requirements.");
+        }
     }
     
     /**
@@ -536,7 +551,13 @@ public class MajorMinorDeclarationService {
             return departmentAdvisors.get(0);
         }
         
-        throw new IllegalStateException("No department advisor found for " + subjectCode);
+        // Ultimate fallback: find university-level advisor
+        List<User> universityAdvisors = userRepository.findByAdvisorLevel("university");
+        if (!universityAdvisors.isEmpty()) {
+            return universityAdvisors.get(0);
+        }
+        
+        throw new IllegalStateException("No advisor found for " + subjectCode);
     }
     
     /**
