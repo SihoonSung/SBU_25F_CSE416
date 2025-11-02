@@ -13,6 +13,16 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * TP: Used Cursor to implement JPA repository for waitlist entries.
+ * Repository interface for WaitlistEntry entity.
+ * Provides database operations for waitlist functionality.
+ * 
+ * Features:
+ * - Find waitlist entries by class
+ * - Check queue position
+ * - Delete entries by semester/year
+ */
 @Repository
 public interface WaitlistRepository extends JpaRepository<WaitlistEntry, Long> {
 

@@ -3,6 +3,16 @@ package edu.sbu.cse416.sam_system.entity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+/**
+ * TP: Used Cursor to implement waitlist entry entity.
+ * Entity class representing a student's entry on a class waitlist.
+ * Maps to the 'waitlist' table in the database.
+ * 
+ * Features:
+ * - Unique constraint on class_id and user_id combination
+ * - Status tracking (WAITING, ENROLLED, CANCELLED)
+ * - Timestamp tracking for queue position
+ */
 @Entity
 @Table(name = "waitlist", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"class_id", "user_id"})
