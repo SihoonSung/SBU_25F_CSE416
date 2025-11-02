@@ -330,6 +330,21 @@ public class RegistrationScheduleService {
             } else {
                 throw new RuntimeException("startDate is required when 'advanced_registration_begins' is not found in academic calendar for " + semester + " " + year);
             }
+        } else {
+            // Validate: startDate cannot be before Advanced Registration Begins date from academic calendar
+            Optional<LocalDate> advancedRegDate = getAdvancedRegistrationBegins(semester, year);
+            if (advancedRegDate.isPresent()) {
+                LocalDate earliestStartDate = advancedRegDate.get();
+                if (startDate.isBefore(earliestStartDate)) {
+                    throw new RuntimeException(
+                        String.format("Start date (%s) cannot be before Advanced Registration Begins date (%s) for %s %d. " +
+                            "The earliest allowed start date is %s.",
+                            startDate, earliestStartDate, semester, year, earliestStartDate)
+                    );
+                }
+            }
+            // If Advanced Registration Begins is not found in calendar, allow the provided startDate
+            // (user may be creating schedule before calendar is imported)
         }
         
         // If endDate is null, try to get from next term's academic calendar
@@ -401,6 +416,21 @@ public class RegistrationScheduleService {
         if (normalizedClassStanding == null && minCredits == null && maxCredits == null) {
             throw new RuntimeException("At least one of classStanding, minCredits, or maxCredits must be specified");
         }
+        
+        // Validate: startDate cannot be before Advanced Registration Begins date from academic calendar
+        Optional<LocalDate> advancedRegDate = getAdvancedRegistrationBegins(semester, year);
+        if (advancedRegDate.isPresent()) {
+            LocalDate earliestStartDate = advancedRegDate.get();
+            if (startDate.isBefore(earliestStartDate)) {
+                throw new RuntimeException(
+                    String.format("Start date (%s) cannot be before Advanced Registration Begins date (%s) for %s %d. " +
+                        "The earliest allowed start date is %s.",
+                        startDate, earliestStartDate, semester, year, earliestStartDate)
+                );
+            }
+        }
+        // If Advanced Registration Begins is not found in calendar, allow the provided startDate
+        // (user may be updating schedule before calendar is imported)
         
         // Only validate if both dates are set
         if (endDate != null && startDate.isAfter(endDate)) {
