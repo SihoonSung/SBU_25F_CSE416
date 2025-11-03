@@ -8,7 +8,8 @@ package edu.sbu.cse416.sam_system.service;
  * Features:
  * - Two-step scraping: course list page → individual course detail pages
  * - Extracts for ALL subjects: description, credits (including ranges), SBCs
- * - Extracts for FULLY SUPPORTED subjects (BIO, PSY, CSE, ECO, AMS, POL): prerequisites, corequisites, antirequisites, advisory prereqs
+ * - Attempts to extract prerequisites, corequisites, antirequisites, advisory prereqs for ALL subjects
+ * - If parsing fails (format doesn't match), fields are set to null instead of "unknown"
  * - Prevents duplicate entries (updates existing courses if found)
  * - Allows scraping additional subjects for the same term (extension), but prevents re-scraping the same subject
  * - Handles placement exam simplification with warnings
@@ -68,7 +69,9 @@ public class ScrapingService {
     private static final String CATALOG_BASE_URL = "https://catalog.stonybrook.edu/content.php?catoid=7&navoid=225";
     private static final String COURSE_DETAIL_BASE_URL = "https://catalog.stonybrook.edu/preview_course_nopop.php";
     
-    // Supported subjects with full information extraction
+    // Fully supported subjects list - used for warning messages only
+    // Parsing is attempted for ALL subjects, but non-supported subjects will show a warning
+    // If parsing fails (format doesn't match), fields are set to null instead of "unknown"
     private static final List<String> FULLY_SUPPORTED_SUBJECTS = Arrays.asList("BIO", "PSY", "CSE", "ECO", "AMS", "POL");
 
     /**
@@ -109,10 +112,10 @@ public class ScrapingService {
                     continue;
                 }
 
-                // Check if subject is supported
+                // Check if subject is in fully supported list (for warning only - parsing will still be attempted)
                 if (!FULLY_SUPPORTED_SUBJECTS.contains(subject)) {
                     System.out.println("WARNING: Subject '" + subject + "' is not in the fully supported list (BIO, PSY, CSE, ECO, AMS, POL).");
-                    System.out.println("   Requisite information will be marked as 'unknown'.");
+                    System.out.println("   Parsing will still be attempted, but if format doesn't match, fields will be null instead of 'unknown'.");
                 }
 
                 int coursesScraped = scrapeSubject(subject, term);
@@ -261,7 +264,7 @@ public class ScrapingService {
 
         Course course = new Course(subject, courseNumber, courseName, term);
 
-        // Check if subject is fully supported for detailed parsing
+        // Check if subject is fully supported (for warning/info purposes only)
         boolean isFullySupported = FULLY_SUPPORTED_SUBJECTS.contains(subject);
 
         // Get the main content area
@@ -286,44 +289,46 @@ public class ScrapingService {
         String description = extractDescriptionFromHtml(fullHtml);
         course.setDescription(description);
 
-        // Declare variables outside if-else block
+        // Declare variables
         String prerequisites;
         String corequisites;
         String antirequisites;
         String advisoryPrereqs;
         boolean hasWarning = false;
 
+        // Always attempt to extract requisites for all subjects
+        // If parsing fails (null or empty), fields will be set to null instead of "unknown"
         if (isFullySupported) {
-            // FULLY SUPPORTED: Extract all information
-            System.out.println("  [SUPPORTED] Fully supported subject - extracting all information");
-
-            // Extract prerequisites
-            Map<String, Object> prereqResult = extractPrerequisites(fullText);
-            prerequisites = prereqResult != null ? (String) prereqResult.get("text") : null;
-            boolean prereqWarning = prereqResult != null && (Boolean) prereqResult.get("hasWarning");
-
-            // Extract corequisites
-            Map<String, Object> coreqResult = extractCorequisites(fullText);
-            corequisites = coreqResult != null ? (String) coreqResult.get("text") : null;
-            boolean coreqHasWarning = coreqResult != null && (Boolean) coreqResult.get("hasWarning");
-            
-            // Set warning flag if any placement exam simplification was applied
-            hasWarning = prereqWarning || coreqHasWarning;
-
-            // Extract antirequisites
-            antirequisites = extractAntirequisites(fullText);
-
-            // Extract advisory prerequisites
-            advisoryPrereqs = extractAdvisoryPrerequisites(fullText);
+            System.out.println("  [PARSING] Fully supported subject - attempting to extract requisite information for " + subject);
         } else {
-            // NOT FULLY SUPPORTED: Mark requisite fields as "unknown" and set warning
-            System.out.println("  [WARNING] Subject not fully supported - marking requisite fields as 'unknown'");
-            System.out.println("  ✓  Description extracted for unsupported subject");
-            prerequisites = "unknown";
-            corequisites = "unknown";
-            antirequisites = "unknown";
-            advisoryPrereqs = "unknown";
-            hasWarning = true; // Set warning flag for unsupported subjects
+            System.out.println("  [PARSING] Subject not in fully supported list - attempting to extract requisite information for " + subject);
+            System.out.println("  [WARNING] If parsing format doesn't match, fields will be null");
+        }
+
+        // Extract prerequisites
+        Map<String, Object> prereqResult = extractPrerequisites(fullText);
+        prerequisites = prereqResult != null ? (String) prereqResult.get("text") : null;
+        boolean prereqWarning = prereqResult != null && (Boolean) prereqResult.get("hasWarning");
+
+        // Extract corequisites
+        Map<String, Object> coreqResult = extractCorequisites(fullText);
+        corequisites = coreqResult != null ? (String) coreqResult.get("text") : null;
+        boolean coreqHasWarning = coreqResult != null && (Boolean) coreqResult.get("hasWarning");
+        
+        // Set warning flag if any placement exam simplification was applied
+        hasWarning = prereqWarning || coreqHasWarning;
+
+        // Extract antirequisites
+        antirequisites = extractAntirequisites(fullText);
+
+        // Extract advisory prerequisites
+        advisoryPrereqs = extractAdvisoryPrerequisites(fullText);
+        
+        // Log parsing results
+        if (prerequisites != null || corequisites != null || antirequisites != null || advisoryPrereqs != null) {
+            System.out.println("  ✓  Successfully extracted requisite information");
+        } else {
+            System.out.println("  ⚠  No requisite information found (parsing may not match format)");
         }
 
         // Set all fields to course object
@@ -344,10 +349,10 @@ public class ScrapingService {
         
         // Field status with icons
         System.out.println("\n[COURSE ATTRIBUTES]");
-        System.out.println("  [PREREQ] Prerequisites: " + (course.getPrerequisites() != null && !course.getPrerequisites().isEmpty() && !course.getPrerequisites().equals("unknown") ? "[FOUND] " + course.getPrerequisites() : "[NONE] None"));
-        System.out.println("  [COREQ] Corequisites: " + (course.getCorequisites() != null && !course.getCorequisites().isEmpty() && !course.getCorequisites().equals("unknown") ? "[FOUND] " + course.getCorequisites() : "[NONE] None"));
-        System.out.println("  [ANTIREQ] Antirequisites: " + (course.getAntirequisites() != null && !course.getAntirequisites().isEmpty() && !course.getAntirequisites().equals("unknown") ? "[FOUND] " + course.getAntirequisites() : "[NONE] None"));
-        System.out.println("  [ADV_PREREQ] Advisory Prerequisites: " + (course.getAdvisoryPrerequisites() != null && !course.getAdvisoryPrerequisites().isEmpty() && !course.getAdvisoryPrerequisites().equals("unknown") ? "[FOUND] " + course.getAdvisoryPrerequisites() : "[NONE] None"));
+        System.out.println("  [PREREQ] Prerequisites: " + (course.getPrerequisites() != null && !course.getPrerequisites().isEmpty() ? "[FOUND] " + course.getPrerequisites() : "[NONE] None"));
+        System.out.println("  [COREQ] Corequisites: " + (course.getCorequisites() != null && !course.getCorequisites().isEmpty() ? "[FOUND] " + course.getCorequisites() : "[NONE] None"));
+        System.out.println("  [ANTIREQ] Antirequisites: " + (course.getAntirequisites() != null && !course.getAntirequisites().isEmpty() ? "[FOUND] " + course.getAntirequisites() : "[NONE] None"));
+        System.out.println("  [ADV_PREREQ] Advisory Prerequisites: " + (course.getAdvisoryPrerequisites() != null && !course.getAdvisoryPrerequisites().isEmpty() ? "[FOUND] " + course.getAdvisoryPrerequisites() : "[NONE] None"));
         System.out.println("  [SBC] SBCs: " + (sbcs != null && !sbcs.isEmpty() && !sbcs.equals("unknown") ? "[FOUND] " + sbcs : "[NONE] None"));
         System.out.println("=".repeat(80));
 
