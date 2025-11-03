@@ -514,8 +514,8 @@ public class DegreeRequirementStatusService {
                     String courseNumStr = parts[1];
                     
                     UserClasses matchingClass = findMatchingClass(allUserClasses, dept, courseNumStr);
-                    String classIdStr = matchingClass != null ? matchingClass.getId().toString() : null;
-                    if (matchingClass != null && !usedClassIds.contains(classIdStr)) {
+                    String classIdStr = matchingClass != null && matchingClass.getClassId() != null ? matchingClass.getClassId().toString() : null;
+                    if (matchingClass != null && classIdStr != null && !usedClassIds.contains(classIdStr)) {
                         sequenceMatches.add(matchingClass);
                     } else {
                         sequenceComplete = false;
@@ -524,11 +524,19 @@ public class DegreeRequirementStatusService {
                 }
                 
                 if (sequenceComplete && !sequenceMatches.isEmpty()) {
+                    // Check excluded courses
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
+                    
                     for (UserClasses uc : sequenceMatches) {
-                        if (uc.getCredits() != null && !usedClassIds.contains(uc.getId().toString())) {
-                            totalCredits += uc.getCredits();
-                            satisfiedCourses.add(buildCourseInfo(uc, uc.getDepartment() + " " + uc.getCourseNum()));
-                            usedClassIds.add(uc.getId().toString());
+                        String classIdStr = uc.getClassId() != null ? uc.getClassId().toString() : null;
+                        if (uc.getCredits() != null && classIdStr != null && !usedClassIds.contains(classIdStr)) {
+                            // Check if course is excluded
+                            if (excludedCourses == null || !isExcluded(uc, excludedCourses)) {
+                                totalCredits += uc.getCredits();
+                                satisfiedCourses.add(buildCourseInfo(uc, uc.getDepartment() + " " + uc.getCourseNum()));
+                                usedClassIds.add(classIdStr);
+                            }
                         }
                     }
                     // Only count the first complete sequence (natural science requirement needs at least one)
@@ -552,11 +560,17 @@ public class DegreeRequirementStatusService {
                 String courseNumStr = parts[1];
                 
                 UserClasses matchingClass = findMatchingClass(allUserClasses, dept, courseNumStr);
-                if (matchingClass != null && !usedClassIds.contains(matchingClass.getId().toString())) {
-                    if (matchingClass.getCredits() != null) {
-                        totalCredits += matchingClass.getCredits();
-                        satisfiedCourses.add(buildCourseInfo(matchingClass, code));
-                        usedClassIds.add(matchingClass.getId().toString());
+                String classIdStr = matchingClass != null && matchingClass.getClassId() != null ? matchingClass.getClassId().toString() : null;
+                if (matchingClass != null && classIdStr != null && !usedClassIds.contains(classIdStr)) {
+                    // Check excluded courses
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
+                    if (excludedCourses == null || !isExcluded(matchingClass, excludedCourses)) {
+                        if (matchingClass.getCredits() != null) {
+                            totalCredits += matchingClass.getCredits();
+                            satisfiedCourses.add(buildCourseInfo(matchingClass, code));
+                            usedClassIds.add(classIdStr);
+                        }
                     }
                 }
             }
@@ -588,7 +602,7 @@ public class DegreeRequirementStatusService {
                     // Find matching upper-division courses
                     for (UserClasses uc : allUserClasses) {
                         if (totalCredits >= creditsRequired) break;
-                        String classIdStr = uc.getId() != null ? uc.getId().toString() : null;
+                        String classIdStr = uc.getClassId() != null ? uc.getClassId().toString() : null;
                         if (uc.getDepartment() != null && uc.getDepartment().equalsIgnoreCase(dept) &&
                             uc.getCourseNum() != null && uc.getCourseNum() >= minLevel &&
                             classIdStr != null && !usedClassIds.contains(classIdStr)) {
@@ -612,7 +626,8 @@ public class DegreeRequirementStatusService {
                     String courseNumStr = parts[1];
                     
                     UserClasses matchingClass = findMatchingClass(allUserClasses, dept, courseNumStr);
-                    if (matchingClass != null && !usedClassIds.contains(matchingClass.getId().toString())) {
+                    String classIdStr = matchingClass != null && matchingClass.getClassId() != null ? matchingClass.getClassId().toString() : null;
+                    if (matchingClass != null && classIdStr != null && !usedClassIds.contains(classIdStr)) {
                         // Check excluded courses
                         @SuppressWarnings("unchecked")
                         List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
@@ -620,7 +635,7 @@ public class DegreeRequirementStatusService {
                             if (matchingClass.getCredits() != null) {
                                 totalCredits += matchingClass.getCredits();
                                 satisfiedCourses.add(buildCourseInfo(matchingClass, code));
-                                usedClassIds.add(matchingClass.getId().toString());
+                                usedClassIds.add(classIdStr);
                             }
                         }
                     }

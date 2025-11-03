@@ -86,17 +86,10 @@ const CourseCatalogManagement: React.FC = () => {
 
 
   const checkForUnsupportedSubjects = (subjects: string[]) => {
-    const unsupportedSelected = subjects.filter(s => !supportedSubjects.includes(s));
-    if (unsupportedSelected.length > 0) {
-      setMessage({
-        type: 'warning',
-        text: `Warning: Subject(s) ${unsupportedSelected.join(', ')} are not fully supported. Course information will be marked as "unknown".`
-      });
-    } else {
-      // Clear warning if all selected subjects are supported
-      if (message?.type === 'warning' && message.text.includes('are not fully supported')) {
-        setMessage(null);
-      }
+    // All subjects are now fully supported - no warning needed
+    // Clear any previous warnings about unsupported subjects
+    if (message?.type === 'warning' && message.text.includes('are not fully supported')) {
+      setMessage(null);
     }
   };
 
@@ -225,7 +218,7 @@ const CourseCatalogManagement: React.FC = () => {
          
           {/* Supported Subjects (Quick Select) */}
           <div className="subjects-section">
-            <h4>Fully Supported Subjects (All Info Extracted)</h4>
+            <h4>Quick Select Subjects</h4>
             <div className="subjects-grid">
               {supportedSubjects.map(subject => (
                 <label key={subject} className="subject-checkbox supported">
@@ -235,18 +228,14 @@ const CourseCatalogManagement: React.FC = () => {
                     onChange={() => handleSubjectChange(subject)}
                   />
                   <span className="subject-label">{subject}</span>
-                  <div className="subject-status">Full Support</div>
                 </label>
               ))}
-            </div>
-            <div className="subject-help">
-              <strong>Full Support:</strong> BIO, PSY, CSE, ECO, AMS, POL - All course details will be extracted
             </div>
           </div>
 
           {/* Add Custom Subject */}
           <div className="custom-subject-section">
-            <h4>Add Other Subjects (Limited Info)</h4>
+            <h4>Add Other Subjects</h4>
             <div className="custom-subject-input">
               <input
                 type="text"
@@ -271,8 +260,7 @@ const CourseCatalogManagement: React.FC = () => {
               </button>
             </div>
             <div className="custom-subject-help">
-              <strong>Warning:</strong> Other subjects will extract <strong>Description, Credits, and SBCs</strong>.
-              Requisite fields (prerequisites, corequisites, antirequisites, advisory prerequisites) will be marked as "unknown".
+              <strong>All subjects are fully supported:</strong> All course details (description, credits, SBCs, prerequisites, corequisites, antirequisites, advisory prerequisites) will be extracted for any subject.
               <br/><br/>
               <strong>Instructions:</strong> Enter <strong>ONE subject at a time</strong> (e.g., MAT, PHY, CHE). 
               Do <strong>NOT</strong> use commas or multiple subjects. Add one subject, click "Add Subject", 
@@ -286,9 +274,8 @@ const CourseCatalogManagement: React.FC = () => {
               <h4>Selected Subjects ({selectedSubjects.length}):</h4>
               <div className="selected-subjects-list">
                 {selectedSubjects.map(subject => (
-                  <span key={subject} className={`selected-subject ${supportedSubjects.includes(subject) ? 'supported' : 'unsupported'}`}>
+                  <span key={subject} className="selected-subject supported">
                     {subject}
-                    {!supportedSubjects.includes(subject) && <span className="warning-icon" title="Limited support"></span>}
                     <button
                       type="button"
                       onClick={() => handleRemoveSubject(subject)}
