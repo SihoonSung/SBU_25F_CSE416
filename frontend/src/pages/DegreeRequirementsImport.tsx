@@ -25,6 +25,7 @@ const DegreeRequirementsImport: React.FC = () => {
         !selectedFile.name.toLowerCase().endsWith('.yml')) {
       setResult({
         success: false,
+        message: '',
         error: 'Please select a YAML file (.yaml or .yml)'
       });
       return;
@@ -34,6 +35,7 @@ const DegreeRequirementsImport: React.FC = () => {
     if (selectedFile.size > 10 * 1024 * 1024) {
       setResult({
         success: false,
+        message: '',
         error: 'File size must be less than 10MB'
       });
       return;
@@ -75,6 +77,7 @@ const DegreeRequirementsImport: React.FC = () => {
     if (!file) {
       setResult({
         success: false,
+        message: '',
         error: 'Please select a file to upload'
       });
       return;
@@ -108,6 +111,7 @@ const DegreeRequirementsImport: React.FC = () => {
     } catch (error) {
       setResult({
         success: false,
+        message: '',
         error: 'Error uploading file. Please try again.'
       });
     } finally {

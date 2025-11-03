@@ -536,7 +536,7 @@ const DegreeRequirements: React.FC = () => {
                               {courseReqs.groups.map((group: any, groupIndex: number) => (
                                 <div key={groupIndex} className="course-group">
                                   <div className="group-header">
-                                    <strong>{group.id?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</strong>
+                                    <strong>{group.id?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</strong>{' '}
                                     <span className="group-type">{group.type?.replace(/_/g, ' ')}</span>
                                     {group.credits_required && (
                                       <span className="credits-badge">{group.credits_required} credits</span>
