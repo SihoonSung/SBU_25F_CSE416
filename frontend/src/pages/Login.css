@@ -192,6 +192,14 @@
   justify-content: center;
 }
 
+.sbu-logo-img {
+  max-width: 80px;
+  max-height: 80px;
+  height: auto;
+  width: auto;
+  object-fit: contain;
+}
+
 /* Loading styles */
 .loading-container {
   display: flex;

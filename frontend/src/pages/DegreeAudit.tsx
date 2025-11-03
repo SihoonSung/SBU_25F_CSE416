@@ -31,22 +31,34 @@ export default function DegreeAudit() {
   const [loading, setLoading] = useState<boolean>(true)
   const [sbcRequirements, setSbcRequirements] = useState<RequirementStatus[]>([])
   const [majorRequirements, setMajorRequirements] = useState<RequirementStatus[]>([])
+  
+  // Advisor/Registrar mode
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [isAdvisor, setIsAdvisor] = useState<boolean>(false)
+  const [searchStudentId, setSearchStudentId] = useState<string>('')
+  const [searching, setSearching] = useState<boolean>(false)
+  const [searchResult, setSearchResult] = useState<any>(null)
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true)
-        const me = await getCurrentUser()
-        const u = me?.user
-        
-        setStudentName(u?.fullName || '')
-        const sid = u?.studentId || u?.sbuId || null
-        setStudentId(sid)
+  // Load data for a specific student
+  const loadStudentData = async (sid: string, userId: number | null) => {
+    try {
+      setLoading(true)
+      
+      // Fetch student profile
+      const profileResponse = await fetch(`${backendBase}/api/profile/student-id/${sid}`, {
+        credentials: 'include'
+      })
+      
+      if (!profileResponse.ok) {
+        throw new Error('Student not found')
+      }
+      
+      const profileData = await profileResponse.json()
+      setStudentName(profileData.name || `${profileData.firstName} ${profileData.lastName}`.trim())
+      setStudentId(sid)
 
-        // Get userId for fetching classes
-        const userId = u?.userId || null
-
-        if (sid && userId) {
+      // Calculate GPA if userId is provided
+      if (userId) {
           // Calculate GPA directly from completed classes
           try {
             const completedClassesResponse = await fetch(`${backendBase}/api/users/${userId}/classes/completed`, {
@@ -470,22 +482,164 @@ export default function DegreeAudit() {
               setCatalogTerm(`${semester} ${year}`)
             }
           }
-        } catch (error) {
-          console.error('Error fetching terms:', error)
+      } catch (error) {
+        console.error('Error fetching terms:', error)
+      }
+    } catch (error) {
+      console.error('Error loading degree audit data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Initialize current user and check if advisor
+  useEffect(() => {
+    (async () => {
+      try {
+        const me = await getCurrentUser()
+        const u = me?.user
+        setCurrentUser(u)
+        
+        if (u?.role?.toUpperCase() === 'ADVISOR' || u?.role?.toUpperCase() === 'REGISTRAR') {
+          setIsAdvisor(true)
+          // Don't auto-load data for advisors - they need to search first
+          setLoading(false)
+          return
+        }
+        
+        // For students, load their own data
+        const sid = u?.studentId || u?.sbuId || null
+        if (sid && u?.userId) {
+          await loadStudentData(sid, u.userId)
+        } else {
+          setLoading(false)
         }
       } catch (error) {
-        console.error('Error loading degree audit data:', error)
-      } finally {
+        console.error('Error initializing Degree Audit:', error)
         setLoading(false)
       }
     })()
   }, [])
 
+  // Load data when student is selected (for advisor mode)
+  useEffect(() => {
+    if (isAdvisor && studentId && searchResult) {
+      const userId = searchResult.id || null
+      if (userId) {
+        loadStudentData(studentId, userId)
+      }
+    }
+  }, [studentId, searchResult, isAdvisor])
+
+  // Search for student by student ID
+  const handleSearchStudent = async () => {
+    if (!searchStudentId.trim()) {
+      alert('Please enter a student ID')
+      return
+    }
+
+    setSearching(true)
+    try {
+      const response = await fetch(`${backendBase}/api/users/student-lookup?studentId=${encodeURIComponent(searchStudentId.trim())}`, {
+        credentials: 'include'
+      })
+
+      if (response.ok) {
+        const student = await response.json()
+        setSearchResult(student)
+        setStudentId(student.studentId)
+        setStudentName(student.name)
+      } else {
+        alert('Student not found. Please check the student ID.')
+        setSearchResult(null)
+      }
+    } catch (error) {
+      console.error('Error searching for student:', error)
+      alert('Error searching for student. Please try again.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
   return (
     <div className="degree-audit-page">
       <h2>Degree Audit</h2>
 
-      <div className="stats-row">
+      {/* Advisor/Registrar Student Search */}
+      {isAdvisor && (
+        <div style={{ 
+          background: 'white', 
+          border: '1px solid #e1e8ed', 
+          borderRadius: 'var(--radius-md)', 
+          padding: '1.5rem', 
+          marginBottom: '1.5rem' 
+        }}>
+          <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>Search Student</h3>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+                Student ID:
+              </label>
+              <input
+                type="text"
+                value={searchStudentId}
+                onChange={(e) => setSearchStudentId(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearchStudent()}
+                placeholder="Enter student ID (e.g., 1100123456)"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #ddd',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '1rem'
+                }}
+              />
+            </div>
+            <button
+              onClick={handleSearchStudent}
+              disabled={searching || !searchStudentId.trim()}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'var(--color-primary)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                cursor: searching || !searchStudentId.trim() ? 'not-allowed' : 'pointer',
+                fontWeight: 500,
+                opacity: searching || !searchStudentId.trim() ? 0.6 : 1
+              }}
+            >
+              {searching ? 'Searching...' : 'Search'}
+            </button>
+          </div>
+          {searchResult && (
+            <div style={{ 
+              marginTop: '1rem', 
+              padding: '1rem', 
+              background: '#f8f9fa', 
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid #e1e8ed'
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                {searchResult.name} ({searchResult.studentId})
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#666' }}>
+                {searchResult.email} • {searchResult.major}
+              </div>
+            </div>
+          )}
+          {!searchResult && !loading && studentId && (
+            <div style={{ marginTop: '1rem', padding: '1rem', color: '#666', fontStyle: 'italic' }}>
+              Please search for a student to view their degree audit.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Only show data if student is selected or user is a student */}
+      {(!isAdvisor || (isAdvisor && studentId)) && (
+        <>
+          <div className="stats-row">
         <div className="stat-card">
           <div className="stat-label">Student Name</div>
           <div className="stat-value">{studentName || '—'}</div>
@@ -571,6 +725,22 @@ export default function DegreeAudit() {
           </div>
         )}
       </div>
+        </>
+      )}
+      
+      {/* Show message for advisor without selected student */}
+      {isAdvisor && !studentId && (
+        <div style={{ 
+          padding: '3rem', 
+          textAlign: 'center', 
+          color: '#666',
+          background: 'white',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid #e1e8ed'
+        }}>
+          <p>Please search for a student to view their degree audit.</p>
+        </div>
+      )}
     </div>
   )
 }

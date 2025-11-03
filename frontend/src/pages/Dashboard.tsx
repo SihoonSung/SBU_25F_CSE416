@@ -35,6 +35,9 @@ function Dashboard() {
   const [classStats, setClassStats] = useState<any[]>([])
   const [pendingGrades, setPendingGrades] = useState<number>(0)
   const [pendingWaivers, setPendingWaivers] = useState<number>(0)
+  const [recentOverrides, setRecentOverrides] = useState<any[]>([])
+  const [pendingDeclarations, setPendingDeclarations] = useState<number>(0)
+  const [advisorPendingWaivers, setAdvisorPendingWaivers] = useState<number>(0)
   const [calculatedGpa, setCalculatedGpa] = useState<number | null>(null)
   const [cumulativeCredits, setCumulativeCredits] = useState<number>(0)
   const [termGpa, setTermGpa] = useState<number | null>(null)
@@ -123,6 +126,11 @@ function Dashboard() {
           // Fetch professor data if user is an instructor
           if (userRole === 'INSTRUCTOR' && user?.firstName && user?.lastName) {
             await fetchProfessorData(user)
+          }
+          
+          // Fetch advisor data if user is an advisor
+          if (userRole === 'ADVISOR' && user?.userId) {
+            await fetchAdvisorData(user.userId)
           }
           
           // Always try to fetch stats if user is logged in (same as UserManagement page)
@@ -429,6 +437,42 @@ function Dashboard() {
   }
 
   /**
+   * Fetch advisor data (pending declarations and waivers)
+   */
+  const fetchAdvisorData = async (advisorId: number) => {
+    try {
+      // Fetch pending declarations
+      const declarationsResponse = await fetch(`${backendBase}/api/major-minor-declarations/pending`, {
+        credentials: 'include'
+      })
+      
+      if (declarationsResponse.ok) {
+        const data = await declarationsResponse.json()
+        if (data.success && Array.isArray(data.declarations)) {
+          setPendingDeclarations(data.declarations.length)
+        }
+      }
+
+      // Fetch pending waivers for advisor
+      const waiversResponse = await fetch(`${backendBase}/api/waivers/advisor/${advisorId}`, {
+        credentials: 'include'
+      })
+
+      if (waiversResponse.ok) {
+        const waivers = await waiversResponse.json()
+        if (Array.isArray(waivers)) {
+          const pending = waivers.filter((w: any) => w.status === 'PENDING' && w.advisorApproved === null)
+          setAdvisorPendingWaivers(pending.length)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching advisor data:', error)
+      setPendingDeclarations(0)
+      setAdvisorPendingWaivers(0)
+    }
+  }
+
+  /**
    * Check for pending overrides (for admin/registrar)
    */
   const checkPendingOverrides = async () => {
@@ -441,10 +485,23 @@ function Dashboard() {
       })
       
       let pendingCount = 0
+      let recentWaivers: any[] = []
       
       if (waiversResponse.ok) {
         const waivers = await waiversResponse.json()
-        pendingCount += Array.isArray(waivers) ? waivers.length : 0
+        if (Array.isArray(waivers)) {
+          pendingCount += waivers.length
+          // Get recent waivers (last 7 days)
+          const sevenDaysAgo = new Date()
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+          recentWaivers = waivers
+            .filter((w: any) => {
+              if (!w.createdAt) return false
+              const createdDate = new Date(w.createdAt)
+              return createdDate >= sevenDaysAgo
+            })
+            .slice(0, 10) // Limit to 10 most recent
+        }
       }
       
       // Check pending declarations
@@ -462,8 +519,11 @@ function Dashboard() {
       }
       
       setPendingOverrides(pendingCount)
+      setRecentOverrides(recentWaivers)
     } catch (error) {
+      console.error('Error checking pending overrides:', error)
       setPendingOverrides(0)
+      setRecentOverrides([])
     }
   }
 
@@ -632,6 +692,7 @@ function Dashboard() {
   const role = String(me?.role || '').toUpperCase()
   const isRegistrar = role === 'REGISTRAR' || role === 'ADMIN'
   const isInstructor = role === 'INSTRUCTOR'
+  const isAdvisor = role === 'ADVISOR'
 
   return (
     <div className="dashboard">
@@ -819,6 +880,78 @@ function Dashboard() {
                   </tbody>
                 </table>
               )}
+            </div>
+          </div>
+        </>
+        ) : isAdvisor ? (
+        <>
+          {/* Advisor Dashboard */}
+          <div className="left-column">
+            {/* Pending Items Alerts */}
+            {pendingDeclarations > 0 && (
+              <div className="alert-box alert-warning">
+                <div className="alert-icon"></div>
+                <div className="alert-text">
+                  <span className="alert-title">Declarations Pending:</span> You have {pendingDeclarations} declaration{pendingDeclarations > 1 ? 's' : ''} awaiting your review.
+                </div>
+              </div>
+            )}
+
+            {advisorPendingWaivers > 0 && (
+              <div className="alert-box alert-warning">
+                <div className="alert-icon"></div>
+                <div className="alert-text">
+                  <span className="alert-title">Override Requests:</span> You have {advisorPendingWaivers} override request{advisorPendingWaivers > 1 ? 's' : ''} awaiting your review.
+                </div>
+              </div>
+            )}
+
+            {/* Quick Stats */}
+            <div className="stats-container">
+              <div className="stat-card">
+                <div className="stat-label">Pending Declarations</div>
+                <div className="stat-value">{pendingDeclarations}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Pending Overrides</div>
+                <div className="stat-value">{advisorPendingWaivers}</div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="reminder-card">
+              <div className="reminder-title">Quick Actions</div>
+              <div className="reminder-content">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <button 
+                    className="course-btn" 
+                    onClick={() => navigate('/advisor-approval')}
+                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                  >
+                    Review Declarations & Overrides
+                  </button>
+                  <button 
+                    className="course-btn" 
+                    onClick={() => navigate('/degree-audit')}
+                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                  >
+                    View Student Degree Audit
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div className="right-column">
+            <div className="schedule-section">
+              <div className="section-header">
+                <h2>Recent Activity</h2>
+                <h3>Last 7 days</h3>
+              </div>
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                No recent activity to display.
+              </div>
             </div>
           </div>
         </>
@@ -1141,20 +1274,40 @@ function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td className="time-cell">SBU123456</td>
-                    <td className="course-cell">Prerequisite</td>
-                    <td className="course-cell">CSE 300</td>
-                    <td className="course-cell">Pending</td>
-                    <td className="course-cell">2025-02-14</td>
-                  </tr>
-                  <tr>
-                    <td className="time-cell">SBU987654</td>
-                    <td className="course-cell">Capacity</td>
-                    <td className="course-cell">CSE 312</td>
-                    <td className="course-cell">Approved</td>
-                    <td className="course-cell">2025-02-13</td>
-                  </tr>
+                  {recentOverrides.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="course-cell" style={{ textAlign: 'center', color: '#666' }}>
+                        No recent override requests
+                      </td>
+                    </tr>
+                  ) : (
+                    recentOverrides.map((waiver: any) => (
+                      <tr key={waiver.waiverId}>
+                        <td className="time-cell">{waiver.student?.studentId || waiver.studentId || 'N/A'}</td>
+                        <td className="course-cell">Time Conflict</td>
+                        <td className="course-cell">
+                          {waiver.enrolledClass?.department}{waiver.enrolledClass?.courseNum} / {waiver.conflictingClass?.department}{waiver.conflictingClass?.courseNum}
+                        </td>
+                        <td className="course-cell">
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            backgroundColor: waiver.status === 'APPROVED' ? '#d1fae5' : 
+                                           waiver.status === 'REJECTED' ? '#fee2e2' : '#fef3c7',
+                            color: waiver.status === 'APPROVED' ? '#065f46' :
+                                   waiver.status === 'REJECTED' ? '#991b1b' : '#92400e'
+                          }}>
+                            {waiver.status || 'PENDING'}
+                          </span>
+                        </td>
+                        <td className="course-cell">
+                          {waiver.createdAt ? new Date(waiver.createdAt).toLocaleDateString() : 'N/A'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

@@ -61,7 +61,7 @@ function NavigationBar() {
    const navbar_menus : Record<string, string[]>  = {
     "student" : ["Course Search", "Registration", "Planner", "Degree Audit", "Sign out"],
     "professor" :["Course Search", "Registration Overrides", "Roaster", "Grades", "Sign out"],
-    "academic_advisor" : ["Course Search", "Registration Overrides", "Roaster", "Degree Audit", "Advisor Approval", "Sign out"],
+    "academic_advisor" : ["Advisor Approval", "Degree Audit", "Sign out"],
     "registrar" : ["User Management", "Data Import", "Degree Requirements", "Class Management","Registration Schedule", "Sign out"]
 
   }
