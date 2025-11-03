@@ -11,6 +11,7 @@ import CourseRegistration from './pages/CourseRegistration'
 import UserManagement from './pages/UserManagement'
 import DataImport from './pages/DataImport'
 import DegreeRequirements from './pages/DegreeRequirements'
+import DegreeAudit from './pages/DegreeAudit'
 import MajorMinorDeclaration from './pages/MajorMinorDeclaration'
 import AdvisorApproval from './pages/AdvisorApproval'
 import PdfUpload from './pages/PdfUpload'
@@ -38,6 +39,7 @@ function App() {
           <Route path="/user-management" element={<UserManagement/>} />
           <Route path="/data-import" element={<ProtectedRoute><DataImport/></ProtectedRoute>} />
           <Route path="/degree-requirements" element={<ProtectedRoute><DegreeRequirements/></ProtectedRoute>} />
+          <Route path="/degree-audit" element={<ProtectedRoute><DegreeAudit/></ProtectedRoute>} />
           <Route path="/major-minor-declaration" element={<ProtectedRoute><MajorMinorDeclaration/></ProtectedRoute>} />
           <Route path="/advisor-approval" element={<ProtectedRoute><AdvisorApproval/></ProtectedRoute>} />
           <Route path="/pdf-upload" element={<ProtectedRoute><PdfUpload/></ProtectedRoute>} />

@@ -136,19 +136,25 @@ export default function DegreeAudit() {
               
               // Process declared majors - each group is a requirement group
               if (statusData.declaredMajors && Array.isArray(statusData.declaredMajors)) {
+                console.log(`[DegreeAudit] Processing ${statusData.declaredMajors.length} declared major(s)`)
                 for (const major of statusData.declaredMajors) {
                   const subjectCode = major.subjectCode || ''
                   const degreeType = major.degreeType || ''
                   const programName = `${subjectCode} ${degreeType}`.trim()
+                  
+                  console.log(`[DegreeAudit] Processing major: ${programName}, groups:`, major.groups)
                   
                   // Fetch SBC requirements from the major's DegreeRequirement
                   try {
                     const majorReqResponse = await fetch(`${backendBase}/api/degree-requirements/${encodeURIComponent(subjectCode)}/${encodeURIComponent(degreeType)}`, {
                       credentials: 'include'
                     })
+                    console.log(`[DegreeAudit] Degree requirement API response for ${subjectCode}/${degreeType}:`, majorReqResponse.status)
                     if (majorReqResponse.ok) {
                       const majorReqData: any = await majorReqResponse.json()
+                      console.log(`[DegreeAudit] Degree requirement data:`, majorReqData)
                       if (majorReqData.success && majorReqData.requirement && majorReqData.requirement.sbcRequirements) {
+                        console.log(`[DegreeAudit] Found SBC requirements in requirement data`)
                         try {
                           const sbcRequirementsJson = typeof majorReqData.requirement.sbcRequirements === 'string' 
                             ? JSON.parse(majorReqData.requirement.sbcRequirements)
@@ -250,7 +256,8 @@ export default function DegreeAudit() {
                     console.error(`[DegreeAudit] Error fetching SBC requirements for ${subjectCode} ${degreeType}:`, e)
                   }
                   
-                  if (major.groups && Array.isArray(major.groups)) {
+                  if (major.groups && Array.isArray(major.groups) && major.groups.length > 0) {
+                    console.log(`[DegreeAudit] Found ${major.groups.length} groups for ${programName}`)
                     for (const group of major.groups) {
                       const groupId = group.groupId || group.id || ''
                       const groupType = group.groupType || group.type || ''
@@ -278,6 +285,8 @@ export default function DegreeAudit() {
                         note: group.message || (group.creditsRequired ? `Credits: ${group.creditsSatisfied || 0}/${group.creditsRequired}` : null)
                       })
                     }
+                  } else {
+                    console.warn(`[DegreeAudit] No groups found for major ${programName}. Major object:`, major)
                   }
                   
                   // Also check if there are individual requirements in the major
@@ -486,7 +495,10 @@ export default function DegreeAudit() {
         console.error('Error fetching terms:', error)
       }
     } catch (error) {
-      console.error('Error loading degree audit data:', error)
+      console.error('[DegreeAudit] Error loading degree audit data:', error)
+      // Set student ID even if there's an error, so the UI can show something
+      setStudentId(sid)
+      setStudentName(sid || 'Unknown')
     } finally {
       setLoading(false)
     }
@@ -496,9 +508,18 @@ export default function DegreeAudit() {
   useEffect(() => {
     (async () => {
       try {
+        setLoading(true)
         const me = await getCurrentUser()
         const u = me?.user
         setCurrentUser(u)
+        
+        console.log('[DegreeAudit] Current user:', u)
+        
+        if (!u) {
+          console.error('[DegreeAudit] No user found')
+          setLoading(false)
+          return
+        }
         
         if (u?.role?.toUpperCase() === 'ADVISOR' || u?.role?.toUpperCase() === 'REGISTRAR') {
           setIsAdvisor(true)
@@ -509,13 +530,18 @@ export default function DegreeAudit() {
         
         // For students, load their own data
         const sid = u?.studentId || u?.sbuId || null
+        console.log('[DegreeAudit] Student ID:', sid, 'User ID:', u?.userId)
         if (sid && u?.userId) {
           await loadStudentData(sid, u.userId)
         } else {
+          console.warn('[DegreeAudit] Missing student ID or user ID. Student ID:', sid, 'User ID:', u?.userId)
+          // Even without student ID, show the page with basic info
+          setStudentId(sid || '')
+          setStudentName(u?.firstName && u?.lastName ? `${u.firstName} ${u.lastName}` : u?.fullName || 'Unknown')
           setLoading(false)
         }
       } catch (error) {
-        console.error('Error initializing Degree Audit:', error)
+        console.error('[DegreeAudit] Error initializing:', error)
         setLoading(false)
       }
     })()
@@ -636,100 +662,124 @@ export default function DegreeAudit() {
         </div>
       )}
 
+      {/* Loading state */}
+      {loading && (
+        <div style={{ 
+          padding: '3rem', 
+          textAlign: 'center', 
+          color: '#666',
+          background: 'white',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid #e1e8ed'
+        }}>
+          <p>Loading degree audit data...</p>
+        </div>
+      )}
+
       {/* Only show data if student is selected or user is a student */}
-      {(!isAdvisor || (isAdvisor && studentId)) && (
+      {!loading && (!isAdvisor || (isAdvisor && studentId)) && (
         <>
           <div className="stats-row">
-        <div className="stat-card">
-          <div className="stat-label">Student Name</div>
-          <div className="stat-value">{studentName || '—'}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">GPA</div>
-          <div className="stat-value">{gpa !== null ? gpa.toFixed(2) : '—'}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Cumulative Credits</div>
-          <div className="stat-value">{totalCredits || '—'}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Catalog Term</div>
-          <div className="stat-value">{catalogTerm}</div>
-        </div>
-      </div>
-
-      <div className="progress-card">
-        <div className="progress-label">Overall Progress</div>
-        <div className="progress-bar"><div className="fill" style={{ width: `${progressPct}%` }} /></div>
-        <div className="progress-pct">{progressPct}%</div>
-      </div>
-
-      <div className="section-card">
-        <div className="section-title">SBC Requirements</div>
-        {loading ? (
-          <div className="placeholder">Loading...</div>
-        ) : sbcRequirements.length === 0 ? (
-          <div className="placeholder">No SBC requirements found.</div>
-        ) : (
-          <div className="requirements-list">
-            {sbcRequirements.map((req, idx) => (
-              <div key={`sbc-${idx}`} className={`requirement-item requirement-${req.status}`}>
-                <div className="requirement-header">
-                  <span className="requirement-code">{req.code}</span>
-                  <span className="requirement-title">{req.title}</span>
-                  <span className={`status-badge status-${req.status}`}>
-                    {req.status === 'satisfied' ? '✓ Satisfied' : 
-                     req.status === 'pending' ? '⏳ Pending' : 
-                     '✗ Unsatisfied'}
-                  </span>
-                </div>
-                {req.usingClasses && req.usingClasses.length > 0 && (
-                  <div className="requirement-classes">
-                    Using: {req.usingClasses.map(c => `${c.subject}${c.courseNum}`).join(', ')}
-                  </div>
-                )}
-                {req.note && <div className="requirement-note">{req.note}</div>}
-              </div>
-            ))}
+            <div className="stat-card">
+              <div className="stat-label">Student Name</div>
+              <div className="stat-value">{studentName || '—'}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">GPA</div>
+              <div className="stat-value">{gpa !== null ? gpa.toFixed(2) : '—'}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Cumulative Credits</div>
+              <div className="stat-value">{totalCredits || '—'}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Catalog Term</div>
+              <div className="stat-value">{catalogTerm}</div>
+            </div>
           </div>
-        )}
-      </div>
 
-      <div className="section-card">
-        <div className="section-title">Major Requirements</div>
-        {loading ? (
-          <div className="placeholder">Loading...</div>
-        ) : majorRequirements.length === 0 ? (
-          <div className="placeholder">No major requirements found.</div>
-        ) : (
-          <div className="requirements-list">
-            {majorRequirements.map((req, idx) => (
-              <div key={`major-${idx}`} className={`requirement-item requirement-${req.status}`}>
-                <div className="requirement-header">
-                  <span className="requirement-code">{req.code}</span>
-                  <span className="requirement-title">{req.title}</span>
-                  <span className={`status-badge status-${req.status}`}>
-                    {req.status === 'satisfied' ? '✓ Satisfied' : 
-                     req.status === 'pending' ? '⏳ Pending' : 
-                     '✗ Unsatisfied'}
-                  </span>
-                </div>
-                {req.usingClasses && req.usingClasses.length > 0 && (
-                  <div className="requirement-classes">
-                    Using: {req.usingClasses.map(c => `${c.subject}${c.courseNum}`).join(', ')}
-                  </div>
-                )}
-                {req.note && <div className="requirement-note">{req.note}</div>}
-              </div>
-            ))}
+          <div className="progress-card">
+            <div className="progress-label">Overall Progress</div>
+            <div className="progress-bar"><div className="fill" style={{ width: `${progressPct}%` }} /></div>
+            <div className="progress-pct">{progressPct}%</div>
           </div>
-        )}
-      </div>
+
+          <div className="section-card">
+            <div className="section-title">SBC Requirements</div>
+            {sbcRequirements.length === 0 ? (
+              <div className="placeholder">No SBC requirements found.</div>
+            ) : (
+              <div className="requirements-list">
+                {sbcRequirements.map((req, idx) => (
+                  <div key={`sbc-${idx}`} className={`requirement-item requirement-${req.status}`}>
+                    <div className="requirement-header">
+                      <span className="requirement-code">{req.code}</span>
+                      <span className="requirement-title">{req.title}</span>
+                      <span className={`status-badge status-${req.status}`}>
+                        {req.status === 'satisfied' ? '✓ Satisfied' : 
+                         req.status === 'pending' ? '⏳ Pending' : 
+                         '✗ Unsatisfied'}
+                      </span>
+                    </div>
+                    {req.usingClasses && req.usingClasses.length > 0 && (
+                      <div className="requirement-classes">
+                        Using: {req.usingClasses.map(c => `${c.subject}${c.courseNum}`).join(', ')}
+                      </div>
+                    )}
+                    {req.note && <div className="requirement-note">{req.note}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="section-card">
+            <div className="section-title">Major Requirements</div>
+            {majorRequirements.length === 0 ? (
+              <div className="placeholder">No major requirements found.</div>
+            ) : (
+              <div className="requirements-list">
+                {majorRequirements.map((req, idx) => (
+                  <div key={`major-${idx}`} className={`requirement-item requirement-${req.status}`}>
+                    <div className="requirement-header">
+                      <span className="requirement-code">{req.code}</span>
+                      <span className="requirement-title">{req.title}</span>
+                      <span className={`status-badge status-${req.status}`}>
+                        {req.status === 'satisfied' ? '✓ Satisfied' : 
+                         req.status === 'pending' ? '⏳ Pending' : 
+                         '✗ Unsatisfied'}
+                      </span>
+                    </div>
+                    {req.usingClasses && req.usingClasses.length > 0 && (
+                      <div className="requirement-classes">
+                        Using: {req.usingClasses.map(c => `${c.subject}${c.courseNum}`).join(', ')}
+                      </div>
+                    )}
+                    {req.note && <div className="requirement-note">{req.note}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </>
+      )}
+
+      {/* Show message for students without data */}
+      {!loading && !isAdvisor && !studentId && (
+        <div style={{ 
+          padding: '3rem', 
+          textAlign: 'center', 
+          color: '#666',
+          background: 'white',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid #e1e8ed'
+        }}>
+          <p>Unable to load degree audit data. Please check your student ID or contact support.</p>
+        </div>
       )}
       
       {/* Show message for advisor without selected student */}
-      {isAdvisor && !studentId && (
+      {isAdvisor && !studentId && !loading && (
         <div style={{ 
           padding: '3rem', 
           textAlign: 'center', 

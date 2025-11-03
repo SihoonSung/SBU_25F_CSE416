@@ -99,6 +99,16 @@ function CourseRegistration() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, selectedSemester, selectedYear])
+
+  /**
+   * Reload cart when registered classes change to check for conflicts
+   */
+  useEffect(() => {
+    if (userId && registeredClasses.length >= 0) {
+      loadCartFromDB()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registeredClasses])
   
   
   /**
@@ -219,7 +229,32 @@ function CourseRegistration() {
           status: 'Enrolled'
         }))
 
-        setRegisteredClasses(transformed)
+        // Check for time conflicts between registered classes
+        const classesWithConflicts = transformed.map((cls: any, index: number) => {
+          const conflictingClasses: string[] = []
+          for (let i = 0; i < transformed.length; i++) {
+            if (i !== index && cls.schedule && transformed[i].schedule) {
+              try {
+                const result = checkTimeConflict(cls.schedule, transformed[i].schedule)
+                if (result.hasConflict) {
+                  conflictingClasses.push(`${transformed[i].code} (${transformed[i].title})`)
+                }
+              } catch (error) {
+                // Fallback to simple string comparison
+                if (cls.schedule === transformed[i].schedule) {
+                  conflictingClasses.push(`${transformed[i].code} (${transformed[i].title})`)
+                }
+              }
+            }
+          }
+          return {
+            ...cls,
+            hasTimeConflict: conflictingClasses.length > 0,
+            conflictingClasses: conflictingClasses
+          }
+        })
+
+        setRegisteredClasses(classesWithConflicts)
         console.log(`[CourseRegistration] Loaded ${transformed.length} registered classes for ${selectedSemester} ${selectedYear}`, transformed)
       } else {
         console.error('Failed to load registered classes:', response.status)
@@ -233,6 +268,7 @@ function CourseRegistration() {
 
   /**
    * Load cart items from database
+   * Also checks for conflicts with registered classes
    */
   const loadCartFromDB = async () => {
     if (!userId) {
@@ -247,7 +283,50 @@ function CourseRegistration() {
       const data = await response.json()
       
       if (data.success) {
-        setCart(data.items)
+        let cartItems = data.items
+        
+        // Check for conflicts with registered classes
+        if (registeredClasses.length > 0) {
+          cartItems = cartItems.map((cartItem: any) => {
+            const cartSchedule = cartItem.schedule || combineSchedules(cartItem)
+            if (!cartSchedule) return cartItem
+            
+            let hasConflictWithRegistered = false
+            const conflictingRegisteredClasses: string[] = []
+            
+            for (const registeredClass of registeredClasses) {
+              const registeredSchedule = registeredClass.schedule
+              if (!registeredSchedule) continue
+              
+              try {
+                const result = checkTimeConflict(cartSchedule, registeredSchedule)
+                if (result.hasConflict) {
+                  hasConflictWithRegistered = true
+                  conflictingRegisteredClasses.push(`${registeredClass.code} (${registeredClass.title})`)
+                }
+              } catch (error) {
+                // Fallback to simple string comparison
+                if (cartSchedule === registeredSchedule) {
+                  hasConflictWithRegistered = true
+                  conflictingRegisteredClasses.push(`${registeredClass.code} (${registeredClass.title})`)
+                }
+              }
+            }
+            
+            if (hasConflictWithRegistered) {
+              return {
+                ...cartItem,
+                status: 'Conflict with enrolled',
+                hasConflictWithRegistered: true,
+                conflictingRegisteredClasses: conflictingRegisteredClasses
+              }
+            }
+            
+            return cartItem
+          })
+        }
+        
+        setCart(cartItems)
       } else {
         console.error('Error loading cart:', data.message)
         setCart([])
@@ -703,6 +782,7 @@ function CourseRegistration() {
 
   /**
    * Handle submitting registration for all cart items
+   * Blocks submission if cart has conflicts with enrolled classes
    */
   const handleSubmitRegistration = async () => {
     if (!userId) {
@@ -712,6 +792,21 @@ function CourseRegistration() {
     
     if (cart.length === 0) {
       alert('Your cart is empty. Add classes to register.')
+      return
+    }
+
+    // Check for conflicts with enrolled classes before submitting
+    const cartItemsWithRegisteredConflicts = cart.filter((item: any) => 
+      item.hasConflictWithRegistered || item.status === 'Conflict with enrolled'
+    )
+    
+    if (cartItemsWithRegisteredConflicts.length > 0) {
+      const conflictMessages = cartItemsWithRegisteredConflicts.map((item: any) => {
+        const conflicts = item.conflictingRegisteredClasses || []
+        return `${item.code} conflicts with: ${conflicts.join(', ')}`
+      }).join('\n')
+      
+      alert(`Cannot register classes due to time conflicts with enrolled classes:\n\n${conflictMessages}\n\nPlease remove conflicting classes from cart or drop the enrolled classes first.`)
       return
     }
 
@@ -1224,13 +1319,27 @@ function CourseRegistration() {
               <h3>Registered Classes ({selectedSemester} {selectedYear})</h3>
               <div className="registered-courses">
                 {registeredClasses.map((course) => (
-                  <div key={course.id} className="registered-course-card">
+                  <div key={course.id} className={`registered-course-card ${course.hasTimeConflict ? 'has-conflict' : ''}`}>
                     <div className="course-info">
                       <div className="course-code">{course.code}</div>
                       <div className="course-title">{course.title}</div>
                       <div className="course-schedule">{course.schedule}</div>
                       <div className="course-instructor">{course.instructor}</div>
                       <div className="course-location">{course.location}</div>
+                      {course.hasTimeConflict && course.conflictingClasses && course.conflictingClasses.length > 0 && (
+                        <div className="time-conflict-warning" style={{
+                          marginTop: '0.5rem',
+                          padding: '0.5rem',
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.875rem',
+                          color: '#991b1b'
+                        }}>
+                          <strong>⚠️ Time Conflict:</strong> This class conflicts with {course.conflictingClasses.join(', ')}. 
+                          {course.hasWaiver ? ' Override approved.' : ' Please resolve this conflict or request an override.'}
+                        </div>
+                      )}
                     </div>
                     <span className="status-tag enrolled">Enrolled</span>
                     <button 
@@ -1286,7 +1395,7 @@ function CourseRegistration() {
               </div>
             ) : (
               cart.map((course) => {
-                // Find courses that conflict with this course
+                // Find courses that conflict with this course (in cart)
                 const conflictingCourses = cart.filter((otherCourse) => 
                   otherCourse.id !== course.id && 
                   course.status === 'Conflict' && 
@@ -1295,7 +1404,7 @@ function CourseRegistration() {
                 )
                 
                 return (
-                  <div key={course.id} className="cart-course-card">
+                  <div key={course.id} className={`cart-course-card ${course.hasConflictWithRegistered ? 'has-conflict-with-registered' : ''}`}>
                     <div className="course-info">
                       <div className="course-code">{course.code}</div>
                       <div className="course-title">{course.title}</div>
@@ -1309,9 +1418,22 @@ function CourseRegistration() {
                           </span>
                         </div>
                       )}
+                      {course.hasConflictWithRegistered && course.conflictingRegisteredClasses && course.conflictingRegisteredClasses.length > 0 && (
+                        <div className="conflict-info" style={{
+                          marginTop: '0.5rem',
+                          padding: '0.5rem',
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.875rem',
+                          color: '#991b1b'
+                        }}>
+                          <strong>⚠️ Cannot Register:</strong> This class conflicts with enrolled classes: {course.conflictingRegisteredClasses.join(', ')}. Please drop the enrolled classes first or remove this from cart.
+                        </div>
+                      )}
                     </div>
-                    <span className={`status-tag ${course.status.toLowerCase()}`}>
-                      {course.status}
+                    <span className={`status-tag ${(course.status === 'Conflict with enrolled' || course.hasConflictWithRegistered) ? 'conflict-with-enrolled' : course.status.toLowerCase()}`}>
+                      {course.status === 'Conflict with enrolled' ? 'Conflict with Enrolled' : course.status}
                     </span>
                     <button 
                       className="drop-btn"

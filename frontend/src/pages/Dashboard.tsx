@@ -27,6 +27,7 @@ function Dashboard() {
   const [currentYear, setCurrentYear] = useState<number>(2025)
   const [latestTerm, setLatestTerm] = useState<{ semester: string; year: number } | null>(null)
   const [timeConflicts, setTimeConflicts] = useState<string[]>([])
+  const [activeHolds, setActiveHolds] = useState<any[]>([])
   const [pendingOverrides, setPendingOverrides] = useState<number>(0)
   const [userStats, setUserStats] = useState<any>(null)
   const [dbStats, setDbStats] = useState<any>(null)
@@ -119,6 +120,7 @@ function Dashboard() {
             await checkRegistrationEligibility(user.userId)
             await checkTimeConflicts(user.userId)
             await calculateGpa(user.userId)
+            await checkActiveHolds(user.userId)
           } else {
             console.log(`[Dashboard] User is not a student. Role: ${userRole}, userId: ${user?.userId}`)
           }
@@ -133,9 +135,8 @@ function Dashboard() {
             await fetchAdvisorData(user.userId)
           }
           
-          // Always try to fetch stats if user is logged in (same as UserManagement page)
-          // This ensures stats are loaded regardless of role
-          if (user) {
+          // Fetch admin stats only for REGISTRAR/ADMIN roles
+          if ((userRole === 'REGISTRAR' || userRole === 'ADMIN') && user) {
             await fetchAdminStats()
           }
           
@@ -160,6 +161,31 @@ function Dashboard() {
     run()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendBase]) // success parameter is removed after processing and replaced with /home, so excluded from dependencies
+
+  /**
+   * Check for active registration holds
+   */
+  const checkActiveHolds = async (userId: number) => {
+    try {
+      const response = await fetch(`${backendBase}/api/holds/check/${userId}`, {
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.hasActiveHolds && data.activeHolds && Array.isArray(data.activeHolds)) {
+          setActiveHolds(data.activeHolds)
+        } else {
+          setActiveHolds([])
+        }
+      } else {
+        setActiveHolds([])
+      }
+    } catch (error) {
+      console.error('Error checking holds:', error)
+      setActiveHolds([])
+    }
+  }
 
   /**
    * Check registration eligibility for a student
@@ -623,15 +649,12 @@ function Dashboard() {
       
       if (userStatsResponse.ok) {
         const stats = await userStatsResponse.json()
-        console.log('User statistics received:', stats)
         setUserStats(stats)
       } else {
-        const errorText = await userStatsResponse.text().catch(() => 'Unknown error')
-        console.error('Failed to fetch user statistics:', userStatsResponse.status, errorText)
-        
-        // If 403 Forbidden, the user might not be recognized as REGISTRAR by backend
-        if (userStatsResponse.status === 403) {
-          console.warn('Access denied: User may not have REGISTRAR role. Current user:', me)
+        // Silently handle 403 errors - don't log warnings for non-registrar users
+        if (userStatsResponse.status !== 403) {
+          const errorText = await userStatsResponse.text().catch(() => 'Unknown error')
+          console.error('Failed to fetch user statistics:', userStatsResponse.status, errorText)
         }
         
         setUserStats({ 
@@ -959,6 +982,26 @@ function Dashboard() {
         <>
         {/* Left Column */}
         <div className="left-column">
+          {/* Registration Hold Alert - Show if there are active holds */}
+          {activeHolds.length > 0 && (
+            <div className="alert-box alert-error">
+              <div className="alert-icon"></div>
+              <div className="alert-text">
+                <span className="alert-title">Registration Blocked:</span> You have {activeHolds.length} active hold{activeHolds.length > 1 ? 's' : ''} that prevent registration:
+                <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
+                  {activeHolds.map((hold: any, index: number) => (
+                    <li key={index} style={{ marginTop: '0.25rem' }}>
+                      <strong>{hold.holdType}:</strong> {hold.reason || 'No reason provided'}
+                    </li>
+                  ))}
+                </ul>
+                <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                  Please resolve these holds before registering for classes.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Registration Eligibility Alert - Only show if registration is open */}
           {registrationEligibility && registrationEligibility.canRegister && (
             <div className="alert-box alert-success">

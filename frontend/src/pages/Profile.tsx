@@ -475,7 +475,7 @@ export default function ProfilePage() {
     const termYear = termParts.length === 2 ? parseInt(termParts[0]) : null;
     const termSemester = termParts.length === 2 ? termParts[1] : null;
 
-    const [p, d, gpa, schedOld, planList, adm, deg, h, w, log, trOld, chOld, cpOld] = await Promise.all([
+    const [p, d, gpa, schedOld, planList, adm, deg, hOld, w, log, trOld, chOld, cpOld] = await Promise.all([
       sid ? safeFetch(`${prefix}`).catch(() => null) : Promise.resolve(null),
       safeFetch(`${prefix}/details`).catch(() => null),
       safeFetch(`${prefix}/gpa`).catch(() => null),
@@ -495,6 +495,38 @@ export default function ProfilePage() {
     let userId: number | null = null;
     if (p && (p as any).id) {
       userId = (p as any).id;
+    }
+
+    // Fetch holds using RegistrationHoldController API (more reliable)
+    let h: Hold[] = [];
+    if (userId) {
+      try {
+        const holdsResponse = await safeFetch(`${BASE}/api/holds/student/${userId}`).catch(() => null);
+        if (holdsResponse && holdsResponse.success && Array.isArray(holdsResponse.holds)) {
+          h = holdsResponse.holds.map((hold: any) => ({
+            holdId: hold.holdId,
+            holdType: hold.holdType,
+            reason: hold.reason || '',
+            placedAt: hold.placedAt || '',
+            placedBy: hold.placedBy ? {
+              userId: hold.placedBy.userId || 0,
+              name: hold.placedBy.name || ''
+            } : undefined
+          }));
+        } else if (Array.isArray(hOld) && hOld.length > 0) {
+          // Fallback to old API response if new API fails
+          h = hOld as Hold[];
+        }
+      } catch (error) {
+        console.error('Error fetching holds from /api/holds/student:', error);
+        // Fallback to old API response
+        if (Array.isArray(hOld) && hOld.length > 0) {
+          h = hOld as Hold[];
+        }
+      }
+    } else if (Array.isArray(hOld) && hOld.length > 0) {
+      // If no userId, use old API response
+      h = hOld as Hold[];
     }
 
     // Fetch additional user data using User APIs if userId is available
