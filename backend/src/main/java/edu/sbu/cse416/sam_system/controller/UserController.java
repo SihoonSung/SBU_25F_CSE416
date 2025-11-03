@@ -213,6 +213,25 @@ public class UserController {
         }
     }
 
+    /** Deactivate user */
+    @PutMapping("/{userId}/deactivate")
+    // TP: Used cursor to deactivate a user
+    public ResponseEntity<User> deactivateUser(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal OAuth2User principal) {
+
+        if (!isRegistrar(principal)) {
+            return ResponseEntity.status(403).build();
+        }
+
+        try {
+            User user = userService.deactivateUser(userId);
+            return ResponseEntity.ok(user);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     /** Import users from YAML file */
     @PostMapping("/import")
     // TP: Used cursor to import users from YAML upload
