@@ -112,7 +112,15 @@ type RequirementStatus = {
   note?: string | null;
 };
 
-type Hold = { code: string; title: string; placedAt: string; placedBy?: string };
+type Hold = { 
+  holdId?: number;
+  code?: string; 
+  title?: string; 
+  holdType?: string;
+  placedAt: string; 
+  placedBy?: string | { userId: number; name: string };
+  reason?: string;
+};
 type TimeConflictWaiver = { classA: string; classB: string; term: string; waivedBy: string; waivedAt: string };
 type AuditLogEntry = { id: number; timestamp: string; actorRole: "student" | "advisor" | "registrar" | "system"; actorDisplay: string; action: string; details?: string };
 
@@ -144,6 +152,7 @@ export default function ProfilePage() {
   const [me, setMe] = useState<CurrentUserInfo | null>(null);
   const [myPerson, setMyPerson] = useState<PersonBasic | null>(null); // non-student compatible info (from YAML)
   const [myIsStudent, setMyIsStudent] = useState<boolean>(false);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   /** ===== My student bundle (only if STUDENT) ===== */
   const [myTerm, setMyTerm] = useState<string>("2025-Fall");
@@ -245,6 +254,10 @@ export default function ProfilePage() {
             netId: whoRaw?.netId ?? "",
             roles: authRoles as Role[],
           });
+
+          // Set current user ID if available
+          const userId = whoRaw?.user?.userId || whoRaw?.userId || null;
+          setCurrentUserId(userId);
 
           const isStudent = authRoles.includes("STUDENT" as Role);
           setMyIsStudent(isStudent);
@@ -650,6 +663,28 @@ export default function ProfilePage() {
           coursePlan={myCoursePlan}
           fmt={fmt}
           busy={busy}
+          isAdvisorOrRegistrar={isAdvisorOrRegistrar}
+          studentId={myProfile?.studentId}
+          currentUserId={currentUserId}
+          onHoldsUpdate={async () => {
+            if (myProfile?.studentId) {
+              await loadStudentBundle(myProfile.studentId, myTerm, {
+                setProfile: setMyProfile,
+                setDetails: setMyDetails,
+                setSummary: setMySummary,
+                setSchedule: setMySchedule,
+                setPlans: setMyPlans,
+                setAdmissionReqs: setMyAdmissionReqs,
+                setDegreeReqs: setMyDegreeReqs,
+                setHolds: setMyHolds,
+                setWaived: setMyWaived,
+                setAudit: setMyAudit,
+                setTransfers: setMyTransfers,
+                setClassHistory: setMyClassHistory,
+                setCoursePlan: setMyCoursePlan,
+              });
+            }
+          }}
         />
       )}
 
@@ -708,6 +743,28 @@ export default function ProfilePage() {
         coursePlan={coursePlan}
         fmt={fmt}
         busy={busy}
+        isAdvisorOrRegistrar={isAdvisorOrRegistrar}
+        studentId={targetSid}
+        currentUserId={currentUserId}
+        onHoldsUpdate={async () => {
+          if (targetSid) {
+            await loadStudentBundle(targetSid, term, {
+              setProfile: setProfile,
+              setDetails: setDetails,
+              setSummary: setSummary,
+              setSchedule: setSchedule,
+              setPlans: setPlans,
+              setAdmissionReqs: setAdmissionReqs,
+              setDegreeReqs: setDegreeReqs,
+              setHolds: setHolds,
+              setWaived: setWaivedConflicts,
+              setAudit: setAudit,
+              setTransfers: setTransfers,
+              setClassHistory: setClassHistory,
+              setCoursePlan: setCoursePlan,
+            });
+          }
+        }}
       />)}
 
       {/* ===== Admin: Academic calendar + system date (optional) ===== */}
@@ -796,6 +853,10 @@ function StudentBundleView(props: {
     join: (arr?: string[] | null) => string;
   };
   busy: boolean;
+  isAdvisorOrRegistrar?: boolean;
+  studentId?: string | null;
+  currentUserId?: number | null;
+  onHoldsUpdate?: () => void;
 }) {
   const {
     title,
@@ -816,7 +877,104 @@ function StudentBundleView(props: {
     coursePlan,
     fmt,
     busy,
+    isAdvisorOrRegistrar = false,
+    studentId,
+    currentUserId,
+    onHoldsUpdate,
   } = props;
+
+  const backendBase = BASE;
+
+  // Hold management state
+  const [showHoldModal, setShowHoldModal] = useState(false);
+  const [holdType, setHoldType] = useState<'ACADEMIC_ADVISING' | 'FINANCIAL'>('ACADEMIC_ADVISING');
+  const [holdReason, setHoldReason] = useState('');
+  const [holdLoading, setHoldLoading] = useState(false);
+
+  // Create hold
+  const handleCreateHold = async () => {
+    if (!studentId || !currentUserId) {
+      alert('Student ID or current user ID is missing');
+      return;
+    }
+
+    // Convert studentId (string) to userId (number) - need to fetch student by studentId
+    let studentUserId: number | null = null;
+    try {
+      const studentRes = await fetch(`${backendBase}/api/profile/student-id/${studentId}`, {
+        credentials: 'include'
+      });
+      if (studentRes.ok) {
+        const studentData = await studentRes.json();
+        studentUserId = studentData.userId || studentData.id || null;
+      }
+    } catch (e) {
+      console.error('Error fetching student:', e);
+    }
+
+    if (!studentUserId) {
+      alert('Could not find student user ID');
+      return;
+    }
+
+    setHoldLoading(true);
+    try {
+      const response = await fetch(`${backendBase}/api/holds`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          studentId: studentUserId,
+          holdType,
+          placedById: currentUserId,
+          reason: holdReason.trim() || null
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        alert('Hold created successfully');
+        setShowHoldModal(false);
+        setHoldReason('');
+        if (onHoldsUpdate) onHoldsUpdate();
+      } else {
+        alert(data.message || 'Failed to create hold');
+      }
+    } catch (error) {
+      alert('Error creating hold: ' + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setHoldLoading(false);
+    }
+  };
+
+  // Remove hold
+  const handleRemoveHold = async (holdId: number) => {
+    if (!currentUserId) {
+      alert('Current user ID is missing');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to remove this hold?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${backendBase}/api/holds/${holdId}?removedById=${currentUserId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        alert('Hold removed successfully');
+        if (onHoldsUpdate) onHoldsUpdate();
+      } else {
+        alert(data.message || 'Failed to remove hold');
+      }
+    } catch (error) {
+      alert('Error removing hold: ' + (error instanceof Error ? error.message : String(error)));
+    }
+  };
 
   return (
     <section style={{ background: "#fff", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
@@ -1128,26 +1286,149 @@ function StudentBundleView(props: {
 
           {/* Holds */}
           <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
-            <h3 style={{ marginTop: 0 }}>Registration Holds</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ marginTop: 0 }}>Registration Holds</h3>
+              {isAdvisorOrRegistrar && studentId && currentUserId && (
+                <button 
+                  onClick={() => setShowHoldModal(true)}
+                  disabled={busy || holdLoading}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: '#1890ff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontSize: 14
+                  }}
+                >
+                  + Add Hold
+                </button>
+              )}
+            </div>
             {holds.length === 0 ? (
               <div>No holds.</div>
             ) : (
               <div style={{ border: "1px solid #eee", borderRadius: 8, overflow: "hidden" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 200px", background: "#fafafa", fontWeight: 600, padding: "8px 12px" }}>
-                  <div>Code</div>
-                  <div>Title</div>
+                <div style={{ display: "grid", gridTemplateColumns: isAdvisorOrRegistrar ? "120px 1fr 150px 100px 80px" : "120px 1fr 150px 100px", background: "#fafafa", fontWeight: 600, padding: "8px 12px" }}>
+                  <div>Type</div>
+                  <div>Reason</div>
                   <div>Placed</div>
+                  <div>By</div>
+                  {isAdvisorOrRegistrar && <div>Action</div>}
                 </div>
                 {holds.map((h, i) => (
-                  <div key={`${h.code}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 1fr 200px", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
-                    <div>{h.code}</div>
-                    <div>{h.title}</div>
+                  <div key={`${h.holdId || i}-${h.placedAt}`} style={{ display: "grid", gridTemplateColumns: isAdvisorOrRegistrar ? "120px 1fr 150px 100px 80px" : "120px 1fr 150px 100px", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
+                    <div>{h.holdType || h.code || 'N/A'}</div>
+                    <div>{h.reason || h.title || '-'}</div>
                     <div>{fmt.date(h.placedAt)}</div>
+                    <div>
+                      {typeof h.placedBy === 'object' ? h.placedBy.name : (h.placedBy || '-')}
+                    </div>
+                    {isAdvisorOrRegistrar && h.holdId && (
+                      <div>
+                        <button
+                          onClick={() => handleRemoveHold(h.holdId!)}
+                          disabled={busy || holdLoading}
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#ff4d4f',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: 4,
+                            cursor: 'pointer',
+                            fontSize: 12
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </section>
+
+          {/* Hold Creation Modal */}
+          {showHoldModal && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}>
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: 8,
+                padding: 24,
+                maxWidth: 500,
+                width: '90%',
+                maxHeight: '90vh',
+                overflow: 'auto'
+              }}>
+                <h3 style={{ marginTop: 0 }}>Create Registration Hold</h3>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Hold Type</label>
+                  <select
+                    value={holdType}
+                    onChange={(e) => setHoldType(e.target.value as 'ACADEMIC_ADVISING' | 'FINANCIAL')}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: 4 }}
+                  >
+                    <option value="ACADEMIC_ADVISING">Academic Advising</option>
+                    <option value="FINANCIAL">Financial</option>
+                  </select>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Reason (Optional)</label>
+                  <textarea
+                    value={holdReason}
+                    onChange={(e) => setHoldReason(e.target.value)}
+                    placeholder="Enter reason for the hold"
+                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: 4, minHeight: 100 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => {
+                      setShowHoldModal(false);
+                      setHoldReason('');
+                    }}
+                    disabled={holdLoading}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#f0f0f0',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateHold}
+                    disabled={holdLoading}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#1890ff',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {holdLoading ? 'Creating...' : 'Create Hold'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Waived Time Conflicts */}
           <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>

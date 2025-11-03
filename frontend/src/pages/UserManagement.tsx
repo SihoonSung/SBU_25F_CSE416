@@ -114,7 +114,25 @@ const UserManagement: React.FC = () => {
         credentials: 'include'
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+          console.log('Import response:', data);
+        } catch (jsonError) {
+          setImportMessage(`Error: Failed to parse response`);
+          console.error('Error parsing JSON response:', jsonError);
+          return;
+        }
+      } else {
+        // Response is not JSON
+        const text = await response.text();
+        console.error('Non-JSON response:', response.status, text);
+        setImportMessage(`Error: ${response.status === 500 ? 'Internal Server Error' : text || 'Unknown error'}`);
+        return;
+      }
 
       if (response.ok) {
         setImportMessage(`Successfully imported ${data.importedCount} users`);
@@ -122,10 +140,22 @@ const UserManagement: React.FC = () => {
         fetchStatistics();
         setSelectedFile(null);
       } else {
-        setImportMessage(`Error: ${data.error}`);
+        // Show detailed error information
+        const errorMsg = data.error || data.message || data.message || 'Unknown error';
+        const errorDetails = data.exception ? ` (${data.exception})` : '';
+        const fullError = `${errorMsg}${errorDetails}`;
+        
+        console.error('Import error details:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: data,
+          responseHeaders: Object.fromEntries(response.headers.entries())
+        });
+        
+        setImportMessage(`Error: ${fullError}. Please check the browser console and backend logs for more details.`);
       }
     } catch (error) {
-      setImportMessage('Error uploading file');
+      setImportMessage('Error uploading file: Network error or server unavailable');
       console.error('Error uploading file:', error);
     }
   };

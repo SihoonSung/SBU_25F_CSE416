@@ -40,13 +40,25 @@ export async function getCurrentUser(): Promise<{
 
 export async function isAuthenticated(): Promise<boolean> {
   try {
-    const res = await fetch(`${BACKEND_BASE}/api/auth/status`, {
+    // Use /api/auth/me to actually check if user is authenticated
+    const res = await fetch(`${BACKEND_BASE}/api/auth/me`, {
       method: 'GET',
-      credentials: 'include', 
+      credentials: 'include',
+      cache: 'no-cache',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
     });
-    if (!res.ok) return false;
+    
+    if (!res.ok) {
+      return false;
+    }
+    
     const data = await res.json();
-    return Boolean(data?.authenticated);
+    // Check if user data actually exists
+    const user = data.user || data;
+    return Boolean(user && user.userId && user.email);
   } catch {
     return false;
   }

@@ -23,6 +23,8 @@ const DegreeRequirements: React.FC = () => {
   const [requirements, setRequirements] = useState<DegreeRequirement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedRequirementId, setExpandedRequirementId] = useState<number | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   
   // Filter states
   const [selectedSubject, setSelectedSubject] = useState('');
@@ -34,6 +36,29 @@ const DegreeRequirements: React.FC = () => {
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [availableDegreeTypes, setAvailableDegreeTypes] = useState<string[]>([]);
   const [availableTerms, setAvailableTerms] = useState<string[]>([]);
+  
+  const handleRequirementClick = (requirementId: number) => {
+    setExpandedRequirementId(expandedRequirementId === requirementId ? null : requirementId);
+  };
+  
+  const handleSectionToggle = (sectionKey: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setExpandedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionKey)) {
+        newSet.delete(sectionKey);
+      } else {
+        newSet.add(sectionKey);
+      }
+      return newSet;
+    });
+  };
+  
+  const isSectionExpanded = (sectionKey: string) => {
+    return expandedSections.has(sectionKey);
+  };
 
   useEffect(() => {
     fetchRequirements();
@@ -377,25 +402,34 @@ const DegreeRequirements: React.FC = () => {
           </div>
         ) : (
           <div className="requirements-grid">
-            {getFilteredRequirements().map(requirement => (
-              <div key={requirement.requirementId} className="requirement-card">
-                <div className="requirement-header">
-                  <div className="requirement-title">
-                    <h3>{requirement.subjectCode} {getDegreeTypeDisplayName(requirement.degreeType)}</h3>
-                    <div className="requirement-badges">
-                      {requirement.isRestricted && (
-                        <span className="badge restricted">Restricted</span>
-                      )}
-                      <span className="badge version">{requirement.requirementsVersion}</span>
+            {getFilteredRequirements().map(requirement => {
+              const isExpanded = expandedRequirementId === requirement.requirementId;
+              
+              return (
+                <div 
+                  key={requirement.requirementId} 
+                  className={`requirement-card ${isExpanded ? 'expanded' : 'collapsed'}`}
+                  onClick={() => handleRequirementClick(requirement.requirementId)}
+                >
+                  <div className="requirement-header">
+                    <div className="requirement-title">
+                      <h3>{requirement.subjectCode} {getDegreeTypeDisplayName(requirement.degreeType)}</h3>
+                      <div className="requirement-badges">
+                        {requirement.isRestricted && (
+                          <span className="badge restricted">Restricted</span>
+                        )}
+                        <span className="badge version">{requirement.requirementsVersion}</span>
+                      </div>
+                    </div>
+                    <div className="requirement-meta">
+                      <span className="effective-term">Effective: {requirement.effectiveTerm}</span>
+                      <span className="created-date">Created: {formatDate(requirement.createdAt)}</span>
                     </div>
                   </div>
-                  <div className="requirement-meta">
-                    <span className="effective-term">Effective: {requirement.effectiveTerm}</span>
-                    <span className="created-date">Created: {formatDate(requirement.createdAt)}</span>
-                  </div>
-                </div>
 
-                <div className="requirement-details">
+                  {isExpanded && (
+                    <div className="requirement-content-wrapper">
+                      <div className="requirement-details">
                   <div className="detail-row">
                     <span className="detail-label">Total Credits:</span>
                     <span className="detail-value">{requirement.totalCreditsRequired}</span>
@@ -419,8 +453,17 @@ const DegreeRequirements: React.FC = () => {
                 {/* Admission Requirements */}
                 {requirement.admissionRequirements && (
                   <div className="requirement-section">
-                    <h4>Admission Requirements</h4>
-                    <div className="requirement-content">
+                    <div 
+                      className="requirement-section-header"
+                      onClick={(e) => handleSectionToggle(`admission-${requirement.requirementId}`, e)}
+                    >
+                      <h4>Admission Requirements</h4>
+                      <span className="section-toggle-icon">
+                        {isSectionExpanded(`admission-${requirement.requirementId}`) ? '▼' : '▶'}
+                      </span>
+                    </div>
+                    {isSectionExpanded(`admission-${requirement.requirementId}`) && (
+                      <div className="requirement-content">
                       {(() => {
                         const admissionReqs = parseJsonField(requirement.admissionRequirements);
                         if (admissionReqs) {
@@ -466,15 +509,25 @@ const DegreeRequirements: React.FC = () => {
                         }
                         return <p>{requirement.admissionRequirements}</p>;
                       })()}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Course Requirements */}
                 {requirement.courseRequirements && (
                   <div className="requirement-section">
-                    <h4>Course Requirements</h4>
-                    <div className="requirement-content">
+                    <div 
+                      className="requirement-section-header"
+                      onClick={(e) => handleSectionToggle(`course-${requirement.requirementId}`, e)}
+                    >
+                      <h4>Course Requirements</h4>
+                      <span className="section-toggle-icon">
+                        {isSectionExpanded(`course-${requirement.requirementId}`) ? '▼' : '▶'}
+                      </span>
+                    </div>
+                    {isSectionExpanded(`course-${requirement.requirementId}`) && (
+                      <div className="requirement-content">
                       {(() => {
                         const courseReqs = parseJsonField(requirement.courseRequirements);
                         if (courseReqs && courseReqs.groups) {
@@ -501,13 +554,17 @@ const DegreeRequirements: React.FC = () => {
                                   {group.sequences && (
                                     <div className="sequences-container">
                                       {group.sequences.map((sequence: any[], seqIndex: number) => (
-                                        <div key={seqIndex} className="sequence">
-                                          {sequence.map((course: any, courseIndex: number) => (
-                                            <span key={courseIndex} className="course-tag">
-                                              {course.code}
-                                              {courseIndex < sequence.length - 1 && ' → '}
-                                            </span>
-                                          ))}
+                                        <div key={seqIndex} className="sequence-module">
+                                          <div className="sequence-path">
+                                            {sequence.map((course: any, courseIndex: number) => (
+                                              <React.Fragment key={courseIndex}>
+                                                <span className="course-tag sequence-course">{course.code}</span>
+                                                {courseIndex < sequence.length - 1 && (
+                                                  <span className="sequence-arrow">→</span>
+                                                )}
+                                              </React.Fragment>
+                                            ))}
+                                          </div>
                                         </div>
                                       ))}
                                     </div>
@@ -543,15 +600,25 @@ const DegreeRequirements: React.FC = () => {
                         }
                         return <p>{requirement.courseRequirements}</p>;
                       })()}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* SBC Requirements */}
                 {requirement.sbcRequirements && (
                   <div className="requirement-section">
-                    <h4>SBC Categories</h4>
-                    <div className="requirement-content">
+                    <div 
+                      className="requirement-section-header"
+                      onClick={(e) => handleSectionToggle(`sbc-${requirement.requirementId}`, e)}
+                    >
+                      <h4>SBC Categories</h4>
+                      <span className="section-toggle-icon">
+                        {isSectionExpanded(`sbc-${requirement.requirementId}`) ? '▼' : '▶'}
+                      </span>
+                    </div>
+                    {isSectionExpanded(`sbc-${requirement.requirementId}`) && (
+                      <div className="requirement-content">
                       {(() => {
                         const sbcReqs = parseJsonField(requirement.sbcRequirements);
                         if (sbcReqs && Array.isArray(sbcReqs)) {
@@ -620,22 +687,29 @@ const DegreeRequirements: React.FC = () => {
                         }
                         return <p>{requirement.sbcRequirements}</p>;
                       })()}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                <div className="requirement-footer">
-                  <span className="created-by">Created by: {requirement.createdBy}</span>
-                  <button 
-                    className="delete-button"
-                    onClick={() => deleteRequirement(requirement.requirementId)}
-                    title="Delete this requirement"
-                  >
-                    Delete
-                  </button>
+                      <div className="requirement-footer">
+                        <span className="created-by">Created by: {requirement.createdBy}</span>
+                        <button 
+                          className="delete-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteRequirement(requirement.requirementId);
+                          }}
+                          title="Delete this requirement"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

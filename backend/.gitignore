@@ -37,3 +37,6 @@ build/
 
 ### Log files
 *.log
+
+### Test configuration files
+src/main/resources/course_yaml/users1.yaml

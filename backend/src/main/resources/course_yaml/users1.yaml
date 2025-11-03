@@ -17,6 +17,10 @@ registrars:
   first_name: Ralph
   last_name: Randall
   email: ralph.randall@stonybrook.edu
+- SBU_ID: 112211221
+  first_name: Si
+  last_name: Sung
+  email: shsung060514@gmail.com
 
 academic_advisors:
 - SBU_ID: 100765431
@@ -98,6 +102,37 @@ students:
   planned_major_requirement_versions: []
   planned_degrees: []
   planned_minors: [CSE]
+  planned_minor_requirement_versions: [{semester: Spring, year: 2025}]
+  graduation: null
+  transfer_courses: null
+  classes:  # list of classes the student took, is taking, or is registered for in a future semester.
+    # GPNC is a boolean flag indicating whether GPMC option was selected.
+    - {class_id: 12345, department: CSE, course_num: 101, section: 2, semester: Fall, year: 2020, credits: 3, GPNC: false, grade: A}
+    - {class_id: 23456, department: AMS, course_num: 151, section: 1, semester: Spring, year: 2021, credits: 3, GPNC: false, grade: A-}
+    - {class_id: 34567, department: CSE, course_num: 214, section: 2, semester: SummerI, year: 2020, credits: 3, GPNC: true, grade: P}
+    - {class_id: 45678, department: AMS, course_num: 261, section: 1, semester: Fall, year: 2025, credits: 3, GPNC: false, grade: null}
+    - {class_id: 56789, department: CSE, course_num: 220, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: null}
+  course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
+    - {department: CSE, course_num: 101, semester: Spring, year: 2026, credits: 3}
+    - {department: CSE, course_num: 114, semester: Spring, year: 2026, credits: 3}
+
+- SBU_ID: 113949353
+  first_name: Sihoon
+  last_name: Sung
+  email: sihoon.sung@stonybrook.edu
+  university_entry: {semester: Spring, year: 2020}
+  direct_admit: null
+  AOI: null
+  college:
+  majors: [CSE]
+  degrees: [BS]
+  major_requirement_versions: [{semester: Spring, year: 2021}]
+  minors: []
+  minor_requirement_versions: []
+  planned_majors: []
+  planned_major_requirement_versions: []
+  planned_degrees: []
+  planned_minors: [BM]
   planned_minor_requirement_versions: [{semester: Spring, year: 2025}]
   graduation: null
   transfer_courses: null

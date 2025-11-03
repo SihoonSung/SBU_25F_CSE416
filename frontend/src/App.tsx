@@ -36,7 +36,7 @@ function App() {
           <Route path="/planner" element={<ProtectedRoute><Planner/></ProtectedRoute>} />
           <Route path="/registration" element={<ProtectedRoute><CourseRegistration/></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile/></ProtectedRoute>}/>
-          <Route path="/user-management" element={<ProtectedRoute><UserManagement/></ProtectedRoute>} />
+          <Route path="/user-management" element={<UserManagement/>} />
           <Route path="/data-import" element={<ProtectedRoute><DataImport/></ProtectedRoute>} />
           <Route path="/degree-requirements" element={<ProtectedRoute><DegreeRequirements/></ProtectedRoute>} />
           <Route path="/degree-audit" element={<ProtectedRoute><DegreeAudit/></ProtectedRoute>} />

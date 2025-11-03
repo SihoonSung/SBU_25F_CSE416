@@ -413,115 +413,7 @@ function CourseSearch() {
 
         {/* Results */}
         <div className="results-main">
-          <h1>Course Search Results</h1>
-          <div className="results-shell">
-            <div className="results-header">
-              <div>COURSE CODE</div>
-              <div>TITLE</div>
-              <div>CREDITS</div>
-              <div>PREREQUISITES</div>
-              <div>INSTRUCTOR</div>
-              <div>TIME</div>
-              <div>SEATS OPEN</div>
-              <div></div>
-            </div>
-            <div className="results-body">
-              {currentItems.map((course) => (
-                <div key={course.id}>
-                  {selectedCourse && selectedCourse.id === course.id ? (
-                    <div className="catalog-detail-card" onClick={handleBackToSearch}>
-                      <div className="catalog-detail-header">
-                        <div className="catalog-detail-info">
-                          <div className="catalog-code-large">{course.subject} {course.courseNumber}</div>
-                          {course.warning && (
-                            <div className="catalog-warning-text">Simplified placement exam info</div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="catalog-detail-content">
-                        <div className="catalog-detail-row">
-                          <span className="catalog-detail-label">Title:</span>
-                          <span className="catalog-detail-value">{course.courseName}</span>
-                        </div>
-                        <div className="catalog-detail-row">
-                          <span className="catalog-detail-label">Credits:</span>
-                          <span className="catalog-detail-value">
-                            {typeof course.credits === 'string' && course.credits.includes('-') 
-                              ? `${course.credits} credits` 
-                              : `${course.credits} credit${course.credits !== 1 ? 's' : ''}`}
-                          </span>
-                        </div>
-                        {course.sbcsSatisfied && course.sbcsSatisfied !== 'None' && (
-                          <div className="catalog-detail-row">
-                            <span className="catalog-detail-label">SBC:</span>
-                            <span className={`catalog-detail-value ${course.sbcsSatisfied === 'unknown' ? 'catalog-unknown-info' : 'catalog-sbc-badges'}`}>
-                              {course.sbcsSatisfied}
-                            </span>
-                          </div>
-                        )}
-                        {course.description && course.description !== 'No description available' && (
-                          <div className="catalog-detail-row">
-                            <span className="catalog-detail-label">Description:</span>
-                            <span className="catalog-detail-value catalog-description-text">{course.description}</span>
-                          </div>
-                        )}
-                        <div className="catalog-requisites-section">
-                          {course.prerequisites && course.prerequisites !== 'None' && (
-                            <div className="catalog-detail-row">
-                              <span className="catalog-detail-label">Prerequisites:</span>
-                              <span className={`catalog-detail-value ${course.prerequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>{course.prerequisites}</span>
-                            </div>
-                          )}
-                          {course.corequisites && course.corequisites !== 'None' && (
-                            <div className="catalog-detail-row">
-                              <span className="catalog-detail-label">Corequisites:</span>
-                              <span className={`catalog-detail-value ${course.corequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>{course.corequisites}</span>
-                            </div>
-                          )}
-                          {course.antirequisites && course.antirequisites !== 'None' && (
-                            <div className="catalog-detail-row">
-                              <span className="catalog-detail-label">Antirequisites:</span>
-                              <span className={`catalog-detail-value ${course.antirequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>{course.antirequisites}</span>
-                            </div>
-                          )}
-                          {course.advisoryPrerequisites && course.advisoryPrerequisites !== 'None' && (
-                            <div className="catalog-detail-row">
-                              <span className="catalog-detail-label">Advisory Prerequisites:</span>
-                              <span className={`catalog-detail-value ${course.advisoryPrerequisites === 'unknown' ? 'catalog-unknown-info' : ''}`}>{course.advisoryPrerequisites}</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="catalog-detail-row">
-                          <a 
-                            href={`https://classie-evals.stonybrook.edu/?SearchKeyword=${course.subject}${course.courseNumber}&SearchTerm=ALL`}
-                            target="_blank" rel="noopener noreferrer" className="catalog-detail-link"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            View Course Evaluations
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="search-row" onClick={() => handleCourseSelect(course)}>
-                      <div className="cell-code">{course.subject} {course.courseNumber}</div>
-                      <div className="cell-title">{course.courseName}</div>
-                  <div className="cell-credits">{typeof course.credits === 'string' ? course.credits : `${course.credits}`}</div>
-                  <div className="cell-prereq">{course.prerequisites && course.prerequisites !== 'None' ? course.prerequisites : '—'}</div>
-                  <div className="cell-instructor">N/A</div>
-                      <div className="cell-time">View details</div>
-                  <div className="cell-seats">N/A</div>
-                      <div className="add-to-cart">
-                        <button className="add-to-cart-btn" onClick={(e) => { e.stopPropagation(); /* add to cart action */ }}>
-                          Add to Cart
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          <h1>Courses</h1>
           <div className="catalog-results-cards">
             {courses.length === 0 ? (
               <div className="catalog-no-data">
@@ -645,24 +537,28 @@ function CourseSearch() {
                       className="catalog-result-card catalog-clickable"
                       onClick={() => handleCourseSelect(course)}
                     >
-                      <div className="catalog-course-code">
-                        {course.subject} {course.courseNumber}
-                        {!supportedSubjects.includes(course.subject) && (
-                          <span className="catalog-unsupported-badge"></span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '120px' }}>
+                        <div className="catalog-course-code">
+                          {course.subject} {course.courseNumber}
+                        </div>
+                        {(course.warning || !supportedSubjects.includes(course.subject)) && (
+                          <span style={{ fontSize: '16px', color: '#f59e0b' }} title={course.warning ? 'Simplified placement exam info' : 'Limited support'}>⚠️</span>
                         )}
                       </div>
-                        <div className="catalog-course-title">{course.courseName}</div>
-                        <div className="catalog-course-schedule">
-                          {typeof course.credits === 'string' && course.credits.includes('-') 
-                            ? `${course.credits} credits` 
-                            : `${course.credits} credit${course.credits !== 1 ? 's' : ''}`
-                          }
-                        </div>
-                      {course.sbcsSatisfied && course.sbcsSatisfied !== 'None' && course.sbcsSatisfied !== 'unknown' ? (
-                        <div className="catalog-course-instructor">SBC: {course.sbcsSatisfied}</div>
-                      ) : course.sbcsSatisfied === 'unknown' && (
-                        <div className="catalog-course-instructor catalog-unknown-info">SBC: Unknown</div>
-                      )}
+                      <div className="catalog-course-title">{course.courseName}</div>
+                      <div className="catalog-course-schedule">
+                        {typeof course.credits === 'string' && course.credits.includes('-') 
+                          ? `${course.credits} credits` 
+                          : `${course.credits} credit${course.credits !== 1 ? 's' : ''}`
+                        }
+                      </div>
+                      <div className="catalog-course-instructor">
+                        {course.sbcsSatisfied && course.sbcsSatisfied !== 'None' && course.sbcsSatisfied !== 'unknown' ? (
+                          <>SBC: {course.sbcsSatisfied}</>
+                        ) : course.sbcsSatisfied === 'unknown' ? (
+                          <span className="catalog-unknown-info">SBC: Unknown</span>
+                        ) : null}
+                      </div>
                     </div>
                   )}
                 </div>

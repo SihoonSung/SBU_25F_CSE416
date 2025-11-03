@@ -17,7 +17,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       try {
         const ok = await isAuthenticated();
         if (!mounted) return;
-        setAuthed(ok);
+        // Explicitly set authenticated to false if check fails
+        setAuthed(ok === true);
+      } catch (error) {
+        if (!mounted) return;
+        console.error('Auth check error:', error);
+        setAuthed(false);
       } finally {
         if (mounted) setLoading(false);
       }

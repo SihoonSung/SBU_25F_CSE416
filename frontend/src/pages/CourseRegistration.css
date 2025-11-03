@@ -506,6 +506,28 @@
   margin-bottom: 0.125rem;
 }
 
+.cart-course-card .conflict-info {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cart-course-card .conflict-label {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.cart-course-card .conflict-courses {
+  color: #dc2626;
+  font-weight: 500;
+}
+
 /* Status Tag */
 .status-tag {
   padding: 0.25rem 0.75rem;

@@ -41,6 +41,25 @@ function Login() {
 
   return (
     <div className="login-page">
+      {/* Error Message Display - Above the card */}
+      {errorMessage && (
+        <div className="error-box">
+          <div className="error-content">
+            <h3>Access Denied</h3>
+            <p>{errorMessage}</p>
+            <button 
+              className="retry-button" 
+              onClick={() => {
+                setErrorMessage('')
+                window.location.href = '/login'
+              }}
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      )}
+      
       <div className="login-card">
         <div className="login-header">
           <h1 className="sbu-title">SBU Academics Management</h1>
@@ -48,26 +67,6 @@ function Login() {
         </div>
         
         <div className="login-form">
-          {/* Error Message Display */}
-          {errorMessage && (
-            <div className="error-message">
-              <div className="error-icon"></div>
-              <div className="error-content">
-                <h3>Access Denied</h3>
-                <p>{errorMessage}</p>
-                <button 
-                  className="retry-button" 
-                  onClick={() => {
-                    setErrorMessage('')
-                    window.location.href = '/login'
-                  }}
-                >
-                  Try Again
-                </button>
-              </div>
-            </div>
-          )}
-          
           {isLoading ? (
             <div className="loading-container">
               <div className="loading-spinner"></div>

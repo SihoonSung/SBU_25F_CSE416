@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './DataImport.css';
 
 /**
@@ -71,7 +71,30 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
   const [customSubject, setCustomSubject] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [scrapingMessage, setScrapingMessage] = useState<{ type: 'success' | 'error' | 'warning', text: string } | null>(null);
+  const [terms, setTerms] = useState<any[]>([]);
+  const [showProgressModal, setShowProgressModal] = useState<boolean>(false);
+  const [subjectStatuses, setSubjectStatuses] = useState<Map<string, 'processing' | 'success' | 'skipped' | 'failed'>>(new Map());
   const supportedSubjects = ['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL'];
+
+  useEffect(() => {
+    if (subTab === 'scraping') {
+      fetchTerms();
+    }
+  }, [subTab]);
+
+  const fetchTerms = async () => {
+    try {
+      const response = await fetch(`${backendBase}/api/scraping/terms`, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const termsData = await response.json();
+        setTerms(termsData);
+      }
+    } catch (error) {
+      console.error('Error fetching terms:', error);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -116,13 +139,8 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
         credentials: 'include'
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to upload file' }));
-        setUploadMessage(`Error: ${errorData.message || 'Upload failed'}`);
-        return;
-      }
-
       const data = await response.json();
+      
       if (data.success) {
         setUploadMessage(`Success: ${data.message || 'Upload successful'}`);
         setSelectedFile(null);
@@ -131,7 +149,24 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
         const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
       } else {
-        setUploadMessage(`Error: ${data.message || 'Upload failed'}`);
+        // Check for format-related errors (same as original PdfUpload page)
+        if (data.message && (
+          data.message.toLowerCase().includes('format') || 
+          data.message.toLowerCase().includes('invalid') || 
+          data.message.toLowerCase().includes('parse') ||
+          data.message.toLowerCase().includes('structure') ||
+          data.message.toLowerCase().includes('unable to') ||
+          data.message.toLowerCase().includes('corrupted') ||
+          data.message.toLowerCase().includes('course schedule') ||
+          data.message.toLowerCase().includes('sbu') ||
+          data.message.toLowerCase().includes('not a valid') ||
+          data.message.toLowerCase().includes('does not appear')
+        )) {
+          setFormatWarning(`PDF Format Issue: ${data.message}`);
+          setUploadMessage('Error: Upload failed - Please upload the correct SBU Course Schedule PDF');
+        } else {
+          setUploadMessage(`Error: ${data.message || 'Upload failed'}`);
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -142,22 +177,78 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
   };
 
   const handleSubjectChange = (subject: string) => {
-    if (selectedSubjects.includes(subject)) {
-      setSelectedSubjects(selectedSubjects.filter(s => s !== subject));
-    } else {
-      setSelectedSubjects([...selectedSubjects, subject]);
-    }
+    const newSelectedSubjects = selectedSubjects.includes(subject)
+      ? selectedSubjects.filter(s => s !== subject)
+      : [...selectedSubjects, subject];
+    setSelectedSubjects(newSelectedSubjects);
+    checkForUnsupportedSubjects(newSelectedSubjects);
   };
 
   const handleAddCustomSubject = () => {
-    if (customSubject.trim() && !selectedSubjects.includes(customSubject.toUpperCase())) {
-      setSelectedSubjects([...selectedSubjects, customSubject.toUpperCase()]);
-      setCustomSubject('');
+    const trimmed = customSubject.trim().toUpperCase();
+    if (!trimmed) {
+      return;
     }
+    
+    if (selectedSubjects.includes(trimmed)) {
+      setScrapingMessage({ type: 'warning', text: `Subject "${trimmed}" is already selected.` });
+      return;
+    }
+    
+    const newSelectedSubjects = [...selectedSubjects, trimmed];
+    setSelectedSubjects(newSelectedSubjects);
+    setCustomSubject('');
+    checkForUnsupportedSubjects(newSelectedSubjects);
   };
 
   const handleRemoveSubject = (subject: string) => {
-    setSelectedSubjects(selectedSubjects.filter(s => s !== subject));
+    const newSelectedSubjects = selectedSubjects.filter(s => s !== subject);
+    setSelectedSubjects(newSelectedSubjects);
+    checkForUnsupportedSubjects(newSelectedSubjects);
+  };
+
+  const checkForUnsupportedSubjects = (subjects: string[]) => {
+    const unsupportedSelected = subjects.filter(s => !supportedSubjects.includes(s));
+    if (unsupportedSelected.length > 0) {
+      setScrapingMessage({
+        type: 'warning',
+        text: `Warning: Subject(s) ${unsupportedSelected.join(', ')} are not fully supported. Course information will be marked as "unknown".`
+      });
+    } else {
+      // Clear warning if all selected subjects are supported
+      if (scrapingMessage?.type === 'warning' && scrapingMessage.text.includes('are not fully supported')) {
+        setScrapingMessage(null);
+      }
+    }
+  };
+
+  const isValidTermFormat = (term: string): boolean => {
+    const pattern = /^(Fall|Spring|Summer)\s+\d{4}$/;
+    return pattern.test(term);
+  };
+
+  const checkTermStatus = (termName: string): 'not_scraped' | 'scraped' | 'not_found' => {
+    const term = terms.find((t: any) => t.name === termName);
+    if (!term) return 'not_found';
+    return term.isScraped ? 'scraped' : 'not_scraped';
+  };
+
+  const getTermStatusDisplay = (termName: string) => {
+    if (!isValidTermFormat(termName)) {
+      return <span className="status-badge invalid" style={{ marginLeft: '10px', padding: '4px 8px', borderRadius: '4px', backgroundColor: '#fee2e2', color: '#991b1b' }}>Invalid Format</span>;
+    }
+
+    const status = checkTermStatus(termName);
+    switch (status) {
+      case 'scraped':
+        return <span className="status-badge scraped" style={{ marginLeft: '10px', padding: '4px 8px', borderRadius: '4px', backgroundColor: '#dbeafe', color: '#1e40af' }}>Already Scraped</span>;
+      case 'not_scraped':
+        return <span className="status-badge not-scraped" style={{ marginLeft: '10px', padding: '4px 8px', borderRadius: '4px', backgroundColor: '#dcfce7', color: '#166534' }}>Ready to Scrape</span>;
+      case 'not_found':
+        return <span className="status-badge not-found" style={{ marginLeft: '10px', padding: '4px 8px', borderRadius: '4px', backgroundColor: '#f3f4f6', color: '#374151' }}>Valid Term</span>;
+      default:
+        return <span className="status-badge unknown" style={{ marginLeft: '10px', padding: '4px 8px', borderRadius: '4px', backgroundColor: '#fef3c7', color: '#92400e' }}>Unknown</span>;
+    }
   };
 
   const handleScraping = async () => {
@@ -166,8 +257,21 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
       return;
     }
 
+    if (!isValidTermFormat(selectedTerm)) {
+      setScrapingMessage({ type: 'warning', text: 'Please enter a valid term format (e.g., Fall 2025, Spring 2026).' });
+      return;
+    }
+
     setIsLoading(true);
     setScrapingMessage(null);
+    
+    // Initialize subject statuses and show progress modal
+    const initialStatuses = new Map<string, 'processing' | 'success' | 'skipped' | 'failed'>();
+    selectedSubjects.forEach(subject => {
+      initialStatuses.set(subject, 'processing');
+    });
+    setSubjectStatuses(initialStatuses);
+    setShowProgressModal(true);
 
     try {
       const response = await fetch(`${backendBase}/api/scraping/scrape`, {
@@ -182,22 +286,61 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to scrape courses' }));
+        // Mark all as failed
+        const failedStatuses = new Map<string, 'processing' | 'success' | 'skipped' | 'failed'>();
+        selectedSubjects.forEach(subject => {
+          failedStatuses.set(subject, 'failed');
+        });
+        setSubjectStatuses(failedStatuses);
         setScrapingMessage({ type: 'error', text: errorData.message || 'Scraping failed' });
         return;
       }
 
       const result = await response.json();
       if (result.success) {
+        // Update subject statuses based on results
+        const updatedStatuses = new Map<string, 'processing' | 'success' | 'skipped' | 'failed'>();
+        selectedSubjects.forEach(subject => {
+          if (result.scrapedSubjects?.includes(subject)) {
+            updatedStatuses.set(subject, 'success');
+          } else if (result.skippedSubjects?.includes(subject)) {
+            updatedStatuses.set(subject, 'skipped');
+          } else if (result.failedSubjects?.includes(subject)) {
+            updatedStatuses.set(subject, 'failed');
+          } else {
+            updatedStatuses.set(subject, 'success'); // Default to success if not in any list
+          }
+        });
+        setSubjectStatuses(updatedStatuses);
+        
         let messageType: 'success' | 'warning' = 'success';
         if (result.skippedSubjects && result.skippedSubjects.length > 0) {
           messageType = 'warning';
         }
         setScrapingMessage({ type: messageType, text: result.message || 'Scraping successful' });
+        await fetchTerms(); // Refresh terms to update isScraped status
+        
+        // Close modal after a short delay to show final status
+        setTimeout(() => {
+          setShowProgressModal(false);
+        }, 2000);
       } else {
+        // Mark all as failed
+        const failedStatuses = new Map<string, 'processing' | 'success' | 'skipped' | 'failed'>();
+        selectedSubjects.forEach(subject => {
+          failedStatuses.set(subject, 'failed');
+        });
+        setSubjectStatuses(failedStatuses);
         setScrapingMessage({ type: 'error', text: result.message || 'Scraping failed' });
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      // Mark all as failed
+      const failedStatuses = new Map<string, 'processing' | 'success' | 'skipped' | 'failed'>();
+      selectedSubjects.forEach(subject => {
+        failedStatuses.set(subject, 'failed');
+      });
+      setSubjectStatuses(failedStatuses);
       setScrapingMessage({ type: 'error', text: `Failed to scrape courses: ${errorMessage}` });
     } finally {
       setIsLoading(false);
@@ -259,54 +402,109 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
 
           <div className="form-group">
             <label>Enter Term:</label>
-            <input
-              type="text"
-              value={selectedTerm}
-              onChange={(e) => setSelectedTerm(e.target.value)}
-              placeholder="e.g., Fall 2025, Spring 2026"
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input
+                type="text"
+                value={selectedTerm}
+                onChange={(e) => setSelectedTerm(e.target.value)}
+                placeholder="e.g., Fall 2025, Spring 2026"
+                style={{ flex: 1 }}
+              />
+              {selectedTerm && getTermStatusDisplay(selectedTerm)}
+            </div>
+            <small style={{ display: 'block', marginTop: '5px', color: '#6b7280' }}>
+              Format: Fall 2025, Spring 2026, Summer 2025
+            </small>
           </div>
 
           <div className="form-group">
             <label>Select Subjects:</label>
-            <div className="subjects-grid">
-              {supportedSubjects.map(subject => (
-                <label key={subject} className="subject-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedSubjects.includes(subject)}
-                    onChange={() => handleSubjectChange(subject)}
-                  />
-                  {subject}
-                </label>
-              ))}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ marginBottom: '10px', fontSize: '14px', fontWeight: 600 }}>Fully Supported Subjects (All Info Extracted)</h4>
+              <div className="subjects-grid">
+                {supportedSubjects.map(subject => (
+                  <label key={subject} className="subject-checkbox" style={{ position: 'relative' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSubjects.includes(subject)}
+                      onChange={() => handleSubjectChange(subject)}
+                    />
+                    <span>{subject}</span>
+                    <small style={{ display: 'block', fontSize: '11px', color: '#059669', marginTop: '2px' }}>Full Support</small>
+                  </label>
+                ))}
+              </div>
+              <small style={{ display: 'block', marginTop: '8px', color: '#6b7280' }}>
+                <strong>Full Support:</strong> BIO, PSY, CSE, ECO, AMS, POL - All course details will be extracted
+              </small>
             </div>
           </div>
 
           <div className="form-group">
-            <label>Add Custom Subject:</label>
+            <label>Add Other Subjects (Limited Info):</label>
             <div className="custom-subject-input">
               <input
                 type="text"
                 value={customSubject}
                 onChange={(e) => setCustomSubject(e.target.value.toUpperCase())}
                 onKeyPress={(e) => e.key === 'Enter' && handleAddCustomSubject()}
-                placeholder="e.g., MAT, PHY"
+                placeholder="e.g., MAT, PHY, CHE"
                 maxLength={10}
               />
-              <button onClick={handleAddCustomSubject} disabled={!customSubject.trim()}>+ Add</button>
+              <button onClick={handleAddCustomSubject} disabled={!customSubject.trim()}>+ Add Subject</button>
             </div>
+            <small style={{ display: 'block', marginTop: '8px', color: '#dc2626' }}>
+              <strong>Warning:</strong> Other subjects will extract <strong>Description, Credits, and SBCs</strong> only.
+              Requisite fields (prerequisites, corequisites, antirequisites, advisory prerequisites) will be marked as "unknown".
+              <br />
+              <strong>Instructions:</strong> Enter <strong>ONE subject at a time</strong> (e.g., MAT, PHY, CHE).
+              Do <strong>NOT</strong> use commas or multiple subjects.
+            </small>
           </div>
 
           {selectedSubjects.length > 0 && (
-            <div className="selected-subjects">
-              <strong>Selected ({selectedSubjects.length}):</strong>
-              {selectedSubjects.map(subject => (
-                <span key={subject} className="subject-tag">
-                  {subject}
-                  <button onClick={() => handleRemoveSubject(subject)}>×</button>
-                </span>
-              ))}
+            <div className="selected-subjects" style={{ marginTop: '20px', marginBottom: '20px' }}>
+              <h4 style={{ marginBottom: '10px', fontSize: '14px', fontWeight: 600 }}>
+                Selected Subjects ({selectedSubjects.length}):
+              </h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {selectedSubjects.map(subject => (
+                  <span
+                    key={subject}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: supportedSubjects.includes(subject) ? '#dcfce7' : '#fee2e2',
+                      color: supportedSubjects.includes(subject) ? '#166534' : '#991b1b',
+                      border: `1px solid ${supportedSubjects.includes(subject) ? '#86efac' : '#fecaca'}`,
+                    }}
+                  >
+                    {subject}
+                    {!supportedSubjects.includes(subject) && (
+                      <span title="Limited support" style={{ fontSize: '12px' }}>⚠️</span>
+                    )}
+                    <button
+                      onClick={() => handleRemoveSubject(subject)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '18px',
+                        lineHeight: 1,
+                        padding: 0,
+                        marginLeft: '4px',
+                        color: 'inherit',
+                      }}
+                      title="Remove subject"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
@@ -317,6 +515,160 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
           <button onClick={handleScraping} disabled={!selectedTerm || selectedSubjects.length === 0 || isLoading} className="scrape-button">
             {isLoading ? 'Scraping...' : 'Start Scraping'}
           </button>
+
+          {/* Progress Modal */}
+          {showProgressModal && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+              }}
+              onClick={(e) => {
+                // Only close if clicking the backdrop, not the modal content
+                if (e.target === e.currentTarget && !isLoading) {
+                  setShowProgressModal(false);
+                }
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  maxWidth: '500px',
+                  width: '90%',
+                  maxHeight: '80vh',
+                  overflow: 'auto',
+                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>Scraping Progress</h3>
+                  {!isLoading && (
+                    <button
+                      onClick={() => setShowProgressModal(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '24px',
+                        cursor: 'pointer',
+                        padding: '0',
+                        lineHeight: 1,
+                        color: '#6b7280',
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                
+                <div style={{ marginBottom: '16px', color: '#6b7280' }}>
+                  <strong>Term:</strong> {selectedTerm}
+                </div>
+                
+                <div style={{ marginBottom: '20px' }}>
+                  <strong style={{ display: 'block', marginBottom: '12px' }}>
+                    Processing {selectedSubjects.length} subject(s):
+                  </strong>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {selectedSubjects.map(subject => {
+                      const status = subjectStatuses.get(subject) || 'processing';
+                      return (
+                        <div
+                          key={subject}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 12px',
+                            borderRadius: '6px',
+                            backgroundColor: status === 'processing' ? '#f3f4f6' :
+                                           status === 'success' ? '#dcfce7' :
+                                           status === 'skipped' ? '#fef3c7' : '#fee2e2',
+                            border: `1px solid ${
+                              status === 'processing' ? '#e5e7eb' :
+                              status === 'success' ? '#86efac' :
+                              status === 'skipped' ? '#fde047' : '#fecaca'
+                            }`,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {status === 'processing' && (
+                              <div
+                                style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  border: '2px solid #3b82f6',
+                                  borderTop: '2px solid transparent',
+                                  borderRadius: '50%',
+                                  animation: 'spin 1s linear infinite',
+                                }}
+                              />
+                            )}
+                            {status === 'success' && <span style={{ fontSize: '18px' }}>✓</span>}
+                            {status === 'skipped' && <span style={{ fontSize: '18px' }}>⚠</span>}
+                            {status === 'failed' && <span style={{ fontSize: '18px' }}>✗</span>}
+                            <span style={{ fontWeight: 500 }}>{subject}</span>
+                            {!supportedSubjects.includes(subject) && (
+                              <span style={{ fontSize: '12px', color: '#dc2626' }}>(Limited Info)</span>
+                            )}
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '12px',
+                              color: status === 'processing' ? '#3b82f6' :
+                                     status === 'success' ? '#166534' :
+                                     status === 'skipped' ? '#92400e' : '#991b1b',
+                              fontWeight: 500,
+                            }}
+                          >
+                            {status === 'processing' && 'Processing...'}
+                            {status === 'success' && 'Completed'}
+                            {status === 'skipped' && 'Already Scraped'}
+                            {status === 'failed' && 'Failed'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {isLoading && (
+                  <div style={{ textAlign: 'center', color: '#6b7280', fontSize: '14px', marginTop: '16px' }}>
+                    Please wait while we scrape course data...
+                  </div>
+                )}
+
+                {!isLoading && (
+                  <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                    <button
+                      onClick={() => setShowProgressModal(false)}
+                      style={{
+                        padding: '8px 20px',
+                        backgroundColor: '#B91C1C',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -366,7 +366,13 @@ function CourseRegistration() {
       return
     }
     
-    // Check for time conflicts with existing cart items BEFORE adding
+    // Check if course is already in cart first - if yes, show message and return immediately
+    if (cart.some(c => c.id === course.id)) {
+      alert('This class is already in your cart!')
+      return
+    }
+    
+    // Check for time conflicts with existing cart items BEFORE adding (only for different courses)
     const courseSchedule = combineSchedules(course)
     let hasConflict = false
     
@@ -374,6 +380,11 @@ function CourseRegistration() {
       let conflictMessage = ''
 
       for (const cartItem of cart) {
+        // Skip checking conflict with the same course (shouldn't happen here, but safety check)
+        if (cartItem.id === course.id) {
+          continue
+        }
+        
         const cartSchedule = combineSchedules(cartItem)
         
         if (cartSchedule) {
@@ -412,9 +423,6 @@ function CourseRegistration() {
       
       if (data.success) {
         await loadCartFromDB()
-        if (!hasConflict) {
-          alert('Class added to cart successfully!')
-        }
       } else {
         if (data.message.includes('already exists')) {
           alert('This class is already in your cart!')
@@ -448,7 +456,6 @@ function CourseRegistration() {
       if (data.success) {
         // Reload cart after removal (conflicts will be updated automatically by backend)
         await loadCartFromDB()
-        alert('Class removed from cart successfully!')
       } else {
         alert('Error removing class from cart: ' + data.message)
       }
@@ -852,28 +859,6 @@ function CourseRegistration() {
         <h2>My Course Cart</h2>
         <div className="cart-container">
           
-          {/* Conflict Warning */}
-          {cart.some(item => item.status === 'Conflict') && (
-            <div className="conflict-warning">
-              <div className="conflict-icon"></div>
-              <div className="conflict-details">
-                <div className="conflict-title">Time Conflicts Detected</div>
-                <div className="conflict-message">
-                  {(() => {
-                    const conflictPairs = findConflictPairs(cart)
-                    if (conflictPairs.length > 0) {
-                      const conflictMessages = conflictPairs.map(([a, b]) => 
-                        `${a.code || `${a.department}${a.courseNum}.${a.section}`} and ${b.code || `${b.department}${b.courseNum}.${b.section}`}`
-                      )
-                      return `Time conflicts detected: ${conflictMessages.join(', ')}. Please resolve before submitting.`
-                    }
-                    return 'Some classes in your cart have scheduling conflicts. Please resolve these before submitting registration.'
-                  })()}
-                </div>
-              </div>
-            </div>
-          )}
-          
           {/* Cart Courses */}
           <div className="cart-courses">
             {cart.length === 0 ? (
@@ -883,25 +868,43 @@ function CourseRegistration() {
                 <p>Add classes to your cart to get started!</p>
               </div>
             ) : (
-              cart.map((course) => (
-                <div key={course.id} className="cart-course-card">
-                  <div className="course-info">
-                    <div className="course-code">{course.code}</div>
-                    <div className="course-title">{course.title}</div>
-                    <div className="course-schedule">{combineSchedules(course)}</div>
-                    <div className="course-instructor">{course.instructor}</div>
+              cart.map((course) => {
+                // Find courses that conflict with this course
+                const conflictingCourses = cart.filter((otherCourse) => 
+                  otherCourse.id !== course.id && 
+                  course.status === 'Conflict' && 
+                  otherCourse.status === 'Conflict' &&
+                  isOverlap(course, otherCourse)
+                )
+                
+                return (
+                  <div key={course.id} className="cart-course-card">
+                    <div className="course-info">
+                      <div className="course-code">{course.code}</div>
+                      <div className="course-title">{course.title}</div>
+                      <div className="course-schedule">{combineSchedules(course)}</div>
+                      <div className="course-instructor">{course.instructor}</div>
+                      {conflictingCourses.length > 0 && (
+                        <div className="conflict-info">
+                          <span className="conflict-label">Time conflict with:</span>
+                          <span className="conflict-courses">
+                            {conflictingCourses.map(c => c.code).join(', ')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <span className={`status-tag ${course.status.toLowerCase()}`}>
+                      {course.status}
+                    </span>
+                    <button 
+                      className="drop-btn"
+                      onClick={() => handleDropCourse(course.classId)}
+                    >
+                      Drop
+                    </button>
                   </div>
-                  <span className={`status-tag ${course.status.toLowerCase()}`}>
-                    {course.status}
-                  </span>
-                  <button 
-                    className="drop-btn"
-                    onClick={() => handleDropCourse(course.classId)}
-                  >
-                    Drop
-                  </button>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
 
