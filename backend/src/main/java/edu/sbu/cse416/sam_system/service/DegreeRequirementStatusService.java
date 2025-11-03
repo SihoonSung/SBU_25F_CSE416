@@ -55,9 +55,9 @@ public class DegreeRequirementStatusService {
         
         // Parse declared majors and minors
         List<Map<String, Object>> declaredMajors = parseMajorsOrMinors(student.getMajors(), student.getDegrees(), student.getMajorRequirementVersions());
-        List<Map<String, Object>> declaredMinors = parseMajorsOrMinors(student.getMinors(), null, student.getMinorRequirementVersions());
+        List<Map<String, Object>> declaredMinors = parseMajorsOrMinors(student.getMinors(), "MINOR", student.getMinorRequirementVersions());
         List<Map<String, Object>> plannedMajors = parseMajorsOrMinors(student.getPlannedMajors(), student.getPlannedDegrees(), student.getPlannedMajorRequirementVersions());
-        List<Map<String, Object>> plannedMinors = parseMajorsOrMinors(student.getPlannedMinors(), null, student.getPlannedMinorRequirementVersions());
+        List<Map<String, Object>> plannedMinors = parseMajorsOrMinors(student.getPlannedMinors(), "MINOR", student.getPlannedMinorRequirementVersions());
         
         // Check requirements for each declared major
         List<Map<String, Object>> declaredMajorStatuses = new ArrayList<>();
@@ -99,6 +99,9 @@ public class DegreeRequirementStatusService {
     
     /**
      * Parse majors or minors JSON arrays
+     * @param subjectsJson JSON array of subject codes
+     * @param degreesJson JSON array of degree types, or string "MINOR" for all minors, or null
+     * @param versionsJson JSON array of requirement versions
      */
     private List<Map<String, Object>> parseMajorsOrMinors(String subjectsJson, String degreesJson, String versionsJson) {
         List<Map<String, Object>> result = new ArrayList<>();
@@ -109,7 +112,33 @@ public class DegreeRequirementStatusService {
         
         try {
             List<?> subjects = objectMapper.readValue(subjectsJson, List.class);
-            List<?> degrees = (degreesJson != null && !degreesJson.trim().isEmpty()) 
+            List<?> degrees = null;
+            
+            // Handle case where degreesJson is "MINOR" string (for minors)
+            if ("MINOR".equals(degreesJson)) {
+                // All items are minors
+                for (int i = 0; i < subjects.size(); i++) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("subjectCode", subjects.get(i).toString());
+                    item.put("degreeType", "MINOR");
+                    
+                    List<?> versions = (versionsJson != null && !versionsJson.trim().isEmpty())
+                            ? objectMapper.readValue(versionsJson, List.class) : null;
+                    if (versions != null && i < versions.size()) {
+                        Object versionObj = versions.get(i);
+                        if (versionObj instanceof Map) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> version = (Map<String, Object>) versionObj;
+                            item.put("requirementVersion", version);
+                        }
+                    }
+                    result.add(item);
+                }
+                return result;
+            }
+            
+            // Regular parsing for majors
+            degrees = (degreesJson != null && !degreesJson.trim().isEmpty()) 
                     ? objectMapper.readValue(degreesJson, List.class) : null;
             List<?> versions = (versionsJson != null && !versionsJson.trim().isEmpty())
                     ? objectMapper.readValue(versionsJson, List.class) : null;
@@ -203,11 +232,37 @@ public class DegreeRequirementStatusService {
                 return status;
             }
             
-            // Check each group
+            // First pass: Check non-electives groups to track used courses
+            Set<String> usedClassIds = new HashSet<>();
             List<Map<String, Object>> groupStatuses = new ArrayList<>();
+            
+            // Check non-electives groups first
             for (Map<String, Object> group : groups) {
-                Map<String, Object> groupStatus = checkGroupStatus(group, completedClasses, inProgressClasses, allUserClasses);
-                groupStatuses.add(groupStatus);
+                String type = (String) group.get("type");
+                if (!"electives".equals(type)) {
+                    Map<String, Object> groupStatus = checkGroupStatus(group, completedClasses, inProgressClasses, allUserClasses, usedClassIds);
+                    groupStatuses.add(groupStatus);
+                    // Track used classes from this group
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> satisfiedCourses = (List<Map<String, Object>>) groupStatus.get("satisfiedCourses");
+                    if (satisfiedCourses != null) {
+                        for (Map<String, Object> courseInfo : satisfiedCourses) {
+                            Object classId = courseInfo.get("classId");
+                            if (classId != null) {
+                                usedClassIds.add(classId.toString());
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Second pass: Check electives groups with used classes excluded
+            for (Map<String, Object> group : groups) {
+                String type = (String) group.get("type");
+                if ("electives".equals(type)) {
+                    Map<String, Object> groupStatus = checkGroupStatus(group, completedClasses, inProgressClasses, allUserClasses, usedClassIds);
+                    groupStatuses.add(groupStatus);
+                }
             }
             
             status.put("groups", groupStatuses);
@@ -237,7 +292,8 @@ public class DegreeRequirementStatusService {
     private Map<String, Object> checkGroupStatus(Map<String, Object> group,
                                                  List<UserClasses> completedClasses,
                                                  List<UserClasses> inProgressClasses,
-                                                 List<UserClasses> allUserClasses) {
+                                                 List<UserClasses> allUserClasses,
+                                                 Set<String> usedClassIds) {
         Map<String, Object> groupStatus = new HashMap<>();
         groupStatus.put("groupId", group.get("id"));
         groupStatus.put("groupType", group.get("type"));
@@ -256,10 +312,10 @@ public class DegreeRequirementStatusService {
                     satisfied = checkOneOfGroup(group, completedClasses, satisfiedCourses);
                     break;
                 case "one_of_sequences":
-                    satisfied = checkOneOfSequencesGroup(group, completedClasses, satisfiedCourses);
+                    satisfied = checkOneOfSequencesGroup(group, completedClasses, satisfiedCourses, usedClassIds);
                     break;
                 case "electives":
-                    satisfied = checkElectivesGroup(group, completedClasses, inProgressClasses, allUserClasses, satisfiedCourses);
+                    satisfied = checkElectivesGroup(group, completedClasses, inProgressClasses, allUserClasses, satisfiedCourses, usedClassIds);
                     break;
                 case "two_of":
                     satisfied = checkTwoOfGroup(group, completedClasses, satisfiedCourses);
@@ -356,15 +412,20 @@ public class DegreeRequirementStatusService {
     
     /**
      * Check one_of_sequences group: at least one complete sequence must be completed
+     * Also adds partially completed courses to satisfiedCourses
      */
     private boolean checkOneOfSequencesGroup(Map<String, Object> group, List<UserClasses> completedClasses,
-                                             List<Map<String, Object>> satisfiedCourses) {
+                                             List<Map<String, Object>> satisfiedCourses,
+                                             Set<String> usedClassIds) {
         @SuppressWarnings("unchecked")
         List<List<Map<String, Object>>> sequences = (List<List<Map<String, Object>>>) group.get("sequences");
         if (sequences == null || sequences.isEmpty()) {
             return true;
         }
         
+        boolean foundCompleteSequence = false;
+        
+        // First, check for complete sequences
         for (List<Map<String, Object>> sequence : sequences) {
             boolean sequenceComplete = true;
             List<Map<String, Object>> sequenceCourses = new ArrayList<>();
@@ -388,26 +449,52 @@ public class DegreeRequirementStatusService {
             
             if (sequenceComplete && sequenceCourses.size() == sequence.size()) {
                 satisfiedCourses.addAll(sequenceCourses);
-                return true; // Found one complete sequence
+                foundCompleteSequence = true;
+                break; // Found one complete sequence, that's enough
             }
         }
         
-        return false;
+        // If no complete sequence found, still add partially completed courses
+        if (!foundCompleteSequence) {
+            for (List<Map<String, Object>> sequence : sequences) {
+                for (Map<String, Object> courseReq : sequence) {
+                    String code = (String) courseReq.get("code");
+                    if (code == null) continue;
+                    
+                    String[] parts = parseCourseCode(code);
+                    String dept = parts[0];
+                    String courseNumStr = parts[1];
+                    
+                    UserClasses matchingClass = findMatchingClass(completedClasses, dept, courseNumStr);
+                    if (matchingClass != null) {
+                        // Check if already added (avoid duplicates)
+                        boolean alreadyAdded = satisfiedCourses.stream()
+                                .anyMatch(sc -> matchingClass.getClassId().equals(sc.get("classId")));
+                        if (!alreadyAdded) {
+                            satisfiedCourses.add(buildCourseInfo(matchingClass, code));
+                        }
+                    }
+                }
+            }
+        }
+        
+        return foundCompleteSequence;
     }
     
     /**
      * Check electives group: must satisfy credits_required from courses/sequences/additional_courses
+     * Excludes classes already used in other requirement groups
      */
     private boolean checkElectivesGroup(Map<String, Object> group, List<UserClasses> completedClasses,
                                        List<UserClasses> inProgressClasses, List<UserClasses> allUserClasses,
-                                       List<Map<String, Object>> satisfiedCourses) {
+                                       List<Map<String, Object>> satisfiedCourses,
+                                       Set<String> usedClassIds) {
         Integer creditsRequired = (Integer) group.get("credits_required");
         if (creditsRequired == null) {
             return false;
         }
         
         int totalCredits = 0;
-        Set<String> usedClassIds = new HashSet<>();
         
         // Check sequences first (if any sequence is complete, all courses in that sequence count)
         // For natural science requirement type: "Must include at least one lab sequence"
@@ -427,7 +514,8 @@ public class DegreeRequirementStatusService {
                     String courseNumStr = parts[1];
                     
                     UserClasses matchingClass = findMatchingClass(allUserClasses, dept, courseNumStr);
-                    if (matchingClass != null && !usedClassIds.contains(matchingClass.getId().toString())) {
+                    String classIdStr = matchingClass != null ? matchingClass.getId().toString() : null;
+                    if (matchingClass != null && !usedClassIds.contains(classIdStr)) {
                         sequenceMatches.add(matchingClass);
                     } else {
                         sequenceComplete = false;
@@ -437,7 +525,7 @@ public class DegreeRequirementStatusService {
                 
                 if (sequenceComplete && !sequenceMatches.isEmpty()) {
                     for (UserClasses uc : sequenceMatches) {
-                        if (uc.getCredits() != null) {
+                        if (uc.getCredits() != null && !usedClassIds.contains(uc.getId().toString())) {
                             totalCredits += uc.getCredits();
                             satisfiedCourses.add(buildCourseInfo(uc, uc.getDepartment() + " " + uc.getCourseNum()));
                             usedClassIds.add(uc.getId().toString());
@@ -500,18 +588,19 @@ public class DegreeRequirementStatusService {
                     // Find matching upper-division courses
                     for (UserClasses uc : allUserClasses) {
                         if (totalCredits >= creditsRequired) break;
+                        String classIdStr = uc.getId() != null ? uc.getId().toString() : null;
                         if (uc.getDepartment() != null && uc.getDepartment().equalsIgnoreCase(dept) &&
                             uc.getCourseNum() != null && uc.getCourseNum() >= minLevel &&
-                            !usedClassIds.contains(uc.getId().toString())) {
+                            classIdStr != null && !usedClassIds.contains(classIdStr)) {
                             
                             // Check excluded courses
                             @SuppressWarnings("unchecked")
                             List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
-                            if (excludedCourses != null && !isExcluded(uc, excludedCourses)) {
+                            if (excludedCourses == null || !isExcluded(uc, excludedCourses)) {
                                 if (uc.getCredits() != null) {
                                     totalCredits += uc.getCredits();
                                     satisfiedCourses.add(buildCourseInfo(uc, uc.getDepartment() + " " + uc.getCourseNum()));
-                                    usedClassIds.add(uc.getId().toString());
+                                    usedClassIds.add(classIdStr);
                                 }
                             }
                         }
