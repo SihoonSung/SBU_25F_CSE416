@@ -22,9 +22,13 @@ function CourseRegistration() {
   const [selectedSemester, setSelectedSemester] = useState('')
   const [selectedYear, setSelectedYear] = useState<number | string>('')
   const [cart, setCart] = useState<any[]>([])
+  const [registeredClasses, setRegisteredClasses] = useState<any[]>([])
+  const [waitlistClasses, setWaitlistClasses] = useState<any[]>([])
   const [userId, setUserId] = useState<number | null>(null)
   const [registrationEligibility, setRegistrationEligibility] = useState<any>(null)
   const [showRegistrationAlert, setShowRegistrationAlert] = useState(false)
+  const [droppingRegisteredClassId, setDroppingRegisteredClassId] = useState<number | null>(null)
+  const [cancelingWaitlistId, setCancelingWaitlistId] = useState<number | null>(null)
 
   /**
    * Fetch available terms and classes on component mount
@@ -81,6 +85,20 @@ function CourseRegistration() {
       })
     }
   }, [userId])
+
+  /**
+   * Load registered classes when userId and term are available
+   */
+  useEffect(() => {
+    if (userId && selectedSemester && selectedYear) {
+      console.log(`[CourseRegistration] useEffect: Loading registered classes for userId=${userId}, semester=${selectedSemester}, year=${selectedYear}`)
+      loadRegisteredClasses()
+    } else {
+      console.log(`[CourseRegistration] useEffect: Skipping loadRegisteredClasses - userId=${userId}, semester=${selectedSemester}, year=${selectedYear}`)
+      setRegisteredClasses([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, selectedSemester, selectedYear])
   
   
   /**
@@ -137,6 +155,80 @@ function CourseRegistration() {
       // Finally by Section
       return a.section.localeCompare(b.section)
     })
+  }
+
+  /**
+   * Load registered classes for selected term
+   */
+  const loadRegisteredClasses = async () => {
+    if (!userId || !selectedSemester || !selectedYear) {
+      setRegisteredClasses([])
+      return
+    }
+
+    try {
+      // Get all registered classes for the user
+      const response = await fetch(`${backendBase}/api/roster/student/${userId}`, {
+        credentials: 'include'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        
+        if (!Array.isArray(data)) {
+          console.error('Invalid response format from roster API:', data)
+          setRegisteredClasses([])
+          return
+        }
+
+        // Filter by selected semester and year
+        const normalizedSelectedSemester = selectedSemester.charAt(0).toUpperCase() + selectedSemester.slice(1).toLowerCase()
+        const selectedYearNum = typeof selectedYear === 'number' ? selectedYear : parseInt(String(selectedYear))
+        
+        console.log(`[CourseRegistration] Filtering for semester=${normalizedSelectedSemester}, year=${selectedYearNum}`)
+        console.log(`[CourseRegistration] Raw data sample:`, data.length > 0 ? data[0] : 'No data')
+        
+        const filtered = data.filter((item: any) => {
+          const itemYear = typeof item.year === 'number' ? item.year : parseInt(String(item.year))
+          const itemSemester = item.semester ? 
+            (String(item.semester).charAt(0).toUpperCase() + String(item.semester).slice(1).toLowerCase()) : null
+          
+          const matches = itemYear === selectedYearNum && itemSemester === normalizedSelectedSemester
+          if (matches) {
+            console.log(`[CourseRegistration] Match found:`, item)
+          }
+          return matches
+        })
+        
+        console.log(`[CourseRegistration] Filtered to ${filtered.length} classes for ${selectedSemester} ${selectedYear}`)
+
+        // Transform to match cart format
+        const transformed = filtered.map((item: any) => ({
+          id: item.classId,
+          code: `${item.department}${item.courseNum}.${item.section}`,
+          classId: item.classId,
+          department: item.department,
+          courseNum: item.courseNum,
+          section: item.section,
+          title: item.title || '',
+          schedule: item.schedule || '',
+          instructor: item.instructor || '',
+          location: item.location || '',
+          semester: item.semester,
+          year: item.year,
+          status: 'Enrolled'
+        }))
+
+        setRegisteredClasses(transformed)
+        console.log(`[CourseRegistration] Loaded ${transformed.length} registered classes for ${selectedSemester} ${selectedYear}`, transformed)
+      } else {
+        console.error('Failed to load registered classes:', response.status)
+        setRegisteredClasses([])
+      }
+    } catch (error) {
+      console.error('Error loading registered classes:', error)
+      setRegisteredClasses([])
+    }
   }
 
   /**
@@ -401,7 +493,18 @@ function CourseRegistration() {
       }
 
       if (hasConflict) {
-        alert(`Time Conflict Detected!\n\n${conflictMessage}\nYou can still add this class, but please resolve conflicts before registration.`)
+        const shouldRequestWaiver = window.confirm(
+          `Time Conflict Detected!\n\n${conflictMessage}\n\nWould you like to request a time conflict waiver?\n\nClick OK to request waiver, or Cancel to add to cart anyway.`
+        );
+        
+        if (shouldRequestWaiver) {
+          // Find the conflicting class
+          const conflictingClass = cart.find(item => conflictMessage.includes(item.code));
+          if (conflictingClass) {
+            handleRequestWaiver(course.id, conflictingClass.id);
+            return; // Don't add to cart if requesting waiver
+          }
+        }
       }
     }
 
@@ -437,6 +540,135 @@ function CourseRegistration() {
   }
 
   /**
+   * Request time conflict waiver
+   */
+  const handleRequestWaiver = async (enrolledClassId: number, conflictingClassId: number) => {
+    if (!userId) {
+      alert('Please wait for user authentication to complete.')
+      return
+    }
+
+    const reason = prompt('Please provide a reason for the time conflict waiver request:')
+    if (!reason || !reason.trim()) {
+      return
+    }
+
+    try {
+      const response = await fetch(`${backendBase}/api/waivers`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentId: userId,
+          enrolledClassId: enrolledClassId,
+          conflictingClassId: conflictingClassId,
+          reason: reason.trim()
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success || response.ok) {
+        alert('Waiver request created successfully! You will be notified when it is approved.')
+      } else {
+        if (data.message && data.message.includes('already exists')) {
+          alert('A waiver request for these classes already exists.')
+        } else {
+          alert('Failed to create waiver request: ' + (data.message || 'Unknown error'))
+        }
+      }
+    } catch (error) {
+      console.error('Error creating waiver request:', error)
+      alert('Error creating waiver request. Please try again.')
+    }
+  }
+
+  /**
+   * Drop a registered class
+   */
+  const handleDropRegisteredClass = async (classId: number) => {
+    if (!userId) {
+      alert('Please wait for user authentication to complete.')
+      return
+    }
+
+    if (!window.confirm('Are you sure you want to drop this class? This action cannot be undone.')) {
+      return
+    }
+
+    setDroppingRegisteredClassId(classId)
+
+    try {
+      const response = await fetch(`${backendBase}/api/users/${userId}/classes/${classId}/drop`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Reload registered classes after drop
+        await loadRegisteredClasses()
+        // Also reload cart in case it affects conflicts
+        await loadCartFromDB()
+        alert(`Class dropped successfully: ${data.department || ''} ${data.courseNum || ''}`)
+      } else {
+        alert(`Failed to drop class: ${data.message}`)
+      }
+    } catch (error) {
+      console.error('Error dropping class:', error)
+      alert('Error dropping class. Please try again.')
+    } finally {
+      setDroppingRegisteredClassId(null)
+    }
+  }
+
+  /**
+   * Handle canceling waitlist for a class
+   */
+  const handleCancelWaitlist = async (classId: number) => {
+    if (!userId) {
+      alert('Please wait for user authentication to complete.')
+      return
+    }
+
+    if (!window.confirm('Are you sure you want to cancel your waitlist entry for this class?')) {
+      return
+    }
+
+    setCancelingWaitlistId(classId)
+    try {
+      const response = await fetch(`${backendBase}/api/users/${userId}/classes/${classId}/waitlist/cancel`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const data = await response.json()
+
+      if (data.success || response.ok) {
+        // Remove from waitlist state
+        setWaitlistClasses(prev => prev.filter(w => w.classId !== classId))
+        alert('Waitlist entry removed successfully')
+      } else {
+        alert('Failed to cancel waitlist: ' + (data.message || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Error canceling waitlist:', error)
+      alert('Error canceling waitlist. Please try again.')
+    } finally {
+      setCancelingWaitlistId(null)
+    }
+  }
+
+  /**
    * Remove a course from the cart
    */
   const handleDropCourse = async (classId: number | string) => {
@@ -456,6 +688,10 @@ function CourseRegistration() {
       if (data.success) {
         // Reload cart after removal (conflicts will be updated automatically by backend)
         await loadCartFromDB()
+        // Also reload registered classes in case dropping from cart affects registered status
+        if (selectedSemester && selectedYear) {
+          await loadRegisteredClasses()
+        }
       } else {
         alert('Error removing class from cart: ' + data.message)
       }
@@ -479,16 +715,57 @@ function CourseRegistration() {
       return
     }
 
-    // Check if there are any items with conflicts
-    const hasConflicts = cart.some(item => item.status === 'Conflict')
-    if (hasConflicts) {
+    // Check for active holds
+    try {
+      const holdsResponse = await fetch(`${backendBase}/api/holds/check/${userId}`, {
+        credentials: 'include'
+      })
+      
+      if (holdsResponse.ok) {
+        const holdsData = await holdsResponse.json()
+        if (holdsData.hasActiveHolds && holdsData.activeHolds && holdsData.activeHolds.length > 0) {
+          const holdMessages = holdsData.activeHolds.map((h: any) => 
+            `- ${h.holdType}: ${h.reason || 'No reason provided'}`
+          ).join('\n')
+          alert(`Registration is blocked due to active holds:\n${holdMessages}\n\nPlease resolve these holds before registering.`)
+          return
+        }
+      }
+    } catch (error) {
+      console.error('Error checking holds:', error)
+      // Continue with registration even if hold check fails
+    }
+
+    // Separate items with and without conflicts
+    const itemsWithoutConflicts = cart.filter(item => item.status !== 'Conflict')
+    const itemsWithConflicts = cart.filter(item => item.status === 'Conflict')
+    
+    if (itemsWithoutConflicts.length === 0) {
       alert('Cannot register classes with time conflicts. Please resolve conflicts first.')
       return
     }
 
     // Confirm registration
-    const confirmed = window.confirm(`Are you sure you want to register for ${cart.length} class(es)?`)
+    let confirmMessage = `Register for ${itemsWithoutConflicts.length} class(es) without conflicts?`
+    if (itemsWithConflicts.length > 0) {
+      confirmMessage += `\n\n${itemsWithConflicts.length} class(es) with conflicts will remain in your cart.`
+    }
+    const confirmed = window.confirm(confirmMessage)
     if (!confirmed) return
+
+    // Temporarily remove conflict items from cart by removing them from backend
+    const conflictClassIds: (number | string)[] = []
+    for (const conflictItem of itemsWithConflicts) {
+      try {
+        await fetch(`${backendBase}/api/cart/remove?userId=${userId}&classId=${conflictItem.classId}`, {
+          credentials: 'include',
+          method: 'DELETE'
+        })
+        conflictClassIds.push(conflictItem.classId)
+      } catch (error) {
+        console.error('Error removing conflict item from cart:', error)
+      }
+    }
 
     try {
       const response = await fetch(`${backendBase}/api/cart/submit-registration?userId=${userId}`, {
@@ -498,12 +775,80 @@ function CourseRegistration() {
       
       const data = await response.json()
       
-      if (data.success) {
-        // Reload cart from database to show updated statuses
-        await loadCartFromDB()
-        // Use message from backend (includes waitlist information if applicable)
-        alert(data.message || `Registration successful! Registered for ${data.registeredCount} class(es).`)
+       if (data.success) {
+         // Reload cart from database to show updated statuses
+         await loadCartFromDB()
+         
+         // Reload registered classes to show newly registered classes
+         if (selectedSemester && selectedYear) {
+           await loadRegisteredClasses()
+         }
+         
+         // Handle waitlist classes from response
+         if (data.waitlistedClasses && Array.isArray(data.waitlistedClasses) && data.waitlistedClasses.length > 0) {
+           // Transform waitlist data to match our format
+           const waitlistData = data.waitlistedClasses.map((wl: any) => ({
+             id: wl.classId,
+             code: `${wl.department}${wl.courseNum}`,
+             classId: wl.classId,
+             department: wl.department,
+             courseNum: wl.courseNum,
+             title: wl.title || '',
+             position: wl.position || 0,
+             semester: selectedSemester,
+             year: selectedYear
+           }))
+           
+           // Filter by current selected semester/year and merge with existing waitlist (avoid duplicates)
+           setWaitlistClasses(prev => {
+             // Remove old waitlist entries for this semester/year
+             const filtered = prev.filter(w => !(w.semester === selectedSemester && w.year === selectedYear))
+             const existingIds = new Set(filtered.map(w => w.classId))
+             const newItems = waitlistData.filter((w: any) => !existingIds.has(w.classId))
+             return [...filtered, ...newItems]
+           })
+         }
+         
+         // Build success message
+         let successMessage = data.message || `Registration successful! Registered for ${data.registeredCount} class(es).`
+        
+        // Re-add conflict items to cart
+        if (itemsWithConflicts.length > 0) {
+          for (const conflictItem of itemsWithConflicts) {
+            try {
+              await fetch(`${backendBase}/api/cart/add?userId=${userId}&classId=${conflictItem.classId}`, {
+                credentials: 'include',
+                method: 'POST'
+              })
+            } catch (error) {
+              console.error('Error re-adding conflict item to cart:', error)
+            }
+          }
+          
+          // Reload cart again to show re-added conflict items
+          await loadCartFromDB()
+          
+          successMessage += `\n\n${itemsWithConflicts.length} class(es) with conflicts remain in your cart:`
+          successMessage += '\n' + itemsWithConflicts.map(item => `- ${item.code}: ${item.title}`).join('\n')
+        }
+        
+        alert(successMessage)
       } else {
+        // Re-add conflict items to cart even if registration failed
+        if (itemsWithConflicts.length > 0) {
+          for (const conflictItem of itemsWithConflicts) {
+            try {
+              await fetch(`${backendBase}/api/cart/add?userId=${userId}&classId=${conflictItem.classId}`, {
+                credentials: 'include',
+                method: 'POST'
+              })
+            } catch (error) {
+              console.error('Error re-adding conflict item to cart:', error)
+            }
+          }
+          await loadCartFromDB()
+        }
+        
         if (data.conflicts && data.conflicts.length > 0) {
           alert(`Registration failed due to time conflicts:\n${data.conflicts.join('\n')}\n\nPlease resolve conflicts before registering.`)
         } else if (data.duplicateClasses && data.duplicateClasses.length > 0) {
@@ -519,6 +864,21 @@ function CourseRegistration() {
         }
       }
     } catch (error) {
+      // Re-add conflict items to cart on error
+      if (itemsWithConflicts.length > 0) {
+        for (const conflictItem of itemsWithConflicts) {
+          try {
+            await fetch(`${backendBase}/api/cart/add?userId=${userId}&classId=${conflictItem.classId}`, {
+              credentials: 'include',
+              method: 'POST'
+            })
+          } catch (addError) {
+            console.error('Error re-adding conflict item to cart:', addError)
+          }
+        }
+        await loadCartFromDB()
+      }
+      
       console.error('Error submitting registration:', error)
       alert('Error submitting registration. Please try again.')
     }
@@ -858,6 +1218,63 @@ function CourseRegistration() {
       <div className="cart-section">
         <h2>My Course Cart</h2>
         <div className="cart-container">
+          {/* Registered Classes inside Cart - only show if there are registered classes */}
+          {registeredClasses.length > 0 && (
+            <div className="registered-inside-cart">
+              <h3>Registered Classes ({selectedSemester} {selectedYear})</h3>
+              <div className="registered-courses">
+                {registeredClasses.map((course) => (
+                  <div key={course.id} className="registered-course-card">
+                    <div className="course-info">
+                      <div className="course-code">{course.code}</div>
+                      <div className="course-title">{course.title}</div>
+                      <div className="course-schedule">{course.schedule}</div>
+                      <div className="course-instructor">{course.instructor}</div>
+                      <div className="course-location">{course.location}</div>
+                    </div>
+                    <span className="status-tag enrolled">Enrolled</span>
+                    <button 
+                      className="drop-btn"
+                      onClick={() => handleDropRegisteredClass(course.classId)}
+                      disabled={droppingRegisteredClassId === course.classId}
+                    >
+                      {droppingRegisteredClassId === course.classId ? 'Dropping...' : 'Drop'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Waitlist Classes - only show if there are waitlist classes for selected semester/year */}
+          {waitlistClasses.filter(w => w.semester === selectedSemester && w.year === selectedYear).length > 0 && (
+            <div className="registered-inside-cart">
+              <h3>Waitlist ({selectedSemester} {selectedYear})</h3>
+              <div className="registered-courses">
+                {waitlistClasses
+                  .filter(w => w.semester === selectedSemester && w.year === selectedYear)
+                  .map((course) => (
+                  <div key={course.id} className="registered-course-card">
+                    <div className="course-info">
+                      <div className="course-code">{course.code}</div>
+                      <div className="course-title">{course.title}</div>
+                      {course.position && course.position > 0 && (
+                        <div className="course-schedule">Position in queue: #{course.position}</div>
+                      )}
+                    </div>
+                    <span className="status-tag waitlisted">Waitlist</span>
+                    <button 
+                      className="drop-btn"
+                      onClick={() => handleCancelWaitlist(course.classId)}
+                      disabled={cancelingWaitlistId === course.classId}
+                    >
+                      {cancelingWaitlistId === course.classId ? 'Canceling...' : 'Cancel'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           {/* Cart Courses */}
           <div className="cart-courses">

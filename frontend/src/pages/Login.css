@@ -4,7 +4,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #e6eefc, #f8f9ff);
+  background: var(--bg-page);
   gap: 24px;
   padding: 20px;
 }
@@ -13,11 +13,11 @@
 .error-box {
   width: 100%;
   max-width: 420px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 12px;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+  box-shadow: var(--shadow-sm);
   animation: slideDown 0.3s ease-out;
 }
 
@@ -37,24 +37,24 @@
 }
 
 .error-content h3 {
-  color: #dc2626;
+  color: var(--button-danger-bg);
   font-size: 20px;
   font-weight: 600;
   margin: 0 0 12px 0;
 }
 
 .error-content p {
-  color: #7f1d1d;
+  color: var(--error-text);
   font-size: 14px;
   margin: 0 0 20px 0;
   line-height: 1.6;
 }
 
 .retry-button {
-  background: #dc2626;
-  color: white;
+  background: var(--button-danger-bg);
+  color: var(--button-primary-text);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
@@ -63,15 +63,16 @@
 }
 
 .retry-button:hover {
-  background: #b91c1c;
+  background: var(--button-danger-hover-bg);
 }
 
 .login-card {
   width: 100%;
   max-width: 420px;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-default);
   padding: 40px 32px;
   text-align: center;
 }
@@ -84,7 +85,7 @@
   margin: 0 0 8px;
   font-size: 28px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   line-height: 1.2;
 }
 
@@ -92,7 +93,7 @@
   margin: 0;
   font-size: 14px;
   font-weight: 400;
-  color: #B91C1C;
+  color: var(--color-primary);
   line-height: 1.4;
 }
 
@@ -106,30 +107,31 @@
   display: flex;
   flex-direction: column;
   font-size: 14px;
-  color: #374151;
+  color: var(--text-secondary);
   gap: 6px;
 }
 
 .form-input {
   height: 42px;
   padding: 0 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   outline: none;
-  background: #f9fafb;
+  background: var(--bg-subtle);
+  color: var(--text-primary);
 }
 
 .form-input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-  background: #ffffff;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--border-focus-shadow);
+  background: var(--bg-elevated);
 }
 
 .form-error {
-  color: #b91c1c;
-  background: #fee2e2;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
+  color: var(--error-text);
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-md);
   padding: 8px 12px;
   font-size: 14px;
 }
@@ -137,15 +139,16 @@
 .submit-button {
   height: 44px;
   border: none;
-  border-radius: 10px;
-  background: #b91c1c; /* Stony Brook red */
-  color: #ffffff;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--button-primary-text);
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.2s;
 }
 
 .submit-button:hover {
-  background: #991b1b;
+  background: var(--button-danger-hover-bg);
 }
 
 /* Google button (replacing regular form) */

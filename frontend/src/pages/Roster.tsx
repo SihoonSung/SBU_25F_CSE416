@@ -39,6 +39,7 @@ const Roster: React.FC = () => {
   const [rosterLoading, setRosterLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [classStats, setClassStats] = useState<any>(null);
 
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 
@@ -55,6 +56,7 @@ const Roster: React.FC = () => {
   useEffect(() => {
     if (selectedClass) {
       fetchRoster(selectedClass.classId);
+      fetchClassStats(selectedClass.classId);
     }
   }, [selectedClass]);
 
@@ -117,6 +119,21 @@ const Roster: React.FC = () => {
       setRoster([]);
     } finally {
       setRosterLoading(false);
+    }
+  };
+
+  const fetchClassStats = async (classId: number) => {
+    try {
+      const response = await fetch(`${backendBase}/api/roster/stats/${classId}`, {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setClassStats(data);
+      }
+    } catch (error) {
+      console.error('Error fetching class stats:', error);
     }
   };
 
@@ -187,6 +204,22 @@ const Roster: React.FC = () => {
                 <p className="class-info">
                   {selectedClass.semester} {selectedClass.year} • {selectedClass.schedule} • {selectedClass.location}
                 </p>
+                {classStats && (
+                  <div className="class-stats">
+                    <div className="stat-item">
+                      <strong>Capacity:</strong> {classStats.currentCapacity || 0} / {classStats.maxCapacity || 0}
+                    </div>
+                    <div className="stat-item">
+                      <strong>Active Enrollments:</strong> {classStats.activeEnrollments || 0}
+                    </div>
+                    <div className="stat-item">
+                      <strong>Available Spots:</strong> {classStats.availableSpots || 0}
+                    </div>
+                    <div className="stat-item">
+                      <strong>Status:</strong> {classStats.isFull ? 'Full' : 'Available'}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {rosterLoading ? (

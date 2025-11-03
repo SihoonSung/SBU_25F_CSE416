@@ -46,8 +46,22 @@
   /* Shadows & Radius */
   --radius-md: 12px;
   --radius-sm: 6px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 9999px;
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.2);
   --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.1);
+  
+  /* Additional colors for buttons and states */
+  --button-success-bg: #48bb78;
+  --button-success-hover-bg: #38a169;
+  --button-info-bg: #4299e1;
+  --button-info-hover-bg: #3182ce;
+  --button-muted-bg-disabled: #cbd5e0;
+  
+  /* Border colors for focus states */
+  --border-focus: var(--color-secondary);
+  --border-focus-shadow: rgba(66, 153, 225, 0.25);
 }
 
 /* Base typography scale */

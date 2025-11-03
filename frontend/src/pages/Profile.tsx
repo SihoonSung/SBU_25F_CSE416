@@ -156,6 +156,7 @@ export default function ProfilePage() {
 
   /** ===== My student bundle (only if STUDENT) ===== */
   const [myTerm, setMyTerm] = useState<string>("2025-Fall");
+  const [availableTerms, setAvailableTerms] = useState<string[]>([]);
   const [myProfile, setMyProfile] = useState<StudentProfile | null>(null);
   const [myDetails, setMyDetails] = useState<FullStudentDetails | null>(null);
   const [mySummary, setMySummary] = useState<GpaSummary | null>(null);
@@ -296,16 +297,47 @@ export default function ProfilePage() {
             });
           }
 
-          // 4) Admin utilities
-          const [ev, now] = await Promise.all([
+          // 4) Admin utilities and available terms
+          const [ev, now, termsData] = await Promise.all([
             safeFetch(`${BASE}/api/admin/academic-calendar`).catch(() => []),
             safeFetch(`${BASE}/api/admin/system-date`).catch(() => null),
+            safeFetch(`${BASE}/api/classes/terms`).catch(() => []),
           ]);
           setEvents(Array.isArray(ev) ? ev : []);
           if (now) {
             setSysDate(now.currentDate ?? "");
             setOverridden(!!now.overridden);
           }
+          
+          // Convert terms to "2026-Spring" format
+          const defaultTerms = ['2026-Spring', '2025-Fall', '2025-Spring', '2024-Fall'];
+          let termStrings: string[] = [];
+          
+          if (Array.isArray(termsData) && termsData.length > 0) {
+            termStrings = termsData.map((t: any) => {
+              const semester = t.semester || '';
+              const year = t.year || '';
+              if (semester && year) {
+                const semesterName = semester.charAt(0).toUpperCase() + semester.slice(1).toLowerCase();
+                return `${year}-${semesterName}`;
+              }
+              return null;
+            }).filter((t: string | null) => t !== null) as string[];
+          }
+          
+          // Merge with default terms and remove duplicates
+          const allTerms = [...new Set([...termStrings, ...defaultTerms])];
+          
+          // Sort terms descending (newest first)
+          allTerms.sort((a, b) => {
+            const [yearA, semA] = a.split('-');
+            const [yearB, semB] = b.split('-');
+            if (yearA !== yearB) return parseInt(yearB) - parseInt(yearA);
+            const semOrder: Record<string, number> = { 'Fall': 3, 'Summer': 2, 'Spring': 1 };
+            return (semOrder[semB] || 0) - (semOrder[semA] || 0);
+          });
+          
+          setAvailableTerms(allTerms);
         } catch (e: any) {
           setMsg(e.message || "Failed to load.");
           setMe(null);
@@ -321,16 +353,61 @@ export default function ProfilePage() {
     (async () => {
       if (!myIsStudent || !myProfile?.studentId) return;
       try {
+        // Parse term for alternative API
+        const termParts = myTerm.split('-');
+        const termYear = termParts.length === 2 ? parseInt(termParts[0]) : null;
+        const termSemester = termParts.length === 2 ? termParts[1] : null;
+        
+        // Try original schedule API first
         const sched = await safeFetch(
           `${buildSidPrefix(myProfile.studentId)}/schedule?term=${encodeURIComponent(myTerm)}`
-        );
-        setMySchedule(Array.isArray(sched) ? (sched as ScheduleClass[]) : []);
+        ).catch(() => []);
+        
+        let scheduleData: ScheduleClass[] = Array.isArray(sched) ? (sched as ScheduleClass[]) : [];
+        
+        // If original schedule API returns empty, try roster API
+        if (scheduleData.length === 0 && currentUserId && termYear && termSemester) {
+          try {
+            const rosterData = await safeFetch(`${BASE}/api/roster/student/${currentUserId}`).catch(() => []);
+            
+            if (Array.isArray(rosterData) && rosterData.length > 0) {
+              // Normalize semester for comparison
+              const normalizedSemester = termSemester.charAt(0).toUpperCase() + termSemester.slice(1).toLowerCase();
+              
+              const filteredRoster = rosterData.filter((item: any) => {
+                const itemYear = typeof item.year === 'number' ? item.year : parseInt(item.year);
+                const itemSemester = item.semester ? 
+                  (item.semester.charAt(0).toUpperCase() + item.semester.slice(1).toLowerCase()) : null;
+                
+                return itemYear === termYear && itemSemester === normalizedSemester;
+              });
+              
+              if (filteredRoster.length > 0) {
+                scheduleData = filteredRoster.map((item: any) => ({
+                  classId: item.classId,
+                  subject: item.department || item.subject,
+                  courseNum: item.courseNum,
+                  section: item.section || '',
+                  title: item.title || '',
+                  schedule: item.schedule || '',
+                  location: item.location || '',
+                  instructor: item.instructor || '',
+                  credits: item.credits || item.minCredits || 0
+                }));
+              }
+            }
+          } catch (e) {
+            console.error('Error fetching roster data for my schedule:', e);
+          }
+        }
+        
+        setMySchedule(scheduleData);
       } catch (e: any) {
         setMsg(e.message);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myTerm, myIsStudent, myProfile?.studentId]);
+  }, [myTerm, myIsStudent, myProfile?.studentId, currentUserId]);
 
   /** ===== Target schedule reload on term change ===== */
   useEffect(() => {
@@ -393,7 +470,12 @@ export default function ProfilePage() {
 
     const prefix = buildSidPrefix(theSid!);
 
-    const [p, d, gpa, sched, planList, adm, deg, h, w, log, tr, ch, cp] = await Promise.all([
+    // Parse term for alternative API (e.g., "2026-Spring" -> year=2026, semester="Spring")
+    const termParts = t.split('-');
+    const termYear = termParts.length === 2 ? parseInt(termParts[0]) : null;
+    const termSemester = termParts.length === 2 ? termParts[1] : null;
+
+    const [p, d, gpa, schedOld, planList, adm, deg, h, w, log, trOld, chOld, cpOld] = await Promise.all([
       sid ? safeFetch(`${prefix}`).catch(() => null) : Promise.resolve(null),
       safeFetch(`${prefix}/details`).catch(() => null),
       safeFetch(`${prefix}/gpa`).catch(() => null),
@@ -408,6 +490,167 @@ export default function ProfilePage() {
       safeFetch(`${prefix}/classes`).catch(() => []),
       safeFetch(`${prefix}/course-plan`).catch(() => []),
     ]);
+
+    // Get userId for additional API calls
+    let userId: number | null = null;
+    if (p && (p as any).id) {
+      userId = (p as any).id;
+    }
+
+    // Fetch additional user data using User APIs if userId is available
+    let tr = trOld;
+    let ch = chOld;
+    let cp = cpOld;
+
+    if (userId && (!tr || (Array.isArray(tr) && tr.length === 0))) {
+      try {
+        const transferData = await safeFetch(`${BASE}/api/users/${userId}/transfer-courses`).catch(() => []);
+        if (Array.isArray(transferData) && transferData.length > 0) {
+          // Transform UserTransferCourses to TransferCourse format
+          tr = transferData.map((item: any) => ({
+            originalClass: item.originalClass || item.courseName || '',
+            originalUniversity: item.originalUniversity || item.university || '',
+            credits: item.credits || 0,
+            subject: item.subject || item.equivalentSubject || null,
+            courseNum: item.courseNum || item.equivalentCourseNum || null,
+            grade: item.grade || null
+          }));
+        }
+      } catch (e) {
+        console.error('Error fetching transfer courses:', e);
+      }
+    }
+
+    if (userId && (!cp || (Array.isArray(cp) && cp.length === 0))) {
+      try {
+        const planData = await safeFetch(`${BASE}/api/users/${userId}/course-plan`).catch(() => []);
+        if (Array.isArray(planData) && planData.length > 0) {
+          // Transform UserCoursePlan to PlannedCourse format
+          cp = planData.map((item: any) => ({
+            subject: item.subject || item.department || '',
+            courseNum: item.courseNum || 0,
+            semester: item.semester || null,
+            year: item.year || 0,
+            credits: item.credits || 0
+          }));
+        }
+      } catch (e) {
+        console.error('Error fetching course plan:', e);
+      }
+    }
+
+    if (userId && (!ch || (Array.isArray(ch) && ch.length === 0))) {
+      try {
+        // Get completed classes (with grades) and future classes (without grades)
+        const [completedData, futureData] = await Promise.all([
+          safeFetch(`${BASE}/api/users/${userId}/classes/completed`).catch(() => []),
+          safeFetch(`${BASE}/api/users/${userId}/classes/future`).catch(() => [])
+        ]);
+
+        if (Array.isArray(completedData) && completedData.length > 0) {
+          // Transform completed classes to HistoricClass format
+          ch = completedData.map((item: any) => ({
+            classId: item.classId,
+            subject: item.department || '',
+            courseNum: item.courseNum || 0,
+            section: item.section || '',
+            title: item.title || '',
+            semester: item.semester || '',
+            year: item.year || 0,
+            credits: item.credits || 0,
+            grade: item.grade || null,
+            gpa: item.gpnc || null
+          }));
+        } else if (Array.isArray(futureData) && futureData.length > 0) {
+          // If no completed classes, use future classes
+          ch = futureData.map((item: any) => ({
+            classId: item.classId,
+            subject: item.department || '',
+            courseNum: item.courseNum || 0,
+            section: item.section || '',
+            title: item.title || '',
+            semester: item.semester || '',
+            year: item.year || 0,
+            credits: item.credits || 0,
+            grade: null,
+            gpa: null
+          }));
+        }
+      } catch (e) {
+        console.error('Error fetching class history:', e);
+      }
+    }
+
+    // Process schedule: try roster API as fallback if original schedule API returns empty
+    let sched: ScheduleClass[] = Array.isArray(schedOld) ? (schedOld as ScheduleClass[]) : [];
+    
+    // If original schedule API returns empty, try roster API
+    if (sched.length === 0 && termYear && termSemester) {
+      try {
+        // Try to get userId from profile (id field)
+        let userId: number | null = null;
+        if (p && (p as any).id) {
+          userId = (p as any).id;
+        }
+        
+        if (!userId && sid) {
+          // Fallback: try to get userId from current user if available
+          // This will be set from the useEffect that fetches current user
+        }
+        
+        if (userId) {
+          console.log(`[Profile] Fetching roster for userId=${userId}, term=${t} (year=${termYear}, semester=${termSemester})`);
+          const rosterData = await safeFetch(`${BASE}/api/roster/student/${userId}`).catch((err) => {
+            console.error('[Profile] Error fetching roster:', err);
+            return [];
+          });
+          
+          console.log(`[Profile] Roster data received:`, rosterData);
+          
+          if (Array.isArray(rosterData) && rosterData.length > 0) {
+            // Normalize semester for comparison (Spring, Fall, Summer)
+            const normalizedSemester = termSemester.charAt(0).toUpperCase() + termSemester.slice(1).toLowerCase();
+            
+            const filteredRoster = rosterData.filter((item: any) => {
+              const itemYear = typeof item.year === 'number' ? item.year : 
+                               (item.year ? parseInt(String(item.year)) : null);
+              const itemSemester = item.semester ? 
+                (String(item.semester).charAt(0).toUpperCase() + String(item.semester).slice(1).toLowerCase()) : null;
+              
+              const yearMatch = itemYear === termYear;
+              const semesterMatch = itemSemester === normalizedSemester;
+              
+              if (yearMatch && semesterMatch) {
+                console.log(`[Profile] Matched class:`, item);
+              }
+              
+              return yearMatch && semesterMatch;
+            });
+            
+            console.log(`[Profile] Filtered roster (${filteredRoster.length} classes):`, filteredRoster);
+            
+            if (filteredRoster.length > 0) {
+              sched = filteredRoster.map((item: any) => ({
+                classId: item.classId,
+                subject: item.department || item.subject,
+                courseNum: item.courseNum,
+                section: item.section || '',
+                title: item.title || '',
+                schedule: item.schedule || '',
+                location: item.location || '',
+                instructor: item.instructor || '',
+                credits: item.credits || item.minCredits || 0
+              }));
+              console.log(`[Profile] Mapped schedule:`, sched);
+            }
+          }
+        } else {
+          console.warn(`[Profile] No userId available for roster fetch. Profile data:`, p);
+        }
+      } catch (e) {
+        console.error('[Profile] Error fetching roster data:', e);
+      }
+    }
 
     if (sid) sinks.setProfile(p as StudentProfile | null);
     sinks.setDetails(d as FullStudentDetails | null);
@@ -648,6 +891,7 @@ export default function ProfilePage() {
           title="My Student Profile"
           term={myTerm}
           setTerm={setMyTerm}
+          availableTerms={availableTerms}
           profile={myProfile}
           details={myDetails}
           plans={myPlans}
@@ -667,6 +911,25 @@ export default function ProfilePage() {
           studentId={myProfile?.studentId}
           currentUserId={currentUserId}
           onHoldsUpdate={async () => {
+            if (myProfile?.studentId) {
+              await loadStudentBundle(myProfile.studentId, myTerm, {
+                setProfile: setMyProfile,
+                setDetails: setMyDetails,
+                setSummary: setMySummary,
+                setSchedule: setMySchedule,
+                setPlans: setMyPlans,
+                setAdmissionReqs: setMyAdmissionReqs,
+                setDegreeReqs: setMyDegreeReqs,
+                setHolds: setMyHolds,
+                setWaived: setMyWaived,
+                setAudit: setMyAudit,
+                setTransfers: setMyTransfers,
+                setClassHistory: setMyClassHistory,
+                setCoursePlan: setMyCoursePlan,
+              });
+            }
+          }}
+          onScheduleUpdate={async () => {
             if (myProfile?.studentId) {
               await loadStudentBundle(myProfile.studentId, myTerm, {
                 setProfile: setMyProfile,
@@ -728,6 +991,7 @@ export default function ProfilePage() {
         title={`Target Student Profile${targetSid ? ` (${targetSid})` : ""}`}
         term={term}
         setTerm={setTerm}
+        availableTerms={availableTerms}
         profile={profile}
         details={details}
         plans={plans}
@@ -747,6 +1011,25 @@ export default function ProfilePage() {
         studentId={targetSid}
         currentUserId={currentUserId}
         onHoldsUpdate={async () => {
+          if (targetSid) {
+            await loadStudentBundle(targetSid, term, {
+              setProfile: setProfile,
+              setDetails: setDetails,
+              setSummary: setSummary,
+              setSchedule: setSchedule,
+              setPlans: setPlans,
+              setAdmissionReqs: setAdmissionReqs,
+              setDegreeReqs: setDegreeReqs,
+              setHolds: setHolds,
+              setWaived: setWaivedConflicts,
+              setAudit: setAudit,
+              setTransfers: setTransfers,
+              setClassHistory: setClassHistory,
+              setCoursePlan: setCoursePlan,
+            });
+          }
+        }}
+        onScheduleUpdate={async () => {
           if (targetSid) {
             await loadStudentBundle(targetSid, term, {
               setProfile: setProfile,
@@ -857,11 +1140,13 @@ function StudentBundleView(props: {
   studentId?: string | null;
   currentUserId?: number | null;
   onHoldsUpdate?: () => void;
+  onScheduleUpdate?: () => void | Promise<void>;
 }) {
   const {
     title,
     term,
     setTerm,
+    availableTerms = [],
     profile,
     details,
     plans,
@@ -881,6 +1166,7 @@ function StudentBundleView(props: {
     studentId,
     currentUserId,
     onHoldsUpdate,
+    onScheduleUpdate,
   } = props;
 
   const backendBase = BASE;
@@ -890,6 +1176,9 @@ function StudentBundleView(props: {
   const [holdType, setHoldType] = useState<'ACADEMIC_ADVISING' | 'FINANCIAL'>('ACADEMIC_ADVISING');
   const [holdReason, setHoldReason] = useState('');
   const [holdLoading, setHoldLoading] = useState(false);
+  
+  // Drop class state
+  const [droppingClassId, setDroppingClassId] = useState<number | null>(null);
 
   // Create hold
   const handleCreateHold = async () => {
@@ -947,6 +1236,52 @@ function StudentBundleView(props: {
     }
   };
 
+  // Drop class
+  const handleDropClass = async (classId: number) => {
+    if (!currentUserId) {
+      alert('User ID not available. Please refresh the page.');
+      return;
+    }
+    
+    if (!window.confirm(`Are you sure you want to drop this class? This action cannot be undone.`)) {
+      return;
+    }
+    
+    setDroppingClassId(classId);
+    
+    try {
+      const response = await fetch(`${backendBase}/api/users/${currentUserId}/classes/${classId}/drop`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Reload schedule after drop via callback (before alert to ensure UI updates)
+        if (onScheduleUpdate) {
+          try {
+            await onScheduleUpdate();
+          } catch (updateError) {
+            console.error('Error updating schedule after drop:', updateError);
+          }
+        }
+        // Show success message after schedule is updated
+        alert(`Class dropped successfully: ${data.department || ''} ${data.courseNum || ''}`);
+      } else {
+        alert(`Failed to drop class: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Error dropping class:', error);
+      alert('Error dropping class. Please try again.');
+    } finally {
+      setDroppingClassId(null);
+    }
+  };
+  
   // Remove hold
   const handleRemoveHold = async (holdId: number) => {
     if (!currentUserId) {
@@ -1170,29 +1505,57 @@ function StudentBundleView(props: {
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
               <h3 style={{ margin: 0 }}>Term Schedule</h3>
               <select value={term} onChange={(e) => setTerm(e.target.value)} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd" }} disabled={busy}>
-                <option value="2025-Fall">2025-Fall</option>
-                <option value="2025-Spring">2025-Spring</option>
-                <option value="2024-Fall">2024-Fall</option>
+                {availableTerms.length > 0 ? (
+                  availableTerms.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))
+                ) : (
+                  <>
+                    <option value="2026-Spring">2026-Spring</option>
+                    <option value="2025-Fall">2025-Fall</option>
+                    <option value="2025-Spring">2025-Spring</option>
+                    <option value="2024-Fall">2024-Fall</option>
+                  </>
+                )}
               </select>
             </div>
             <div style={{ border: "1px solid #eee", borderRadius: 8, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr 1fr 1fr", background: "#fafafa", fontWeight: 600, padding: "8px 12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr 1fr 1fr 100px", background: "#fafafa", fontWeight: 600, padding: "8px 12px" }}>
                 <div>Course</div>
                 <div>Title</div>
                 <div>Schedule</div>
                 <div>Location</div>
                 <div>Instructor</div>
+                <div>Action</div>
               </div>
               {schedule.length === 0 ? (
                 <div style={{ padding: "12px" }}>No classes found</div>
               ) : (
                 schedule.map((c) => (
-                  <div key={`${c.classId}`} style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr 1fr 1fr", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
+                  <div key={`${c.classId}`} style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr 1fr 1fr 100px", padding: "8px 12px", borderTop: "1px solid #f0f0f0", alignItems: "center" }}>
                     <div>{c.subject}{c.courseNum}.{c.section}</div>
                     <div>{c.title}</div>
                     <div>{c.schedule}</div>
                     <div>{c.location}</div>
                     <div>{c.instructor || "-"}</div>
+                    <div>
+                      <button
+                        onClick={() => handleDropClass(c.classId)}
+                        disabled={busy || droppingClassId === c.classId}
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: '#ff4d4f',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 4,
+                          cursor: (busy || droppingClassId === c.classId) ? 'not-allowed' : 'pointer',
+                          fontSize: 12,
+                          opacity: (busy || droppingClassId === c.classId) ? 0.6 : 1
+                        }}
+                      >
+                        {droppingClassId === c.classId ? 'Dropping...' : 'Drop'}
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

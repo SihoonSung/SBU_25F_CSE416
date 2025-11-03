@@ -25,6 +25,7 @@ function Dashboard() {
   const [registrationEligibility, setRegistrationEligibility] = useState<any>(null)
   const [currentSemester, setCurrentSemester] = useState<string>('Fall')
   const [currentYear, setCurrentYear] = useState<number>(2025)
+  const [latestTerm, setLatestTerm] = useState<{ semester: string; year: number } | null>(null)
   const [timeConflicts, setTimeConflicts] = useState<string[]>([])
   const [pendingOverrides, setPendingOverrides] = useState<number>(0)
   const [userStats, setUserStats] = useState<any>(null)
@@ -34,6 +35,9 @@ function Dashboard() {
   const [classStats, setClassStats] = useState<any[]>([])
   const [pendingGrades, setPendingGrades] = useState<number>(0)
   const [pendingWaivers, setPendingWaivers] = useState<number>(0)
+  const [calculatedGpa, setCalculatedGpa] = useState<number | null>(null)
+  const [cumulativeCredits, setCumulativeCredits] = useState<number>(0)
+  const [termGpa, setTermGpa] = useState<number | null>(null)
 
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
 
@@ -74,31 +78,65 @@ function Dashboard() {
 
         if (meRes.ok) {
           const data = await meRes.json()
-          setMe(data.user ?? null)
+          const user = data.user ?? null
+          setMe(user)
           
+          console.log(`[Dashboard] User data:`, user)
+          
+          // Normalize role (handle case-insensitive and array formats)
+          const userRole = user?.role ? String(user.role).toUpperCase() : null
+          console.log(`[Dashboard] Normalized role: ${userRole}, userId: ${user?.userId}`)
+          
+          // Get latest term for student dashboard
+          try {
+            const termsResponse = await fetch(`${backendBase}/api/classes/terms`, {
+              credentials: 'include'
+            })
+            if (termsResponse.ok) {
+              const terms = await termsResponse.json()
+              if (Array.isArray(terms) && terms.length > 0) {
+                // Get the most recent term
+                const latest = terms[0]
+                const semester = latest.semester ? 
+                  (latest.semester.charAt(0).toUpperCase() + latest.semester.slice(1).toLowerCase()) : 
+                  'Spring'
+                const year = latest.year || 2025
+                setLatestTerm({ semester, year })
+                setCurrentSemester(semester)
+                setCurrentYear(year)
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching terms:', error)
+          }
+
           // Check registration eligibility if user is a student
-          if (data.user?.role === 'STUDENT' && data.user?.userId) {
-            await checkRegistrationEligibility(data.user.userId)
-            await checkTimeConflicts(data.user.userId)
+          if (userRole === 'STUDENT' && user?.userId) {
+            console.log(`[Dashboard] User is a student, userId: ${user.userId}`)
+            await checkRegistrationEligibility(user.userId)
+            await checkTimeConflicts(user.userId)
+            await calculateGpa(user.userId)
+          } else {
+            console.log(`[Dashboard] User is not a student. Role: ${userRole}, userId: ${user?.userId}`)
           }
           
           // Fetch professor data if user is an instructor
-          if (data.user?.role === 'INSTRUCTOR' && data.user?.firstName && data.user?.lastName) {
-            await fetchProfessorData(data.user)
+          if (userRole === 'INSTRUCTOR' && user?.firstName && user?.lastName) {
+            await fetchProfessorData(user)
           }
           
           // Always try to fetch stats if user is logged in (same as UserManagement page)
           // This ensures stats are loaded regardless of role
-          if (data.user) {
+          if (user) {
             await fetchAdminStats()
           }
           
           // Check pending overrides if user is admin/registrar
-          if ((data.user?.role === 'REGISTRAR' || data.user?.role === 'ADMIN') && data.user?.userId) {
-            console.log('User role for admin dashboard:', data.user?.role, 'User ID:', data.user?.userId)
+          if ((userRole === 'REGISTRAR' || userRole === 'ADMIN') && user?.userId) {
+            console.log('User role for admin dashboard:', userRole, 'User ID:', user.userId)
             await checkPendingOverrides()
           } else {
-            console.log('User is not registrar/admin. Role:', data.user?.role, 'User ID:', data.user?.userId)
+            console.log('User is not registrar/admin. Role:', userRole, 'User ID:', user?.userId)
           }
         } else {
           setMe(null)
@@ -235,6 +273,158 @@ function Dashboard() {
       }
     } catch (error) {
       setTimeConflicts([])
+    }
+  }
+
+  /**
+   * Calculate GPA directly from completed classes
+   */
+  const calculateGpa = async (userId: number) => {
+    console.log(`[Dashboard] Starting GPA calculation for userId: ${userId}`)
+    try {
+      const completedClassesResponse = await fetch(`${backendBase}/api/users/${userId}/classes/completed`, {
+        credentials: 'include'
+      })
+      
+      console.log(`[Dashboard] Completed classes API response status: ${completedClassesResponse.status}`)
+      
+      if (completedClassesResponse.ok) {
+        const completedClasses: Array<{ credits: number; grade: string | null; semester?: string; year?: number }> = await completedClassesResponse.json()
+        
+        console.log(`[Dashboard] Received ${completedClasses.length} completed classes:`, completedClasses)
+        
+        // Grade to GPA points mapping
+        const gradePoints: Record<string, number> = {
+          'A+': 4.0, 'A': 4.0, 'A-': 3.7,
+          'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+          'C+': 2.3, 'C': 2.0, 'C-': 1.7,
+          'D+': 1.3, 'D': 1.0, 'D-': 0.7,
+          'F': 0.0, 'W': 0.0, 'I': 0.0,
+          'P': 0.0, 'NP': 0.0, 'S': 0.0, 'U': 0.0
+        }
+        
+        // Filter classes with valid grades (exclude pass/fail and incomplete)
+        const gradedClasses = completedClasses.filter(cls => {
+          const grade = cls.grade?.trim().toUpperCase()
+          return grade && 
+                 grade !== 'P' && 
+                 grade !== 'NP' && 
+                 grade !== 'S' && 
+                 grade !== 'U' && 
+                 grade !== 'W' && 
+                 grade !== 'I' &&
+                 gradePoints[grade] !== undefined
+        })
+        
+        // Calculate cumulative GPA: (sum of credits × grade points) / total credits
+        let totalPoints = 0
+        let totalCredits = 0
+        
+        gradedClasses.forEach(cls => {
+          const grade = cls.grade?.trim().toUpperCase() || ''
+          const points = gradePoints[grade] || 0
+          const credits = cls.credits || 0
+          
+          totalPoints += points * credits
+          totalCredits += credits
+        })
+        
+        // Calculate cumulative GPA
+        const calculatedGpaValue = totalCredits > 0 ? totalPoints / totalCredits : null
+        console.log(`[Dashboard] Calculated cumulative GPA: ${calculatedGpaValue}, Total credits: ${totalCredits}, Graded classes: ${gradedClasses.length}`)
+        setCalculatedGpa(calculatedGpaValue)
+        
+        // Calculate most recent term GPA (find the term with most recent year and semester)
+        if (completedClasses.length > 0) {
+          // Find the most recent term from completed classes
+          const termMap = new Map<string, Array<{ credits: number; grade: string | null }>>()
+          
+          completedClasses.forEach(cls => {
+            if (cls.semester && cls.year) {
+              const normalizedSemester = cls.semester.charAt(0).toUpperCase() + cls.semester.slice(1).toLowerCase()
+              const termKey = `${cls.year}-${normalizedSemester}`
+              if (!termMap.has(termKey)) {
+                termMap.set(termKey, [])
+              }
+              termMap.get(termKey)!.push(cls)
+            }
+          })
+          
+          // Find the most recent term (highest year, then Fall > Summer > Spring)
+          let latestTermKey: string | null = null
+          let latestYear = 0
+          let latestSemesterOrder = 0
+          
+          termMap.forEach((_, termKey) => {
+            const [yearStr, semester] = termKey.split('-')
+            const year = parseInt(yearStr)
+            const semesterOrder = semester === 'Fall' ? 3 : semester === 'Summer' ? 2 : 1
+            
+            if (year > latestYear || (year === latestYear && semesterOrder > latestSemesterOrder)) {
+              latestYear = year
+              latestSemesterOrder = semesterOrder
+              latestTermKey = termKey
+            }
+          })
+          
+          // Calculate GPA for the most recent term
+          if (latestTermKey) {
+            const latestTermClasses = termMap.get(latestTermKey)!
+            const latestTermGraded = latestTermClasses.filter(cls => {
+              const grade = cls.grade?.trim().toUpperCase()
+              return grade && 
+                     grade !== 'P' && 
+                     grade !== 'NP' && 
+                     grade !== 'S' && 
+                     grade !== 'U' && 
+                     grade !== 'W' && 
+                     grade !== 'I' &&
+                     gradePoints[grade] !== undefined
+            })
+            
+            let termPoints = 0
+            let termCredits = 0
+            
+            latestTermGraded.forEach(cls => {
+              const grade = cls.grade?.trim().toUpperCase() || ''
+              const points = gradePoints[grade] || 0
+              const credits = cls.credits || 0
+              
+              termPoints += points * credits
+              termCredits += credits
+            })
+            
+            const termGpaValue = termCredits > 0 ? termPoints / termCredits : null
+            console.log(`[Dashboard] Setting term GPA: ${termGpaValue}, Latest term: ${latestTermKey}, Term credits: ${termCredits}`)
+            setTermGpa(termGpaValue)
+          } else {
+            console.log(`[Dashboard] No latest term found from completed classes`)
+            setTermGpa(null)
+          }
+        } else {
+          console.log(`[Dashboard] No completed classes found, cannot calculate term GPA`)
+          setTermGpa(null)
+        }
+        
+        // Set total credits (include all completed classes)
+        const allCredits = completedClasses.reduce((sum, cls) => sum + (cls.credits || 0), 0)
+        console.log(`[Dashboard] Setting cumulative credits: ${allCredits}`)
+        setCumulativeCredits(allCredits)
+        
+        // Get final term GPA value (check state will be updated after render)
+        const finalTermGpa = termGpa !== null ? termGpa.toFixed(2) : 'N/A'
+        console.log(`[Dashboard] Final results - Cumulative GPA: ${calculatedGpaValue?.toFixed(2)}, Total Credits: ${allCredits}`)
+      } else {
+        console.error(`[Dashboard] Failed to fetch completed classes. Status: ${completedClassesResponse.status}`)
+        setCalculatedGpa(null)
+        setTermGpa(null)
+        setCumulativeCredits(0)
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error calculating GPA:', error)
+      setCalculatedGpa(null)
+      setTermGpa(null)
+      setCumulativeCredits(0)
     }
   }
 
@@ -663,15 +853,15 @@ function Dashboard() {
           <div className="stats-container">
             <div className="stat-card">
               <div className="stat-label">GPA</div>
-              <div className="stat-value">3.52</div>
+              <div className="stat-value">{calculatedGpa !== null ? calculatedGpa.toFixed(2) : '—'}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Term</div>
-              <div className="stat-value">3.31</div>
+              <div className="stat-value">{termGpa !== null ? termGpa.toFixed(2) : '—'}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Cumulative Credits</div>
-              <div className="stat-value">118</div>
+              <div className="stat-value">{cumulativeCredits > 0 ? cumulativeCredits : '—'}</div>
             </div>
           </div>
 

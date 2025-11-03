@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './MajorMinorDeclaration.css';
+import { getCurrentUser } from '../utils/auth';
 
 /**
  * Major/Minor Declaration Component
@@ -101,6 +102,20 @@ const MajorMinorDeclaration: React.FC = () => {
   const [selectedDeclarationType, setSelectedDeclarationType] = useState<'MAJOR' | 'MINOR'>('MAJOR');
   const [effectiveTerm, setEffectiveTerm] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  
+  // Class Override (Time Conflict Waiver) state
+  const [userId, setUserId] = useState<number | null>(null);
+  const [showWaiverForm, setShowWaiverForm] = useState(false);
+  const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
+  const [availableClasses, setAvailableClasses] = useState<any[]>([]);
+  const [selectedEnrolledClass, setSelectedEnrolledClass] = useState<number | null>(null);
+  const [selectedConflictingClass, setSelectedConflictingClass] = useState<number | null>(null);
+  const [waiverReason, setWaiverReason] = useState('');
+  const [waiverTerm, setWaiverTerm] = useState({ semester: '', year: '' });
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [submittingWaiver, setSubmittingWaiver] = useState(false);
+  const [myWaivers, setMyWaivers] = useState<any[]>([]);
+  const [loadingWaivers, setLoadingWaivers] = useState(false);
 
   // Available terms and subjects based on academic calendar
   const getAvailableTerms = () => {
@@ -122,7 +137,54 @@ const MajorMinorDeclaration: React.FC = () => {
   useEffect(() => {
     fetchData();
     loadPlannedMajorsFromStorage();
+    initializeUser();
   }, []);
+
+  useEffect(() => {
+    if (userId) {
+      loadMyWaivers();
+    }
+  }, [userId]);
+
+  /**
+   * Initialize user ID for waiver requests
+   */
+  const initializeUser = async () => {
+    try {
+      const userData = await getCurrentUser();
+      if (userData.user?.userId) {
+        setUserId(userData.user.userId);
+      }
+    } catch (error) {
+      console.error('Failed to get current user:', error);
+    }
+  };
+
+  /**
+   * Load user's waiver requests
+   */
+  const loadMyWaivers = async () => {
+    if (!userId) return;
+
+    setLoadingWaivers(true);
+    try {
+      const response = await fetch(`${backendBase}/api/waivers/student/${userId}`, {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const waivers = await response.json();
+        setMyWaivers(Array.isArray(waivers) ? waivers : []);
+      } else {
+        setMyWaivers([]);
+      }
+    } catch (error) {
+      console.error('Error loading waivers:', error);
+      setMyWaivers([]);
+    } finally {
+      setLoadingWaivers(false);
+    }
+  };
 
   // TP Used cursor to fetch data from APIs
   const fetchData = async () => {
@@ -569,6 +631,112 @@ const MajorMinorDeclaration: React.FC = () => {
     }
   };
 
+  /**
+   * Load enrolled classes and available classes for waiver request
+   */
+  const loadClassesForWaiver = async (semester?: string, year?: string) => {
+    if (!userId || !semester || !year) {
+      return
+    }
+
+    setLoadingClasses(true)
+    try {
+      // Load enrolled classes
+      const enrolledResponse = await fetch(`${backendBase}/api/roster/student/${userId}`, {
+        credentials: 'include'
+      })
+
+      if (enrolledResponse.ok) {
+        const enrolledData = await enrolledResponse.json()
+        const normalizedSemester = semester.charAt(0).toUpperCase() + semester.slice(1).toLowerCase()
+        const yearNum = parseInt(year)
+
+        const filteredEnrolled = Array.isArray(enrolledData) ? enrolledData.filter((cls: any) => {
+          const clsYear = typeof cls.year === 'number' ? cls.year : parseInt(String(cls.year))
+          const clsSemester = cls.semester ? 
+            (String(cls.semester).charAt(0).toUpperCase() + String(cls.semester).slice(1).toLowerCase()) : null
+          return clsYear === yearNum && clsSemester === normalizedSemester
+        }) : []
+
+        setEnrolledClasses(filteredEnrolled)
+      }
+
+      // Load available classes for the term
+      const classesResponse = await fetch(`${backendBase}/api/classes/by-term?semester=${semester}&year=${year}`, {
+        credentials: 'include'
+      })
+
+      if (classesResponse.ok) {
+        const classesData = await classesResponse.json()
+        setAvailableClasses(Array.isArray(classesData) ? classesData : [])
+      } else {
+        setAvailableClasses([])
+      }
+    } catch (error) {
+      console.error('Error loading classes for waiver:', error)
+      setEnrolledClasses([])
+      setAvailableClasses([])
+    } finally {
+      setLoadingClasses(false)
+    }
+  }
+
+  /**
+   * Handle waiver request submission
+   */
+  const handleSubmitWaiver = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!userId || !selectedEnrolledClass || !selectedConflictingClass || !waiverReason.trim()) {
+      setError('Please fill in all required fields.')
+      return
+    }
+
+    setSubmittingWaiver(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch(`${backendBase}/api/waivers`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentId: userId,
+          enrolledClassId: selectedEnrolledClass,
+          conflictingClassId: selectedConflictingClass,
+          reason: waiverReason.trim()
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success || response.ok) {
+        setSuccess('Override request submitted successfully! You will be notified when it is approved.')
+        setShowWaiverForm(false)
+        setSelectedEnrolledClass(null)
+        setSelectedConflictingClass(null)
+        setWaiverReason('')
+        setWaiverTerm({ semester: '', year: '' })
+        // Reload waivers to show the new request
+        loadMyWaivers()
+      } else {
+        if (data.message && data.message.includes('already exists')) {
+          setError('A waiver request for these classes already exists.')
+        } else {
+          setError(data.message || 'Failed to submit override request. Please try again.')
+        }
+      }
+    } catch (err) {
+      console.error('Error submitting waiver request:', err)
+      setError('Failed to submit override request. Please try again.')
+    } finally {
+      setSubmittingWaiver(false)
+    }
+  }
+
   // TP Used cursor to check declaration period validity
   const checkDeclarationPeriod = (term: string, currentDate: Date): boolean => {
     // Declaration periods based on academic calendar
@@ -606,7 +774,8 @@ const MajorMinorDeclaration: React.FC = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    if (!status) return 'status-pending';
+    switch (status.toUpperCase()) {
       case 'APPROVED': return 'status-approved';
       case 'PENDING': return 'status-pending';
       case 'REJECTED': return 'status-rejected';
@@ -1265,6 +1434,235 @@ const MajorMinorDeclaration: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* Class Override Application */}
+      <div className="my-declarations-section">
+        <div className="section-header">
+          <h2>Class Override Application</h2>
+          <button 
+            className="toggle-form-button"
+            onClick={() => {
+              setShowWaiverForm(!showWaiverForm);
+              if (!showWaiverForm) {
+                // Reset form when opening
+                setSelectedEnrolledClass(null);
+                setSelectedConflictingClass(null);
+                setWaiverReason('');
+                setWaiverTerm({ semester: '', year: '' });
+              }
+            }}
+          >
+            {showWaiverForm ? 'Cancel' : 'Apply for Override'}
+          </button>
+        </div>
+
+        {/* My Waiver Requests */}
+        {loadingWaivers ? (
+          <div className="loading-message">Loading waiver requests...</div>
+        ) : myWaivers.length === 0 ? (
+          <div className="no-declarations">
+            <p>You haven't submitted any override requests yet.</p>
+          </div>
+        ) : (
+          <div className="declarations-table-container" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1.2rem', color: '#2c3e50' }}>My Override Requests</h3>
+            <table className="declarations-table">
+              <thead>
+                <tr>
+                  <th>Enrolled Class</th>
+                  <th>Conflicting Class</th>
+                  <th>Status</th>
+                  <th>Submitted</th>
+                  <th>Approvals</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myWaivers.map((waiver: any) => (
+                  <tr key={waiver.waiverId}>
+                    <td className="subject-cell">
+                      {waiver.enrolledClass?.department}{waiver.enrolledClass?.courseNum}.{waiver.enrolledClass?.section}
+                      <br />
+                      <small style={{ color: '#666' }}>{waiver.enrolledClass?.title}</small>
+                    </td>
+                    <td className="subject-cell">
+                      {waiver.conflictingClass?.department}{waiver.conflictingClass?.courseNum}.{waiver.conflictingClass?.section}
+                      <br />
+                      <small style={{ color: '#666' }}>{waiver.conflictingClass?.title}</small>
+                    </td>
+                    <td className="status-cell">
+                      <span className={`status-badge ${getStatusColor(waiver.status || 'PENDING')}`}>
+                        {waiver.status || 'PENDING'}
+                      </span>
+                    </td>
+                    <td className="date-cell">
+                      {waiver.createdAt ? new Date(waiver.createdAt).toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="actions-cell">
+                      <div style={{ fontSize: '0.875rem' }}>
+                        {waiver.enrolledInstructorApproved === null ? (
+                          <span style={{ color: '#f59e0b' }}>Enrolled instructor: Pending</span>
+                        ) : waiver.enrolledInstructorApproved ? (
+                          <span style={{ color: '#22c55e' }}>Enrolled instructor: Approved</span>
+                        ) : (
+                          <span style={{ color: '#ef4444' }}>Enrolled instructor: Rejected</span>
+                        )}
+                        <br />
+                        {waiver.conflictingInstructorApproved === null ? (
+                          <span style={{ color: '#f59e0b' }}>Conflicting instructor: Pending</span>
+                        ) : waiver.conflictingInstructorApproved ? (
+                          <span style={{ color: '#22c55e' }}>Conflicting instructor: Approved</span>
+                        ) : (
+                          <span style={{ color: '#ef4444' }}>Conflicting instructor: Rejected</span>
+                        )}
+                        <br />
+                        {waiver.advisorApproved === null ? (
+                          <span style={{ color: '#f59e0b' }}>Advisor: Pending</span>
+                        ) : waiver.advisorApproved ? (
+                          <span style={{ color: '#22c55e' }}>Advisor: Approved</span>
+                        ) : (
+                          <span style={{ color: '#ef4444' }}>Advisor: Rejected</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {showWaiverForm && (
+          <div className="waiver-form-section">
+            <p className="section-description">
+              Request a time conflict waiver to enroll in classes with overlapping schedules. 
+              Requires approval from both instructors and a department-level advisor.
+            </p>
+
+            <form onSubmit={handleSubmitWaiver} className="waiver-form">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Term Semester:</label>
+                  <select
+                    value={waiverTerm.semester}
+                    onChange={(e) => {
+                      setWaiverTerm({ ...waiverTerm, semester: e.target.value });
+                      if (e.target.value && waiverTerm.year) {
+                        loadClassesForWaiver(e.target.value, waiverTerm.year);
+                      }
+                    }}
+                    required
+                  >
+                    <option value="">Select Semester</option>
+                    <option value="Spring">Spring</option>
+                    <option value="Fall">Fall</option>
+                    <option value="Summer">Summer</option>
+                    <option value="Winter">Winter</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Term Year:</label>
+                  <input
+                    type="number"
+                    value={waiverTerm.year}
+                    onChange={(e) => {
+                      setWaiverTerm({ ...waiverTerm, year: e.target.value });
+                      if (waiverTerm.semester && e.target.value) {
+                        loadClassesForWaiver(waiverTerm.semester, e.target.value);
+                      }
+                    }}
+                    placeholder="e.g., 2026"
+                    min="2020"
+                    max="2030"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Currently Enrolled Class:</label>
+                  <select
+                    value={selectedEnrolledClass || ''}
+                    onChange={(e) => setSelectedEnrolledClass(e.target.value ? parseInt(e.target.value) : null)}
+                    required
+                    disabled={enrolledClasses.length === 0 || loadingClasses}
+                  >
+                    <option value="">Select enrolled class</option>
+                    {enrolledClasses.map(cls => (
+                      <option key={cls.classId} value={cls.classId}>
+                        {cls.department}{cls.courseNum}.{cls.section} - {cls.title} ({cls.schedule})
+                      </option>
+                    ))}
+                  </select>
+                  {enrolledClasses.length === 0 && !loadingClasses && waiverTerm.semester && waiverTerm.year && (
+                    <small className="form-hint">No enrolled classes found for the selected term.</small>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label>Conflicting Class to Add:</label>
+                  <select
+                    value={selectedConflictingClass || ''}
+                    onChange={(e) => setSelectedConflictingClass(e.target.value ? parseInt(e.target.value) : null)}
+                    required
+                    disabled={availableClasses.length === 0 || loadingClasses}
+                  >
+                    <option value="">Select conflicting class</option>
+                    {availableClasses.map(cls => (
+                      <option key={cls.classId} value={cls.classId}>
+                        {cls.department}{cls.courseNum}.{cls.section} - {cls.title} ({cls.schedule})
+                      </option>
+                    ))}
+                  </select>
+                  {availableClasses.length === 0 && !loadingClasses && waiverTerm.semester && waiverTerm.year && (
+                    <small className="form-hint">No available classes found for the selected term.</small>
+                  )}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Reason for Override Request:</label>
+                <textarea
+                  value={waiverReason}
+                  onChange={(e) => setWaiverReason(e.target.value)}
+                  placeholder="Please provide a reason for requesting this time conflict waiver..."
+                  rows={4}
+                  required
+                />
+              </div>
+
+              {loadingClasses && (
+                <div className="loading-message">Loading classes...</div>
+              )}
+
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="cancel-button"
+                  onClick={() => {
+                    setShowWaiverForm(false);
+                    setSelectedEnrolledClass(null);
+                    setSelectedConflictingClass(null);
+                    setWaiverReason('');
+                    setWaiverTerm({ semester: '', year: '' });
+                  }}
+                  disabled={submittingWaiver}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="submit-button"
+                  disabled={submittingWaiver || !selectedEnrolledClass || !selectedConflictingClass || !waiverReason.trim()}
+                >
+                  {submittingWaiver ? 'Submitting...' : 'Submit Override Request'}
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>

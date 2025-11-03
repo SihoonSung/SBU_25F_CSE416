@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import './PdfUpload.css'
 
 /**
- * PDF Upload Page Component
- * Allows registrars to upload PDF schedules and manage class capacities.
+ * Class Management Page Component
+ * Allows registrars to manage class capacities.
  */
 
 interface Class {
@@ -23,12 +23,6 @@ interface Class {
 
 function PdfUpload() {
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [semester, setSemester] = useState('Spring')
-  const [year, setYear] = useState(2025)
-  const [subjects, setSubjects] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const [uploadMessage, setUploadMessage] = useState('')
   const [classes, setClasses] = useState<Class[]>([])
   const [editingCapacity, setEditingCapacity] = useState<{[key: number]: number}>({})
   const [currentPage, setCurrentPage] = useState(1)
@@ -36,7 +30,6 @@ function PdfUpload() {
   const [searchTerm, setSearchTerm] = useState('')
   const [loadingCapacity, setLoadingCapacity] = useState(false)
   const [capacityMessage, setCapacityMessage] = useState('')
-  const [formatWarning, setFormatWarning] = useState('')
 
   /**
    * Fetch all classes on component mount
@@ -53,101 +46,34 @@ function PdfUpload() {
       const response = await fetch(`${backendBase}/api/registrar/classes`, {
         credentials: 'include'
       })
-      const data = await response.json()
-      setClasses(data)
-    } catch (error) {
-      console.error('Error fetching classes:', error)
-    }
-  }
-
-  /**
-   * Handle file selection
-   */
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      
-      // Check if file is PDF
-      if (file.type !== 'application/pdf') {
-        setFormatWarning('Warning: Selected file is not a PDF. Please select a valid PDF file.')
-        setSelectedFile(null)
-        return
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-      
-      // Check file size (limit to 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        setFormatWarning('Warning: File size is too large. Please select a PDF file smaller than 10MB.')
-        setSelectedFile(null)
-        return
-      }
-      
-      setSelectedFile(file)
-      setUploadMessage('')
-      setFormatWarning('')
-    }
-  }
-
-  /**
-   * Handle PDF upload and import
-   */
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      setUploadMessage('Please select a PDF file')
-      return
-    }
-
-    setUploading(true)
-    setUploadMessage('')
-
-    const formData = new FormData()
-    formData.append('file', selectedFile)
-    formData.append('semester', semester)
-    formData.append('year', year.toString())
-    if (subjects.trim()) {
-      formData.append('subjects', subjects.trim())
-    }
-
-    try {
-      const response = await fetch(`${backendBase}/api/registrar/upload-schedule`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
-      })
-
       const data = await response.json()
       
-      if (data.success) {
-        setUploadMessage(`Success: ${data.message}`)
-        setSelectedFile(null)
-        setFormatWarning('')
-        // Refresh class list
-        fetchClasses()
-      } else {
-        // Check for format-related errors
-        if (data.message && (
-          data.message.toLowerCase().includes('format') || 
-          data.message.toLowerCase().includes('invalid') || 
-          data.message.toLowerCase().includes('parse') ||
-          data.message.toLowerCase().includes('structure') ||
-          data.message.toLowerCase().includes('unable to') ||
-          data.message.toLowerCase().includes('corrupted') ||
-          data.message.toLowerCase().includes('course schedule') ||
-          data.message.toLowerCase().includes('sbU') ||
-          data.message.toLowerCase().includes('not a valid') ||
-          data.message.toLowerCase().includes('does not appear')
-        )) {
-          setFormatWarning(`PDF Format Issue: ${data.message}`)
-          setUploadMessage('Error: Upload failed - Please upload the correct SBU Course Schedule PDF')
-        } else {
-          setUploadMessage(`Error: ${data.message}`)
-        }
-      }
+      // Map backend ClassEntity fields to frontend Class interface
+      // Backend uses: maxCapacity, currentCapacity
+      // Frontend expects: capacity (which should be maxCapacity)
+      const mappedClasses = Array.isArray(data) ? data.map((cls: any) => ({
+        classId: cls.classId,
+        department: cls.department,
+        courseNum: cls.courseNum,
+        section: cls.section || '',
+        title: cls.title || '',
+        instructor: cls.instructor || '',
+        schedule: cls.schedule || '',
+        location: cls.location || '',
+        semester: cls.semester || '',
+        year: cls.year || cls.academicYear || 2025,
+        credits: cls.minCredits || cls.maxCredits || 0,
+        capacity: cls.maxCapacity !== null && cls.maxCapacity !== undefined ? cls.maxCapacity : null
+      })) : []
+      
+      setClasses(mappedClasses)
+      console.log(`[PdfUpload] Fetched ${mappedClasses.length} classes`)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      setUploadMessage('Error uploading file: ' + errorMessage)
-      setFormatWarning('')
-    } finally {
-      setUploading(false)
+      console.error('[PdfUpload] Error fetching classes:', error)
+      alert('Failed to fetch classes: ' + (error instanceof Error ? error.message : String(error)))
     }
   }
 
@@ -171,20 +97,29 @@ function PdfUpload() {
     try {
       const response = await fetch(`${backendBase}/api/rooms/load-and-calculate`, {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`)
+      }
 
       const data = await response.json()
       
       if (data.success) {
-        setCapacityMessage('Success: ' + data.message)
+        setCapacityMessage(`Success: ${data.message || 'Capacity loaded successfully'} (${data.roomsLoaded || 0} rooms, ${data.classesUpdated || 0} classes updated)`)
         // Refresh class list to show updated capacities
-        fetchClasses()
+        await fetchClasses()
       } else {
-        setCapacityMessage('Error: ' + data.message)
+        setCapacityMessage('Error: ' + (data.message || 'Failed to load capacities'))
       }
     } catch (error) {
-      setCapacityMessage('Error loading capacities: ' + error)
+      console.error('[PdfUpload] Error loading capacities:', error)
+      setCapacityMessage('Error loading capacities: ' + (error instanceof Error ? error.message : String(error)))
     } finally {
       setLoadingCapacity(false)
     }
@@ -283,80 +218,7 @@ function PdfUpload() {
 
   return (
     <div className="registrar-page">
-      <h1>PDF Upload & Class Management</h1>
-
-      {/* PDF Upload Section */}
-      <div className="upload-section">
-        <h2>Upload Class Schedule PDF</h2>
-        <p className="section-description">
-          Upload a PDF from SBU's Course Offerings by Term page to import class schedules.
-        </p>
-        
-        <div className="upload-form">
-          <div className="form-row">
-            <div className="form-group">
-              <label>Semester:</label>
-              <select value={semester} onChange={(e) => setSemester(e.target.value)}>
-                <option value="Spring">Spring</option>
-                <option value="Fall">Fall</option>
-                <option value="Summer">Summer</option>
-                <option value="Winter">Winter</option>
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label>Year:</label>
-              <input 
-                type="number" 
-                value={year} 
-                onChange={(e) => setYear(parseInt(e.target.value))}
-                min="2020"
-                max="2030"
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Subjects (optional):</label>
-            <input 
-              type="text" 
-              placeholder="e.g., CSE,AMS,MAT (leave empty for all subjects)"
-              value={subjects}
-              onChange={(e) => setSubjects(e.target.value)}
-            />
-            <small>Comma-separated list of subject codes to import</small>
-          </div>
-
-          <div className="form-group">
-            <label>PDF File:</label>
-            <input 
-              type="file" 
-              accept=".pdf"
-              onChange={handleFileChange}
-            />
-            {selectedFile && <span className="file-name">{selectedFile.name}</span>}
-            {formatWarning && (
-              <div className="format-warning">
-                {formatWarning}
-              </div>
-            )}
-          </div>
-
-          <button 
-            className="upload-btn"
-            onClick={handleUpload}
-            disabled={uploading || !selectedFile}
-          >
-            {uploading ? 'Uploading...' : 'Upload & Import'}
-          </button>
-
-          {uploadMessage && (
-            <div className={`upload-message ${uploadMessage.includes('Success') ? 'success' : 'error'}`}>
-              {uploadMessage}
-            </div>
-          )}
-        </div>
-      </div>
+      <h1>Class Capacity Management</h1>
 
       {/* Room Capacity Section */}
       <div className="capacity-section">

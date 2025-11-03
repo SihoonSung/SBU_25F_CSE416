@@ -29,27 +29,27 @@
 }
 
 .error-message {
-  background-color: #fee;
-  border: 1px solid #fcc;
-  border-radius: 8px;
+  background-color: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-md);
   padding: 1rem;
   margin-bottom: 1.5rem;
-  color: #c33;
+  color: var(--error-text);
 }
 
 .success-message {
-  background-color: #dfd;
-  border: 1px solid #9c9;
-  border-radius: 8px;
+  background-color: var(--success-bg);
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius-md);
   padding: 1rem;
   margin-bottom: 1.5rem;
-  color: #363;
+  color: var(--success-text);
 }
 
 .loading {
   text-align: center;
   padding: 2rem;
-  color: var(--text-secondary, #495057);
+  color: var(--text-secondary);
 }
 
 .grades-content {
@@ -59,11 +59,11 @@
 }
 
 .classes-section {
-  background: var(--bg-elevated, #ffffff);
-  border-radius: 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
   padding: 1.5rem;
-  border: 1px solid var(--border-default, #e1e8ed);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
   height: fit-content;
 }
 
@@ -82,21 +82,21 @@
 
 .class-card {
   padding: 1rem;
-  border: 1px solid var(--border-default, #e1e8ed);
-  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s;
-  background: var(--bg-elevated, #ffffff);
+  background: var(--bg-elevated);
 }
 
 .class-card:hover {
-  border-color: var(--color-primary, #C50000);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .class-card.selected {
-  border-color: var(--color-primary, #C50000);
-  background-color: #fff5f5;
+  border-color: var(--color-primary);
+  background-color: var(--error-bg);
 }
 
 .class-code {

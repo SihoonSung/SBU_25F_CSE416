@@ -102,6 +102,7 @@ const AdvisorApproval: React.FC = () => {
   useEffect(() => {
     if (userRole === 'ADVISOR') {
       fetchDeclarations();
+      fetchAdvisorWaivers();
     } else if (userRole === 'INSTRUCTOR') {
       fetchWaivers();
     }
@@ -240,6 +241,34 @@ const AdvisorApproval: React.FC = () => {
     } catch (err) {
       setError('Error fetching waivers');
       console.error('Error:', err);
+      setAllWaivers([]);
+      setPendingWaivers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAdvisorWaivers = async () => {
+    if (!currentUser?.userId) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${backendBase}/api/waivers/advisor/${currentUser.userId}`, {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const waivers: TimeConflictWaiver[] = await response.json();
+        setAllWaivers(waivers);
+        setPendingWaivers(waivers.filter(w => w.status === 'PENDING'));
+      } else {
+        setAllWaivers([]);
+        setPendingWaivers([]);
+      }
+    } catch (err) {
+      console.error('Error fetching advisor waivers:', err);
       setAllWaivers([]);
       setPendingWaivers([]);
     } finally {
@@ -402,6 +431,48 @@ const AdvisorApproval: React.FC = () => {
   const handleWaiverReject = async () => {
     if (!selectedWaiver || !currentUser?.userId) return;
     
+    // Check if this is an advisor rejection
+    if (userRole === 'ADVISOR') {
+      if (!comments.trim()) {
+        alert('Please provide a reason for rejection.');
+        return;
+      }
+      
+      setProcessing(true);
+      try {
+        const response = await fetch(`${backendBase}/api/waivers/${selectedWaiver.waiverId}/reject/advisor`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            advisorId: currentUser.userId,
+            reason: comments.trim()
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          setSuccess('Waiver rejected');
+          setShowWaiverRejectionModal(false);
+          setComments('');
+          setSelectedWaiver(null);
+          fetchAdvisorWaivers();
+        } else {
+          setError(data.message || 'Failed to reject waiver');
+        }
+      } catch (err) {
+        setError('Error rejecting waiver');
+        console.error('Error:', err);
+      } finally {
+        setProcessing(false);
+      }
+      return;
+    }
+    
+    // Instructor rejection logic
     const approval = canApproveWaiver(selectedWaiver);
     if (!approval.canApprove || !approval.approvalType) return;
     
@@ -758,13 +829,23 @@ const AdvisorApproval: React.FC = () => {
       <div className="summary-section">
         <div className="summary-cards">
           <div className="summary-card pending">
-            <h3>Pending Approval</h3>
+            <h3>Pending Declarations</h3>
             <div className="count">{pendingDeclarations.length}</div>
             <div className="description">Awaiting your review</div>
           </div>
           <div className="summary-card total">
             <h3>Total Declarations</h3>
             <div className="count">{allDeclarations.length}</div>
+            <div className="description">All time</div>
+          </div>
+          <div className="summary-card pending">
+            <h3>Pending Waivers</h3>
+            <div className="count">{pendingWaivers.length}</div>
+            <div className="description">Awaiting your review</div>
+          </div>
+          <div className="summary-card total">
+            <h3>Total Waivers</h3>
+            <div className="count">{allWaivers.length}</div>
             <div className="description">All time</div>
           </div>
         </div>
@@ -929,6 +1010,150 @@ const AdvisorApproval: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Waivers List for Advisor */}
+      <div className="declarations-section" style={{ marginTop: 32 }}>
+        <div className="section-header">
+          <h2>Time Conflict Waivers</h2>
+          <div className="results-count">
+            {getFilteredWaivers().length} waiver(s) found
+          </div>
+        </div>
+
+        {getFilteredWaivers().length === 0 ? (
+          <div className="no-declarations">
+            <p>No waivers found.</p>
+          </div>
+        ) : (
+          <div className="declarations-table-container">
+            <table className="declarations-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Enrolled Class</th>
+                  <th>Conflicting Class</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getFilteredWaivers().map(waiver => (
+                  <tr key={waiver.waiverId}>
+                    <td>{waiver.studentName}</td>
+                    <td>
+                      {waiver.enrolledClass.department} {waiver.enrolledClass.courseNum}.{waiver.enrolledClass.section}
+                      <br />
+                      <small>{waiver.enrolledClass.title}</small>
+                    </td>
+                    <td>
+                      {waiver.conflictingClass.department} {waiver.conflictingClass.courseNum}.{waiver.conflictingClass.section}
+                      <br />
+                      <small>{waiver.conflictingClass.title}</small>
+                    </td>
+                    <td>{waiver.reason || '—'}</td>
+                    <td>
+                      <span className={`status-badge ${getStatusColor(waiver.status)}`}>
+                        {getStatusText(waiver.status)}
+                      </span>
+                    </td>
+                    <td>{formatDate(waiver.createdAt)}</td>
+                    <td>
+                      {waiver.status === 'PENDING' && waiver.advisorApproved === null ? (
+                        <div className="action-buttons">
+                          <button
+                            className="btn-approve"
+                            onClick={() => openWaiverApprovalModal(waiver)}
+                            disabled={processing}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            className="btn-reject"
+                            onClick={() => openWaiverRejectionModal(waiver)}
+                            disabled={processing}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-muted">
+                          {waiver.advisorApproved === true ? 'Approved' : waiver.advisorApproved === false ? 'Rejected' : 'Already processed'}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Waiver Approval Modal for Advisor */}
+      {showWaiverApprovalModal && selectedWaiver && userRole === 'ADVISOR' && (
+        <div className="modal-overlay" onClick={closeModals}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Approve Waiver</h2>
+            <div className="modal-body">
+              <p><strong>Student:</strong> {selectedWaiver.studentName}</p>
+              <p><strong>Enrolled Class:</strong> {selectedWaiver.enrolledClass.department} {selectedWaiver.enrolledClass.courseNum}.{selectedWaiver.enrolledClass.section} - {selectedWaiver.enrolledClass.title}</p>
+              <p><strong>Conflicting Class:</strong> {selectedWaiver.conflictingClass.department} {selectedWaiver.conflictingClass.courseNum}.{selectedWaiver.conflictingClass.section} - {selectedWaiver.conflictingClass.title}</p>
+              {selectedWaiver.reason && <p><strong>Reason:</strong> {selectedWaiver.reason}</p>}
+              <div className="form-group">
+                <label htmlFor="approvalComments">Comments (optional)</label>
+                <textarea
+                  id="approvalComments"
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                  rows={4}
+                />
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={closeModals} disabled={processing}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={handleWaiverApprove} disabled={processing}>
+                {processing ? 'Processing...' : 'Approve'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Waiver Rejection Modal for Advisor */}
+      {showWaiverRejectionModal && selectedWaiver && userRole === 'ADVISOR' && (
+        <div className="modal-overlay" onClick={closeModals}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Reject Waiver</h2>
+            <div className="modal-body">
+              <p><strong>Student:</strong> {selectedWaiver.studentName}</p>
+              <p><strong>Enrolled Class:</strong> {selectedWaiver.enrolledClass.department} {selectedWaiver.enrolledClass.courseNum}.{selectedWaiver.enrolledClass.section} - {selectedWaiver.enrolledClass.title}</p>
+              <p><strong>Conflicting Class:</strong> {selectedWaiver.conflictingClass.department} {selectedWaiver.conflictingClass.courseNum}.{selectedWaiver.conflictingClass.section} - {selectedWaiver.conflictingClass.title}</p>
+              <div className="form-group">
+                <label htmlFor="rejectionComments">Rejection Reason (required)</label>
+                <textarea
+                  id="rejectionComments"
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                  rows={4}
+                  required
+                />
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={closeModals} disabled={processing}>
+                Cancel
+              </button>
+              <button className="btn-danger" onClick={handleWaiverReject} disabled={processing || !comments.trim()}>
+                {processing ? 'Processing...' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Approval Modal */}
       {showApprovalModal && selectedDeclaration && (
