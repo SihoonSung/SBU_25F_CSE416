@@ -251,10 +251,10 @@ students:
 
 # ======================================================================
 # Test Cases for Degree Requirements Status API
-# 각 requirement type을 테스트하기 위한 학생들
+# Students for testing each requirement type
 # ======================================================================
 
-# Test Case 1: CSE BS - all_of, one_of, one_of_sequences, electives 모두 테스트
+# Test Case 1: CSE BS - test all_of, one_of, one_of_sequences, electives
 - SBU_ID: 200111111
   first_name: TestCSE1
   last_name: AllTypes
@@ -276,35 +276,35 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # all_of 테스트: intro_courses 일부만 (NOT SATISFIED)
+    # all_of test: intro_courses partially completed (NOT SATISFIED)
     - {class_id: 70001, department: CSE, course_num: 114, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A}
     - {class_id: 70002, department: CSE, course_num: 214, section: 1, semester: Spring, year: 2022, credits: 4, GPNC: false, grade: B+}
     - {class_id: 70003, department: CSE, course_num: 215, section: 1, semester: Fall, year: 2022, credits: 4, GPNC: false, grade: A-}
-    # CSE 216, 220 미이수 -> all_of NOT SATISFIED
+    # CSE 216, 220 not taken -> all_of NOT SATISFIED
     
-    # one_of_sequences 테스트: AMS sequence 완료 (SATISFIED)
+    # one_of_sequences test: AMS sequence completed (SATISFIED)
     - {class_id: 70004, department: AMS, course_num: 151, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A}
     - {class_id: 70005, department: AMS, course_num: 161, section: 1, semester: Spring, year: 2022, credits: 4, GPNC: false, grade: B+}
     
-    # one_of 테스트: linear_algebra 완료 (SATISFIED)
+    # one_of test: linear_algebra completed (SATISFIED)
     - {class_id: 70006, department: AMS, course_num: 210, section: 1, semester: Fall, year: 2022, credits: 4, GPNC: false, grade: A}
     
-    # all_of 테스트: statistics 일부만 (NOT SATISFIED)
+    # all_of test: statistics partially completed (NOT SATISFIED)
     - {class_id: 70007, department: AMS, course_num: 301, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
-    # AMS 310 미이수 -> all_of NOT SATISFIED
+    # AMS 310 not taken -> all_of NOT SATISFIED
     
-    # electives 테스트: natural_science_requirement 부분 완료
+    # electives test: natural_science_requirement partially completed
     - {class_id: 70008, department: BIO, course_num: 201, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
     - {class_id: 70009, department: BIO, course_num: 204, section: 1, semester: Spring, year: 2024, credits: 2, GPNC: false, grade: B+}
-    # 9 credits 필요, 현재 5 credits -> NOT SATISFIED
+    # 9 credits required, currently 5 credits -> NOT SATISFIED
     
-    # advanced_fixed all_of 테스트: 일부만 (NOT SATISFIED)
+    # advanced_fixed all_of test: partially completed (NOT SATISFIED)
     - {class_id: 70010, department: CSE, course_num: 303, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: B+}
     - {class_id: 70011, department: CSE, course_num: 310, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A-}
-    # CSE 316, 320, 373, 416 미이수 -> NOT SATISFIED
+    # CSE 316, 320, 373, 416 not taken -> NOT SATISFIED
   course_plan: []
 
-# Test Case 2: CSE BS - 모든 requirement를 satisfied한 완전한 학생
+# Test Case 2: CSE BS - complete student with all requirements satisfied
 - SBU_ID: 200222222
   first_name: TestCSE2
   last_name: Complete
@@ -326,14 +326,14 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # all_of: intro_courses 완료
+    # all_of: intro_courses completed
     - {class_id: 71001, department: CSE, course_num: 114, section: 1, semester: Fall, year: 2020, credits: 4, GPNC: false, grade: A}
     - {class_id: 71002, department: CSE, course_num: 214, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: A}
     - {class_id: 71003, department: CSE, course_num: 215, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A-}
     - {class_id: 71004, department: CSE, course_num: 216, section: 1, semester: Spring, year: 2022, credits: 4, GPNC: false, grade: B+}
     - {class_id: 71005, department: CSE, course_num: 220, section: 1, semester: Fall, year: 2022, credits: 4, GPNC: false, grade: A}
     
-    # all_of: advanced_fixed 완료
+    # all_of: advanced_fixed completed
     - {class_id: 71006, department: CSE, course_num: 303, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
     - {class_id: 71007, department: CSE, course_num: 310, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A-}
     - {class_id: 71008, department: CSE, course_num: 316, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: B+}
@@ -341,39 +341,39 @@ students:
     - {class_id: 71010, department: CSE, course_num: 373, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: A-}
     - {class_id: 71011, department: CSE, course_num: 416, section: 1, semester: Fall, year: 2025, credits: 3, GPNC: false, grade : A}
     
-    # one_of_sequences: MAT sequence 완료
+    # one_of_sequences: MAT sequence completed
     - {class_id: 71012, department: MAT, course_num: 131, section: 1, semester: Fall, year: 2020, credits: 4, GPNC: false, grade: A}
     - {class_id: 71013, department: MAT, course_num: 132, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: B+}
     
-    # one_of: linear_algebra 완료
+    # one_of: linear_algebra completed
     - {class_id: 71014, department: MAT, course_num: 211, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A}
     
-    # all_of: statistics 완료
+    # all_of: statistics completed
     - {class_id: 71015, department: AMS, course_num: 301, section: 1, semester: Spring, year: 2022, credits: 3, GPNC: false, grade: A}
     - {class_id: 71016, department: AMS, course_num: 310, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: B+}
     
-    # electives: natural_science_requirement 완료 (9 credits)
+    # electives: natural_science_requirement completed (9 credits)
     - {class_id: 71017, department: CHE, course_num: 131, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
     - {class_id: 71018, department: CHE, course_num: 133, section: 1, semester: Spring, year: 2023, credits: 1, GPNC: false, grade: A}
     - {class_id: 71019, department: PHY, course_num: 125, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: B+}
     - {class_id: 71020, department: PHY, course_num: 127, section: 1, semester: Spring, year: 2024, credits: 2, GPNC: false, grade: A}
-    # 총 9 credits -> SATISFIED
+    # Total 9 credits -> SATISFIED
     
-    # all_of: professional_ethics 완료
+    # all_of: professional_ethics completed
     - {class_id: 71021, department: CSE, course_num: 312, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     
-    # all_of: upper_division_writing 완료
+    # all_of: upper_division_writing completed
     - {class_id: 71022, department: CSE, course_num: 300, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
     
-    # electives: cse_upper_electives (12 credits 필요)
+    # electives: cse_upper_electives (12 credits required)
     - {class_id: 71023, department: CSE, course_num: 305, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     - {class_id: 71024, department: CSE, course_num: 320, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     - {class_id: 71025, department: CSE, course_num: 330, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
     - {class_id: 71026, department: CSE, course_num: 340, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # 총 12 credits -> SATISFIED
+    # Total 12 credits -> SATISFIED
   course_plan: []
 
-# Test Case 3: BIO BA - two_of 테스트 포함
+# Test Case 3: BIO BA - includes two_of test
 - SBU_ID: 200333333
   first_name: TestBIO1
   last_name: TwoOfTest
@@ -395,52 +395,52 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # one_of_sequences: chemistry_lecture_sequence 완료
+    # one_of_sequences: chemistry_lecture_sequence completed
     - {class_id: 72001, department: CHE, course_num: 131, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: B+}
     # - {class_id: 72002, department: CHE, course_num: 132, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
     
-    # one_of_sequences: chemistry_lab_sequence 완료
+    # one_of_sequences: chemistry_lab_sequence completed
     - {class_id: 72003, department: CHE, course_num: 133, section: 1, semester: Fall, year: 2022, credits: 1, GPNC: false, grade: A}
     - {class_id: 72004, department: CHE, course_num: 134, section: 1, semester: Spring, year: 2023, credits: 1, GPNC: false, grade: A}
     
-    # one_of_sequences: organic_chemistry_lecture_sequence 완료
+    # one_of_sequences: organic_chemistry_lecture_sequence completed
     - {class_id: 72005, department: CHE, course_num: 321, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A-}
     - {class_id: 72006, department: CHE, course_num: 322, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: B+}
     
-    # one_of: organic_chemistry_lab 완료
+    # one_of: organic_chemistry_lab completed
     - {class_id: 72007, department: CHE, course_num: 327, section: 1, semester: Spring, year: 2024, credits: 2, GPNC: false, grade: A}
     
-    # one_of: calculus_requirement 완료
+    # one_of: calculus_requirement completed
     - {class_id: 72008, department: AMS, course_num: 151, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: A}
     
-    # one_of_sequences: physics_sequence 완료
+    # one_of_sequences: physics_sequence completed
     - {class_id: 72009, department: PHY, course_num: 125, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     - {class_id: 72010, department: PHY, course_num: 126, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
     - {class_id: 72011, department: PHY, course_num: 127, section: 1, semester: Spring, year: 2025, credits: 1, GPNC: false, grade : A}
     - {class_id: 72012, department: PHY, course_num: 133, section: 1, semester: Fall, year: 2024, credits: 1, GPNC: false, grade: A}
     - {class_id: 72013, department: PHY, course_num: 134, section: 1, semester: Spring, year: 2025, credits: 1, GPNC: false, grade : A}
     
-    # one_of: statistics_requirement 완료
+    # one_of: statistics_requirement completed
     - {class_id: 72014, department: AMS, course_num: 310, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
     
-    # all_of: bio_core_lectures 완료
+    # all_of: bio_core_lectures completed
     - {class_id: 72015, department: BIO, course_num: 201, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: A}
     - {class_id: 72016, department: BIO, course_num: 202, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
     - {class_id: 72017, department: BIO, course_num: 203, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: B+}
     
-    # one_of_sequences: bio_core_lab_sequence 완료
+    # one_of_sequences: bio_core_lab_sequence completed
     - {class_id: 72018, department: BIO, course_num: 204, section: 1, semester: Spring, year: 2024, credits: 2, GPNC: false, grade: A}
     - {class_id: 72019, department: BIO, course_num: 205, section: 1, semester: Fall, year: 2024, credits: 2, GPNC: false, grade: A}
     
-    # one_of: advanced_bio_requirement 완료
+    # one_of: advanced_bio_requirement completed
     - {class_id: 72020, department: BIO, course_num: 320, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     
-    # electives: advanced_bio_electives (6 credits 필요) - 일부만
+    # electives: advanced_bio_electives (6 credits required) - partially completed
     - {class_id: 72021, department: BIO, course_num: 310, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # 3 credits만 -> NOT SATISFIED
+    # Only 3 credits -> NOT SATISFIED
   course_plan: []
 
-# Test Case 4: BIO MINOR - two_of 테스트
+# Test Case 4: BIO MINOR - two_of test
 - SBU_ID: 200444444
   first_name: TestBIO2
   last_name: MinorTwoOf
@@ -462,25 +462,25 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # POL 전공 과목들
+    # POL major courses
     - {class_id: 73001, department: POL, course_num: 101, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
     - {class_id: 73002, department: POL, course_num: 102, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: B+}
     
-    # two_of 테스트: minor_fundamentals - 2개 완료 (SATISFIED)
+    # two_of test: minor_fundamentals - 2 completed (SATISFIED)
     - {class_id: 73003, department: BIO, course_num: 201, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
     - {class_id: 73004, department: BIO, course_num: 202, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
-    # BIO 203은 이수하지 않음, 하지만 2개 완료 -> SATISFIED
+    # BIO 203 not taken, but 2 completed -> SATISFIED
     
-    # one_of_sequences: minor_lab_sequence 완료
+    # one_of_sequences: minor_lab_sequence completed
     - {class_id: 73005, department: BIO, course_num: 204, section: 1, semester: Fall, year: 2024, credits: 2, GPNC: false, grade: A}
     - {class_id: 73006, department: BIO, course_num: 205, section: 1, semester: Spring, year: 2025, credits: 2, GPNC: false, grade : A}
     
-    # electives: minor_advanced_courses (9 credits 필요) - 일부만
+    # electives: minor_advanced_courses (9 credits required) - partially completed
     - {class_id: 73007, department: BIO, course_num: 310, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    # 3 credits만 -> NOT SATISFIED
+    # Only 3 credits -> NOT SATISFIED
   course_plan: []
 
-# Test Case 5: PSY BA - electives 다양한 패턴 테스트
+# Test Case 5: PSY BA - electives various patterns test
 - SBU_ID: 200555555
   first_name: TestPSY1
   last_name: ElectivesTest
@@ -502,34 +502,34 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # all_of: psy_core_intro 완료
+    # all_of: psy_core_intro completed
     - {class_id: 74001, department: PSY, course_num: 103, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: A}
     
-    # one_of: psy_statistics 완료
+    # one_of: psy_statistics completed
     - {class_id: 74002, department: PSY, course_num: 201, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
     
-    # all_of: psy_research_writing 완료
+    # all_of: psy_research_writing completed
     - {class_id: 74003, department: PSY, course_num: 310, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
     
-    # one_of: psy_survey_a 완료
+    # one_of: psy_survey_a completed
     - {class_id: 74004, department: PSY, course_num: 220, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: B+}
     
-    # one_of: psy_survey_b 완료
+    # one_of: psy_survey_b completed
     - {class_id: 74005, department: PSY, course_num: 250, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     
-    # one_of: psy_survey_third 완료
+    # one_of: psy_survey_third completed
     - {class_id: 74006, department: PSY, course_num: 230, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
     
-    # electives: psy_advanced_one (3 credits) - 완료
+    # electives: psy_advanced_one (3 credits) - completed
     - {class_id: 74007, department: PSY, course_num: 240, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     
-    # electives: psy_advanced_four (12 credits 필요) - 일부만
+    # electives: psy_advanced_four (12 credits required) - partially completed
     - {class_id: 74008, department: PSY, course_num: 320, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     - {class_id: 74009, department: PSY, course_num: 330, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # 6 credits만 -> NOT SATISFIED
+    # Only 6 credits -> NOT SATISFIED
   course_plan: []
 
-# Test Case 6: ECO BA - electives 테스트
+# Test Case 6: ECO BA - electives test
 - SBU_ID: 200666666
   first_name: TestECO1
   last_name: ElectivesTest
@@ -551,29 +551,29 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # all_of: eco_intro 완료
+    # all_of: eco_intro completed
     - {class_id: 75001, department: ECO, course_num: 110, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: B+}
     - {class_id: 75002, department: ECO, course_num: 111, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
     
-    # all_of: eco_intermediate 완료
+    # all_of: eco_intermediate completed
     - {class_id: 75003, department: ECO, course_num: 303, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
     - {class_id: 75004, department: ECO, course_num: 305, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A-}
     - {class_id: 75005, department: ECO, course_num: 320, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
     - {class_id: 75006, department: ECO, course_num: 321, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
     
-    # one_of: eco_mathematics 완료
+    # one_of: eco_mathematics completed
     - {class_id: 75007, department: MAT, course_num: 125, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: A}
     
-    # electives: eco_advanced_five (15 credits 필요) - 일부만
+    # electives: eco_advanced_five (15 credits required) - partially completed
     - {class_id: 75008, department: ECO, course_num: 326, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     - {class_id: 75009, department: ECO, course_num: 327, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # 6 credits만 -> NOT SATISFIED
+    # Only 6 credits -> NOT SATISFIED
     
-    # electives: eco_additional_one (3 credits 필요) - 미완료
+    # electives: eco_additional_one (3 credits required) - not completed
     # NOT SATISFIED
   course_plan: []
 
-# Test Case 7: AMS BS - one_of_sequences 다른 패턴 테스트
+# Test Case 7: AMS BS - one_of_sequences different patterns test
 - SBU_ID: 200777777
   first_name: TestAMS1
   last_name: SequencesTest
@@ -595,36 +595,36 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # one_of_sequences: ams_calculus_sequence 완료 (MAT sequence)
+    # one_of_sequences: ams_calculus_sequence completed (MAT sequence)
     - {class_id: 76001, department: MAT, course_num: 125, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A}
     - {class_id: 76002, department: MAT, course_num: 126, section: 1, semester: Spring, year: 2022, credits: 4, GPNC: false, grade: B+}
     # - {class_id: 76003, department: MAT, course_num: 127, section: 1, semester: Fall, year: 2022, credits: 4, GPNC: false, grade: A}
     
-    # one_of: ams_linear_algebra 완료
+    # one_of: ams_linear_algebra completed
     - {class_id: 76004, department: AMS, course_num: 210, section: 1, semester: Spring, year: 2023, credits: 4, GPNC: false, grade: A}
     
-    # one_of: ams_calculus_iii 완료
+    # one_of: ams_calculus_iii completed
     - {class_id: 76005, department: AMS, course_num: 261, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: A-}
     
-    # one_of: ams_computing 완료
+    # one_of: ams_computing completed
     - {class_id: 76006, department: CSE, course_num: 114, section: 1, semester: Spring, year: 2024, credits: 4, GPNC: false, grade: B+}
     
-    # all_of: ams_301_required 완료
+    # all_of: ams_301_required completed
     - {class_id: 76007, department: AMS, course_num: 301, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     
-    # one_of: ams_probability_stats 완료
+    # one_of: ams_probability_stats completed
     - {class_id: 76008, department: AMS, course_num: 310, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
     
-    # one_of: ams_differential_eq 완료
+    # one_of: ams_differential_eq completed
     - {class_id: 76009, department: AMS, course_num: 315, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     
-    # electives: ams_advanced_courses (18 credits 필요) - 일부만
+    # electives: ams_advanced_courses (18 credits required) - partially completed
     - {class_id: 76010, department: AMS, course_num: 311, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
     - {class_id: 76011, department: AMS, course_num: 312, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # 6 credits만 -> NOT SATISFIED
+    # Only 6 credits -> NOT SATISFIED
   course_plan: []
 
-# Test Case 8: POL BA - electives와 two_of 테스트
+# Test Case 8: POL BA - electives and two_of test
 - SBU_ID: 200888888
   first_name: TestPOL1
   last_name: ElectivesTwoOf
@@ -646,29 +646,29 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # all_of: pol_required 완료
+    # all_of: pol_required completed
     - {class_id: 77001, department: POL, course_num: 101, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: A}
     - {class_id: 77002, department: POL, course_num: 102, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
     - {class_id: 77003, department: POL, course_num: 103, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: B+}
     
-    # one_of: pol_methodology 완료
+    # one_of: pol_methodology completed
     - {class_id: 77004, department: POL, course_num: 201, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
     
-    # electives: pol_concentration (12 credits 필요) - 일부만
+    # electives: pol_concentration (12 credits required) - partially completed
     - {class_id: 77005, department: POL, course_num: 302, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     - {class_id: 77006, department: POL, course_num: 308, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # 6 credits만 -> NOT SATISFIED
+    # Only 6 credits -> NOT SATISFIED
     
-    # electives: pol_electives (12 credits 필요) - 일부만
+    # electives: pol_electives (12 credits required) - partially completed
     - {class_id: 77007, department: POL, course_num: 334, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    # 3 credits만 -> NOT SATISFIED
+    # Only 3 credits -> NOT SATISFIED
     
-    # electives: pol_related_areas (6 credits 필요) - 일부만
+    # electives: pol_related_areas (6 credits required) - partially completed
     - {class_id: 77008, department: ECO, course_num: 303, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
-    # 3 credits만 -> NOT SATISFIED
+    # Only 3 credits -> NOT SATISFIED
   course_plan: []
 
-# Test Case 9: POL MINOR - two_of 테스트
+# Test Case 9: POL MINOR - two_of test
 - SBU_ID: 200999999
   first_name: TestPOL2
   last_name: MinorTwoOf
@@ -690,24 +690,24 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # CSE 전공 과목들 일부
+    # CSE major courses (partial)
     - {class_id: 78001, department: CSE, course_num: 114, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: A}
     
-    # two_of 테스트: pol_minor_intro - 2개 완료 (SATISFIED)
+    # two_of test: pol_minor_intro - 2 completed (SATISFIED)
     - {class_id: 78002, department: POL, course_num: 101, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
     - {class_id: 78003, department: POL, course_num: 102, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: B+}
-    # 2개 완료 -> SATISFIED
+    # 2 completed -> SATISFIED
     
-    # electives: pol_minor_concentration (9 credits 필요) - 일부만
+    # electives: pol_minor_concentration (9 credits required) - partially completed
     - {class_id: 78004, department: POL, course_num: 302, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    # 3 credits만 -> NOT SATISFIED
+    # Only 3 credits -> NOT SATISFIED
     
-    # electives: pol_minor_electives (6 credits 필요) - 일부만
+    # electives: pol_minor_electives (6 credits required) - partially completed
     - {class_id: 78005, department: POL, course_num: 334, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # 3 credits만 -> NOT SATISFIED
+    # Only 3 credits -> NOT SATISFIED
   course_plan: []
 
-# Test Case 10: CSE MINOR - electives와 excluded_courses 테스트
+# Test Case 10: CSE MINOR - electives and excluded_courses test
 - SBU_ID: 201010101
   first_name: TestCSE3
   last_name: MinorExcluded
@@ -729,18 +729,18 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # BIO 전공 과목들 일부
+    # BIO major courses (partial)
     - {class_id: 79001, department: BIO, course_num: 201, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: A}
     
-    # all_of: minor_core 완료
+    # all_of: minor_core completed
     - {class_id: 79002, department: CSE, course_num: 114, section: 1, semester: Spring, year: 2023, credits: 4, GPNC: false, grade: A}
     - {class_id: 79003, department: CSE, course_num: 214, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: B+}
     - {class_id: 79004, department: CSE, course_num: 216, section: 1, semester: Spring, year: 2024, credits: 4, GPNC: false, grade: A}
     
-    # electives: minor_electives (9 credits 필요, CSE 3xx+)
-    # excluded: CSE 301, 312, 475, 487, 488은 제외되어야 함
+    # electives: minor_electives (9 credits required, CSE 3xx+)
+    # excluded: CSE 301, 312, 475, 487, 488 should be excluded
     - {class_id: 79005, department: CSE, course_num: 305, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
     - {class_id: 79006, department: CSE, course_num: 310, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # 6 credits만 -> NOT SATISFIED
-    # CSE 301, 312는 excluded이므로 포함되지 않아야 함
+    # Only 6 credits -> NOT SATISFIED
+    # CSE 301, 312 are excluded, so they should not be included
   course_plan: []

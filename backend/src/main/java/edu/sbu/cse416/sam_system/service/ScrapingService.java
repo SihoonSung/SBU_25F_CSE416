@@ -7,13 +7,7 @@ package edu.sbu.cse416.sam_system.service;
  * 
  * Features:
  * - Two-step scraping: course list page → individual course detail pages
-<<<<<<< HEAD
- * - Extracts for ALL subjects: description, credits (including ranges), SBCs
- * - Attempts to extract prerequisites, corequisites, antirequisites, advisory prereqs for ALL subjects
- * - If parsing fails (format doesn't match), fields are set to null instead of "unknown"
-=======
  * - Extracts for ALL subjects: description, credits (including ranges), SBCs, prerequisites, corequisites, antirequisites, advisory prereqs
->>>>>>> dbc9211 (Completed Student degree works backend with testing user.yaml)
  * - Prevents duplicate entries (updates existing courses if found)
  * - Allows scraping additional subjects for the same term (extension), but prevents re-scraping the same subject
  * - Handles placement exam simplification with warnings
@@ -116,15 +110,7 @@ public class ScrapingService {
                     continue;
                 }
 
-<<<<<<< HEAD
-                // Check if subject is in fully supported list (for warning only - parsing will still be attempted)
-                if (!FULLY_SUPPORTED_SUBJECTS.contains(subject)) {
-                    System.out.println("WARNING: Subject '" + subject + "' is not in the fully supported list (BIO, PSY, CSE, ECO, AMS, POL).");
-                    System.out.println("   Parsing will still be attempted, but if format doesn't match, fields will be null instead of 'unknown'.");
-                }
-=======
                 // All subjects are now scraped with the same extraction logic
->>>>>>> dbc9211 (Completed Student degree works backend with testing user.yaml)
 
                 int coursesScraped = scrapeSubject(subject, term);
                 totalScraped += coursesScraped;
@@ -272,12 +258,6 @@ public class ScrapingService {
 
         Course course = new Course(subject, courseNumber, courseName, term);
 
-<<<<<<< HEAD
-        // Check if subject is fully supported (for warning/info purposes only)
-        boolean isFullySupported = FULLY_SUPPORTED_SUBJECTS.contains(subject);
-
-=======
->>>>>>> dbc9211 (Completed Student degree works backend with testing user.yaml)
         // Get the main content area
         Element contentTd = doc.selectFirst("td.block_content");
         if (contentTd == null) {
@@ -307,35 +287,17 @@ public class ScrapingService {
         String advisoryPrereqs;
         boolean hasWarning = false;
 
-<<<<<<< HEAD
-        // Always attempt to extract requisites for all subjects
-        // If parsing fails (null or empty), fields will be set to null instead of "unknown"
-        if (isFullySupported) {
-            System.out.println("  [PARSING] Fully supported subject - attempting to extract requisite information for " + subject);
-        } else {
-            System.out.println("  [PARSING] Subject not in fully supported list - attempting to extract requisite information for " + subject);
-            System.out.println("  [WARNING] If parsing format doesn't match, fields will be null");
-        }
-
-        // Extract prerequisites
-        Map<String, Object> prereqResult = extractPrerequisites(fullText);
-        prerequisites = prereqResult != null ? (String) prereqResult.get("text") : null;
-=======
         // Extract all requisite information for ALL subjects (same extraction logic for all)
         // Extract prerequisites
         Map<String, Object> prereqResult = extractPrerequisites(fullText);
         prerequisites = prereqResult != null ? (String) prereqResult.get("text") : null;
         if (prerequisites == null) prerequisites = "unknown";
->>>>>>> dbc9211 (Completed Student degree works backend with testing user.yaml)
         boolean prereqWarning = prereqResult != null && (Boolean) prereqResult.get("hasWarning");
 
         // Extract corequisites
         Map<String, Object> coreqResult = extractCorequisites(fullText);
         corequisites = coreqResult != null ? (String) coreqResult.get("text") : null;
-<<<<<<< HEAD
-=======
         if (corequisites == null) corequisites = "unknown";
->>>>>>> dbc9211 (Completed Student degree works backend with testing user.yaml)
         boolean coreqHasWarning = coreqResult != null && (Boolean) coreqResult.get("hasWarning");
         
         // Set warning flag if any placement exam simplification was applied
@@ -343,24 +305,11 @@ public class ScrapingService {
 
         // Extract antirequisites
         antirequisites = extractAntirequisites(fullText);
-<<<<<<< HEAD
-
-        // Extract advisory prerequisites
-        advisoryPrereqs = extractAdvisoryPrerequisites(fullText);
-        
-        // Log parsing results
-        if (prerequisites != null || corequisites != null || antirequisites != null || advisoryPrereqs != null) {
-            System.out.println("  ✓  Successfully extracted requisite information");
-        } else {
-            System.out.println("  ⚠  No requisite information found (parsing may not match format)");
-        }
-=======
         if (antirequisites == null) antirequisites = "unknown";
 
         // Extract advisory prerequisites
         advisoryPrereqs = extractAdvisoryPrerequisites(fullText);
         if (advisoryPrereqs == null) advisoryPrereqs = "unknown";
->>>>>>> dbc9211 (Completed Student degree works backend with testing user.yaml)
 
         // Set all fields to course object
         course.setPrerequisites(prerequisites);

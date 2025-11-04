@@ -12,6 +12,7 @@ import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.security.CurrentUser;
 import edu.sbu.cse416.sam_system.service.PersonProfileService; 
 import edu.sbu.cse416.sam_system.service.PersonProfileService.TermRef; // Import TermRef from PersonProfileService for use
+import edu.sbu.cse416.sam_system.service.SystemDateService;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -28,14 +29,16 @@ public class ProfileController {
     private final UserRepository userRepository;
     private final JdbcTemplate jdbc;
     private final CurrentUser currentUser;
-    private final PersonProfileService personProfileService; 
+    private final PersonProfileService personProfileService;
+    private final SystemDateService systemDateService;
 
     @Autowired
-    public ProfileController(UserRepository userRepository, JdbcTemplate jdbc, CurrentUser currentUser, PersonProfileService personProfileService) {
+    public ProfileController(UserRepository userRepository, JdbcTemplate jdbc, CurrentUser currentUser, PersonProfileService personProfileService, SystemDateService systemDateService) {
         this.userRepository = userRepository;
         this.jdbc = jdbc;
         this.currentUser = currentUser;
-        this.personProfileService = personProfileService; 
+        this.personProfileService = personProfileService;
+        this.systemDateService = systemDateService;
     }
 
     /* ======================================================================
@@ -433,38 +436,119 @@ public class ProfileController {
      * JDBC queries for other data
      * ====================================================================== */
     private List<Map<String, Object>> querySchedule(String studentId, String term) {
-        String sql =
-            "SELECT c.class_id AS classId, " +
-            "       c.subject, " +
-            "       c.course_num AS courseNum, " +
-            "       c.section, " +
-            "       c.title, " +
-            "       COALESCE(c.schedule, c.meeting) AS schedule, " +
-            "       c.location, " +
-            "       c.instructor, " +
-            "       COALESCE(c.max_credits, c.min_credits) AS credits " +
-            "FROM enrollments e " +
-            "JOIN classes c ON c.class_id = e.class_id " +
-            "WHERE e.student_id = ? " +
-            "  AND e.term_code = ? " +
-            "  AND e.status = 'ENROLLED' " +
-            "ORDER BY c.class_id";
-
-        return safeQueryList(() ->
-            jdbc.query(sql, (rs, rowNum) -> {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("classId", rs.getLong("classId"));
-                m.put("subject", rs.getString("subject"));
-                m.put("courseNum", readInt(rs, "courseNum"));
-                m.put("section", rs.getString("section"));
-                m.put("title", rs.getString("title"));
-                m.put("schedule", rs.getString("schedule"));
-                m.put("location", rs.getString("location"));
-                m.put("instructor", rs.getString("instructor"));
-                m.put("credits", readIntNullable(rs, "credits"));
-                return m;
-            }, studentId, term)
+        // Parse term from "2026-Spring" format to semester and year
+        String[] termParts = term.split("-");
+        if (termParts.length != 2) {
+            // Invalid term format, return empty list
+            return Collections.emptyList();
+        }
+        
+        Integer year;
+        String semester;
+        try {
+            year = Integer.parseInt(termParts[0]);
+            semester = termParts[1]; // "Spring", "Fall", etc.
+        } catch (NumberFormatException e) {
+            // Invalid year format, return empty list
+            return Collections.emptyList();
+        }
+        
+        // Determine if this is the current term or a past term
+        // Check if there are any ENROLLED classes in ClassRoster for this term
+        // If yes, it's the current term - show only ENROLLED classes
+        // If no, it's a past term - show classes from UserClasses (historical data)
+        String checkCurrentTermSql =
+            "SELECT COUNT(*) > 0 AS hasEnrolled " +
+            "FROM class_roster cr " +
+            "JOIN classes c ON c.class_id = cr.class_id " +
+            "JOIN users u ON u.user_id = cr.user_id " +
+            "WHERE u.student_id = ? " +
+            "  AND c.semester = ? " +
+            "  AND c.academic_year = ? " +
+            "  AND cr.status = 'ENROLLED'";
+        
+        Boolean isCurrentTerm = safeQueryOne(() ->
+            jdbc.query(checkCurrentTermSql, rs -> {
+                if (rs.next()) {
+                    return rs.getBoolean("hasEnrolled");
+                }
+                return false;
+            }, studentId, semester, year)
         );
+        
+        if (isCurrentTerm != null && isCurrentTerm) {
+            // Current term: Show only ENROLLED classes from ClassRoster
+            String rosterSql =
+                "SELECT c.class_id AS classId, " +
+                "       c.department AS subject, " +
+                "       c.course_num AS courseNum, " +
+                "       c.section, " +
+                "       c.title, " +
+                "       COALESCE(c.schedule, c.lec_schedule) AS schedule, " +
+                "       c.location, " +
+                "       c.instructor, " +
+                "       COALESCE(c.max_credits, c.min_credits) AS credits " +
+                "FROM class_roster cr " +
+                "JOIN classes c ON c.class_id = cr.class_id " +
+                "JOIN users u ON u.user_id = cr.user_id " +
+                "WHERE u.student_id = ? " +
+                "  AND c.semester = ? " +
+                "  AND c.academic_year = ? " +
+                "  AND cr.status = 'ENROLLED' " +
+                "ORDER BY c.class_id";
+            
+            return safeQueryList(() ->
+                jdbc.query(rosterSql, (rs, rowNum) -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("classId", rs.getLong("classId"));
+                    m.put("subject", rs.getString("subject"));
+                    m.put("courseNum", readInt(rs, "courseNum"));
+                    m.put("section", rs.getString("section"));
+                    m.put("title", rs.getString("title"));
+                    m.put("schedule", rs.getString("schedule"));
+                    m.put("location", rs.getString("location"));
+                    m.put("instructor", rs.getString("instructor"));
+                    m.put("credits", readIntNullable(rs, "credits"));
+                    return m;
+                }, studentId, semester, year)
+            );
+        } else {
+            // Past term: Show classes from UserClasses (historical data)
+            String userClassesSql =
+                "SELECT DISTINCT " +
+                "       COALESCE(c.class_id, uc.class_id) AS classId, " +
+                "       COALESCE(c.department, uc.department) AS subject, " +
+                "       COALESCE(c.course_num, uc.course_num) AS courseNum, " +
+                "       COALESCE(c.section, uc.section) AS section, " +
+                "       COALESCE(c.title, CONCAT(uc.department, ' ', uc.course_num)) AS title, " +
+                "       COALESCE(c.schedule, c.lec_schedule, '') AS schedule, " +
+                "       COALESCE(c.location, '') AS location, " +
+                "       COALESCE(c.instructor, '') AS instructor, " +
+                "       COALESCE(c.max_credits, c.min_credits, uc.credits) AS credits " +
+                "FROM user_classes uc " +
+                "JOIN users u ON u.user_id = uc.user_id " +
+                "LEFT JOIN classes c ON c.class_id = uc.class_id " +
+                "WHERE u.student_id = ? " +
+                "  AND uc.semester = ? " +
+                "  AND uc.year = ? " +
+                "ORDER BY classId";
+            
+            return safeQueryList(() ->
+                jdbc.query(userClassesSql, (rs, rowNum) -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("classId", rs.getLong("classId"));
+                    m.put("subject", rs.getString("subject"));
+                    m.put("courseNum", readInt(rs, "courseNum"));
+                    m.put("section", rs.getString("section"));
+                    m.put("title", rs.getString("title"));
+                    m.put("schedule", rs.getString("schedule"));
+                    m.put("location", rs.getString("location"));
+                    m.put("instructor", rs.getString("instructor"));
+                    m.put("credits", readIntNullable(rs, "credits"));
+                    return m;
+                }, studentId, semester, year)
+            );
+        }
     }
 
     private List<Map<String, Object>> queryPlans(String studentId) {
