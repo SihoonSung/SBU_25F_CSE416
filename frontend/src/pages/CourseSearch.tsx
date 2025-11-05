@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement course search page with filtering and pagination
+ */
+
 import { useState, useEffect } from 'react'
 import './CourseSearch.css'
 

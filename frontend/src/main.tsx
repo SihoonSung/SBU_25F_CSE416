@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement React application entry point
+ */
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter} from 'react-router-dom' 

@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement roster viewing page for instructors
+ */
+
 import React, { useState, useEffect } from 'react';
 import './Roster.css';
 import { getCurrentUser } from '../utils/auth';

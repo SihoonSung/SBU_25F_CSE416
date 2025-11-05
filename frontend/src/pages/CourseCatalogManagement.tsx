@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement course catalog management page with scraping functionality
+ */
+
 import React, { useState, useEffect } from 'react';
 import './CourseCatalogManagement.css';
 

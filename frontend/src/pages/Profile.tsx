@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement comprehensive student profile page with academic information
+ */
+
 import { useEffect, useMemo, useState } from "react";
 
 /**

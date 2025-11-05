@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement main App component with routing
+ */
+
 import { Routes, Route, useLocation } from 'react-router-dom'
 import './App.css'
 import NavigationBar from './components/NavigationBar'

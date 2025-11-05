@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement degree audit page with GPA calculation and requirement tracking
+ */
+
 import { useEffect, useState } from 'react'
 import './DegreeAudit.css'
 import { getCurrentUser } from '../utils/auth'

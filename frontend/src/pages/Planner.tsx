@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement course planner page with semester planning functionality
+ */
+
 import { useMemo, useState } from 'react'
 import './Planner.css'
 

@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement advisor approval page for major/minor declarations and time conflict waivers
+ */
+
 import React, { useState, useEffect } from 'react';
 import './AdvisorApproval.css';
 

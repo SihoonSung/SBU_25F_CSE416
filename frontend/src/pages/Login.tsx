@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement login page with Google OAuth2 integration
+ */
+
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import './Login.css'

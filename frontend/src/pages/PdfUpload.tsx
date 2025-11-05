@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement PDF upload page for class management and capacity editing
+ */
+
 import { useState, useEffect } from 'react'
 import './PdfUpload.css'
 

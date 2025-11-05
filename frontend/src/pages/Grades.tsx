@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement grades management page for instructors
+ */
+
 import React, { useState, useEffect } from 'react';
 import './Grades.css';
 import { getCurrentUser } from '../utils/auth';

@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement degree requirements import page with YAML file upload
+ */
+
 import React, { useState } from 'react';
 import './DegreeRequirementsImport.css';
 

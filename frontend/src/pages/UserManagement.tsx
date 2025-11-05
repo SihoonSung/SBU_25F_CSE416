@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement user management page with search, filter, and import functionality
+ */
+
 import React, { useState, useEffect } from 'react';
 import './UserManagement.css';
 
