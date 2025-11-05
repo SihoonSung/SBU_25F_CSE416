@@ -147,12 +147,10 @@ function termKey(year: number, semester: TermRef["semester"]) {
   return `${year}-${semester}`;
 }
 function semesterOrder(sem: string) {
-  // Sort within the same year
   const order: Record<string, number> = { "Spring": 1, "SummerI": 2, "SummerII": 3, "Fall": 4 };
   return order[sem] ?? 0;
 }
 function computeGpaFromHistory(history: HistoricClass[]): GpaSummary {
-  // Aggregate by term
   const perTerm: Record<string, { qpts: number; cr: number }> = {};
   let cumQpts = 0;
   let cumCr = 0;
@@ -160,13 +158,10 @@ function computeGpaFromHistory(history: HistoricClass[]): GpaSummary {
   for (const c of history || []) {
     const grade = (c.grade || "").trim().toUpperCase();
     const credits = Number(c.credits) || 0;
-
-    // Include only courses with credits > 0, with letter grades we map, not GPNC, and not excluded codes.
     if (credits <= 0) continue;
     if (c.gpnc) continue;
     if (!grade || EXCLUDE_GRADES.has(grade)) continue;
 
-    // Normalize odd forms like "A " or "B+ "
     const mapped = GRADE_TO_POINTS[grade] ?? null;
     if (mapped == null) continue;
 
@@ -179,7 +174,6 @@ function computeGpaFromHistory(history: HistoricClass[]): GpaSummary {
     cumCr += credits;
   }
 
-  // Build terms array, sorted by recency (year desc, semester order desc)
   const terms: GpaTerm[] = Object.entries(perTerm)
     .map(([k, v]) => {
       const [y, s] = k.split("-");
@@ -187,7 +181,6 @@ function computeGpaFromHistory(history: HistoricClass[]): GpaSummary {
       return { term: `${s} ${y}`, gpa, credits: v.cr };
     })
     .sort((a, b) => {
-      // parse "Fall 2025"
       const [sa, ya] = a.term.split(" ");
       const [sb, yb] = b.term.split(" ");
       const yaN = parseInt(ya, 10);
@@ -201,7 +194,6 @@ function computeGpaFromHistory(history: HistoricClass[]): GpaSummary {
     credits: cumCr
   };
 
-  // Simple standing rule (customize if you want)
   const standing =
     cumulative.gpa == null ? "-" :
     cumulative.gpa >= 2.0 ? "Good Standing" : "Probation";
@@ -209,11 +201,159 @@ function computeGpaFromHistory(history: HistoricClass[]): GpaSummary {
   return { terms, cumulative, standing };
 }
 
+/** ===== Requirement normalizer & transformer ===== */
+// 응답 포맷이 배열/객체( data / items / requirements ) 등 다양한 경우를 흡수
+function normalizeReqs(raw: any): RequirementStatus[] {
+  if (!raw) return [];
+  const arr = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.items)
+    ? raw.items
+    : Array.isArray(raw?.data)
+    ? raw.data
+    : Array.isArray(raw?.requirements)
+    ? raw.requirements
+    : [];
+
+  return (arr as any[]).map((r) => {
+    // 상태 문자열 방어적 파싱
+    let status: RequirementStatus["status"] = "pending";
+    const s = (r.status || r.requirementStatus || "").toString().toLowerCase();
+    if (s.includes("sat") && !s.includes("un")) status = "satisfied";
+    else if (s.includes("unsat") || s === "no" || s === "false" || s === "not_satisfied") status = "unsatisfied";
+    else status = "pending";
+
+    const using =
+      r.usingClasses && Array.isArray(r.usingClasses)
+        ? r.usingClasses.map((c: any) => ({
+            subject: c.subject || c.department || "",
+            courseNum: Number(c.courseNum ?? c.course_num ?? 0),
+            term: c.term || c.termCode || undefined,
+            grade: c.grade ?? null,
+          }))
+        : [];
+
+    return {
+      area:
+        (r.area?.toUpperCase?.() as RequirementStatus["area"]) === "ADMISSION"
+          ? "ADMISSION"
+          : "DEGREE",
+      programCode: r.programCode ?? r.program ?? r.subjectCode ?? "-",
+      programName: r.programName ?? r.program ?? r.name ?? "-",
+      code: r.code ?? r.id ?? r.groupId ?? "-",
+      title: r.title ?? r.requirementTitle ?? r.groupType ?? "(no title)",
+      status,
+      usingClasses: using,
+      note: r.note ?? r.message ?? null,
+    } satisfies RequirementStatus;
+  });
+}
+
+// DegreeRequirementStatusService 응답을 RequirementStatus[]로 변환
+function transformFromStatus(statusData: any): RequirementStatus[] {
+  if (!statusData) return [];
+  const out: RequirementStatus[] = [];
+
+  // majors
+  if (Array.isArray(statusData.declaredMajors)) {
+    for (const major of statusData.declaredMajors) {
+      const subjectCode = major.subjectCode || "";
+      const degreeType = major.degreeType || "";
+      const programName = `${subjectCode} ${degreeType}`.trim();
+
+      if (Array.isArray(major.groups)) {
+        for (const g of major.groups) {
+          const stat: RequirementStatus["status"] =
+            g.status === "SATISFIED" ? "satisfied" :
+            g.status === "NOT_SATISFIED" ? "unsatisfied" : "pending";
+
+          const using = Array.isArray(g.satisfiedCourses)
+            ? g.satisfiedCourses.map((c: any) => ({
+                subject: c.subject || c.department || "",
+                courseNum: Number(c.courseNum ?? c.course_num ?? 0),
+                term: c.term || c.termCode || undefined,
+                grade: c.grade ?? null,
+              }))
+            : [];
+
+          out.push({
+            area: "DEGREE",
+            programCode: subjectCode || "-",
+            programName,
+            code: g.groupId ?? g.id ?? `${subjectCode}-${g.groupType || "GROUP"}`,
+            title: g.groupType ? `${g.groupType}` : "Requirement Group",
+            status: stat,
+            usingClasses: using,
+            note: g.message || (g.creditsRequired ? `Credits: ${g.creditsSatisfied || 0}/${g.creditsRequired}` : null),
+          });
+        }
+      }
+
+      // 전체 요약을 하나의 레코드로 표시(선택)
+      if (major.overallStatus) {
+        out.push({
+          area: "DEGREE",
+          programCode: subjectCode || "-",
+          programName,
+          code: `${subjectCode}-OVERALL`,
+          title: `Overall ${programName} Requirements`,
+          status:
+            major.overallStatus === "SATISFIED"
+              ? "satisfied"
+              : major.overallStatus === "IN_PROGRESS"
+              ? "pending"
+              : "unsatisfied",
+          usingClasses: [],
+          note: `Progress: ${major.satisfiedGroups || 0}/${major.totalGroups || 0} groups satisfied`,
+        });
+      }
+    }
+  }
+
+  // minors
+  if (Array.isArray(statusData.declaredMinors)) {
+    for (const minor of statusData.declaredMinors) {
+      const subjectCode = minor.subjectCode || "";
+      const programName = `${subjectCode} MINOR`.trim();
+
+      if (Array.isArray(minor.groups)) {
+        for (const g of minor.groups) {
+          const stat: RequirementStatus["status"] =
+            g.status === "SATISFIED" ? "satisfied" :
+            g.status === "NOT_SATISFIED" ? "unsatisfied" : "pending";
+
+          const using = Array.isArray(g.satisfiedCourses)
+            ? g.satisfiedCourses.map((c: any) => ({
+                subject: c.subject || c.department || "",
+                courseNum: Number(c.courseNum ?? c.course_num ?? 0),
+                term: c.term || c.termCode || undefined,
+                grade: c.grade ?? null,
+              }))
+            : [];
+
+          out.push({
+            area: "DEGREE",
+            programCode: subjectCode || "-",
+            programName,
+            code: `${subjectCode}-MINOR-${g.groupId ?? g.id ?? "GROUP"}`,
+            title: g.groupType ? `${g.groupType}` : "Requirement Group",
+            status: stat,
+            usingClasses: using,
+            note: g.message ?? null,
+          });
+        }
+      }
+    }
+  }
+
+  return out;
+}
+
 /** ===== Component ===== */
 export default function ProfilePage() {
   /** ===== Common fetch ===== */
   const safeFetch = useMemo(
-    () => async (input: RequestInfo, init?: RequestInit) => {
+    () => async (input: RequestInfo | URL, init?: RequestInit) => {
       const res = await fetch(input, { credentials: "include", ...init });
       const text = await res.text();
       const data = text ? JSON.parse(text) : null;
@@ -228,7 +368,7 @@ export default function ProfilePage() {
 
   /** ===== Who am I ===== */
   const [me, setMe] = useState<CurrentUserInfo | null>(null);
-  const [myPerson, setMyPerson] = useState<PersonBasic | null>(null); // non-student compatible info (from YAML/DB)
+  const [myPerson, setMyPerson] = useState<PersonBasic | null>(null);
   const [myIsStudent, setMyIsStudent] = useState<boolean>(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
@@ -237,7 +377,6 @@ export default function ProfilePage() {
   const [availableTerms, setAvailableTerms] = useState<string[]>([]);
   const [myProfile, setMyProfile] = useState<StudentProfile | null>(null);
   const [myDetails, setMyDetails] = useState<FullStudentDetails | null>(null);
-  // NOTE: summary will now be computed from classHistory; we keep state but won't fetch it.
   const [mySummary, setMySummary] = useState<GpaSummary | null>(null);
   const [mySchedule, setMySchedule] = useState<ScheduleClass[]>([]);
   const [myPlans, setMyPlans] = useState<PlannedProgram[]>([]);
@@ -252,10 +391,10 @@ export default function ProfilePage() {
 
   /** ===== Target student bundle (via search) ===== */
   const [targetSid, setTargetSid] = useState<string | null>(null);
-  const [term, setTerm] = useState<string>("2025-Fall"); // target term
+  const [term, setTerm] = useState<string>("2025-Fall");
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [details, setDetails] = useState<FullStudentDetails | null>(null);
-  const [summary, setSummary] = useState<GpaSummary | null>(null); // computed from classHistory
+  const [summary, setSummary] = useState<GpaSummary | null>(null);
   const [schedule, setSchedule] = useState<ScheduleClass[]>([]);
   const [plans, setPlans] = useState<PlannedProgram[]>([]);
   const [admissionReqs, setAdmissionReqs] = useState<RequirementStatus[]>([]);
@@ -308,12 +447,34 @@ export default function ProfilePage() {
     },
   };
 
-  /** ===== Initial load - Modified: Get myPerson from database ===== */
+  /** ===== Upload YAML ===== */
+  async function onUploadYaml(file: File | null) {
+    if (!file) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const result = await safeFetch(`${BASE}/api/admin/academic-calendar/import`, { method: "POST", body: fd });
+      setMsg(
+        `Imported: ${result.imported} (skipped ${result.skipped})${
+          result.errors?.length ? "\nErrors:\n- " + result.errors.join("\n- ") : ""
+        }`
+      );
+      const ev = await safeFetch(`${BASE}/api/admin/academic-calendar`);
+      setEvents(Array.isArray(ev) ? ev : []);
+    } catch (e: any) {
+      setMsg(`Upload failed: ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** ===== Initial load ===== */
   useEffect(() => {
     (async () => {
       setMsg(null);
       try {
-        // 1) Login/authorization
         const whoRaw = await safeFetch(`${BASE}/api/auth/me`, {
           headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
         });
@@ -321,14 +482,9 @@ export default function ProfilePage() {
         const authRoles =
           Array.isArray(whoRaw?.roles) && whoRaw.roles.length
             ? whoRaw.roles
-            : (whoRaw?.user?.role
-                ? [String(whoRaw.user.role).toUpperCase()]
-                : []);
+            : (whoRaw?.user?.role ? [String(whoRaw.user.role).toUpperCase()] : []);
 
-        setMe({
-          netId: whoRaw?.netId ?? "",
-          roles: authRoles as Role[],
-        });
+        setMe({ netId: whoRaw?.netId ?? "", roles: authRoles as Role[] });
 
         const userId = whoRaw?.user?.userId || whoRaw?.userId || null;
         setCurrentUserId(userId);
@@ -336,20 +492,18 @@ export default function ProfilePage() {
         const isStudent = authRoles.includes("STUDENT" as Role);
         setMyIsStudent(isStudent);
 
-        // 2) Person for My Account display (from DB)
         const personRaw = await safeFetch(`${BASE}/api/profile/person/me`).catch(() => null);
         const person = personRaw
           ? { ...personRaw, role: personRaw.role ? String(personRaw.role).toLowerCase() : "unknown" }
           : null;
         setMyPerson(person as PersonBasic | null);
 
-        // 3) Student bundle
         if (isStudent && person && (person.sbuId || (person as any).studentId)) {
           const sid = (person as any).studentId ?? person.sbuId!;
           await loadStudentBundle(sid, myTerm, {
             setProfile: setMyProfile,
             setDetails: setMyDetails,
-            setSummary: setMySummary, // will be computed after history arrives
+            setSummary: setMySummary,
             setSchedule: setMySchedule,
             setPlans: setMyPlans,
             setAdmissionReqs: setMyAdmissionReqs,
@@ -363,7 +517,6 @@ export default function ProfilePage() {
           });
         }
 
-        // 4) Admin utilities and available terms
         const [ev, now, termsData] = await Promise.all([
           safeFetch(`${BASE}/api/admin/academic-calendar`).catch(() => []),
           safeFetch(`${BASE}/api/admin/system-date`).catch(() => null),
@@ -416,14 +569,12 @@ export default function ProfilePage() {
         const termYear = termParts.length === 2 ? parseInt(termParts[0]) : null;
         const termSemester = termParts.length === 2 ? termParts[1] : null;
         
-        // Try original schedule API first
         const sched = await safeFetch(
           `${buildSidPrefix(myProfile.studentId)}/schedule?term=${encodeURIComponent(myTerm)}`
         ).catch(() => []);
         
         let scheduleData: ScheduleClass[] = Array.isArray(sched) ? (sched as ScheduleClass[]) : [];
         
-        // If empty, try roster API
         if (scheduleData.length === 0 && currentUserId && termYear && termSemester) {
           try {
             const rosterData = await safeFetch(`${BASE}/api/roster/student/${currentUserId}`).catch(() => []);
@@ -483,7 +634,7 @@ export default function ProfilePage() {
     sinks: {
       setProfile: (v: StudentProfile | null) => void;
       setDetails: (v: FullStudentDetails | null) => void;
-      setSummary: (v: GpaSummary | null) => void; // will be set from classHistory
+      setSummary: (v: GpaSummary | null) => void;
       setSchedule: (v: ScheduleClass[]) => void;
       setPlans: (v: PlannedProgram[]) => void;
       setAdmissionReqs: (v: RequirementStatus[]) => void;
@@ -522,19 +673,18 @@ export default function ProfilePage() {
 
     const prefix = buildSidPrefix(theSid!);
 
-    // Parse term
     const termParts = t.split('-');
     const termYear = termParts.length === 2 ? parseInt(termParts[0]) : null;
     const termSemester = termParts.length === 2 ? termParts[1] : null;
 
-    // NOTE: removed backend /gpa call; GPA is computed from classes below
-    const [p, d, schedOld, planList, adm, deg, hOld, w, log, trOld, chOld, cpOld] = await Promise.all([
+    // NOTE: no backend /gpa call; GPA computed later from classes
+    const [p, d, schedOld, planList, admRaw, degRaw, hOld, w, log, trOld, chOld, cpOld] = await Promise.all([
       sid ? safeFetch(`${prefix}`).catch(() => null) : Promise.resolve(null),
       safeFetch(`${prefix}/details`).catch(() => null),
       safeFetch(`${prefix}/schedule?term=${encodeURIComponent(t)}`).catch(() => []),
       safeFetch(`${prefix}/plans`).catch(() => []),
-      safeFetch(`${prefix}/requirements/admission`).catch(() => []),
-      safeFetch(`${prefix}/requirements/degree`).catch(() => []),
+      safeFetch(`${prefix}/requirements/admission`).catch(() => []), // admission reqs
+      safeFetch(`${prefix}/requirements/degree`).catch(() => []),    // degree reqs
       safeFetch(`${prefix}/holds`).catch(() => []),
       safeFetch(`${prefix}/waivers/time-conflicts`).catch(() => []),
       safeFetch(`${prefix}/audit-log`).catch(() => []),
@@ -543,13 +693,12 @@ export default function ProfilePage() {
       safeFetch(`${prefix}/course-plan`).catch(() => []),
     ]);
 
-    // Get userId for additional API calls
     let userId: number | null = null;
     if (p && (p as any).id) {
       userId = (p as any).id;
     }
 
-    // Holds with RegistrationHoldController (more reliable)
+    // Holds best-effort
     let h: Hold[] = [];
     if (userId) {
       try {
@@ -568,8 +717,7 @@ export default function ProfilePage() {
         } else if (Array.isArray(hOld) && hOld.length > 0) {
           h = hOld as Hold[];
         }
-      } catch (error) {
-        console.error('Error fetching holds from /api/holds/student:', error);
+      } catch {
         if (Array.isArray(hOld) && hOld.length > 0) {
           h = hOld as Hold[];
         }
@@ -578,7 +726,6 @@ export default function ProfilePage() {
       h = hOld as Hold[];
     }
 
-    // Transfers / Course plan / Class history (fallback via users APIs if needed)
     let tr = trOld;
     let ch = chOld;
     let cp = cpOld;
@@ -596,9 +743,7 @@ export default function ProfilePage() {
             grade: item.grade || null
           }));
         }
-      } catch (e) {
-        console.error('Error fetching transfer courses:', e);
-      }
+      } catch {}
     }
 
     if (userId && (!cp || (Array.isArray(cp) && cp.length === 0))) {
@@ -613,9 +758,7 @@ export default function ProfilePage() {
             credits: item.credits || 0
           }));
         }
-      } catch (e) {
-        console.error('Error fetching course plan:', e);
-      }
+      } catch {}
     }
 
     if (userId && (!ch || (Array.isArray(ch) && ch.length === 0))) {
@@ -652,20 +795,13 @@ export default function ProfilePage() {
             gpnc: false
           }));
         }
-      } catch (e) {
-        console.error('Error fetching class history:', e);
-      }
+      } catch {}
     } else {
-      // Ensure gpnc is boolean if coming from older API
       if (Array.isArray(ch)) {
-        ch = ch.map((item: any) => ({
-          ...item,
-          gpnc: !!item.gpnc
-        }));
+        ch = ch.map((item: any) => ({ ...item, gpnc: !!item.gpnc }));
       }
     }
 
-    // Process schedule with roster fallback
     let sched: ScheduleClass[] = Array.isArray(schedOld) ? (schedOld as ScheduleClass[]) : [];
     if (sched.length === 0 && termYear && termSemester) {
       try {
@@ -696,17 +832,33 @@ export default function ProfilePage() {
           }
         }
       } catch (e) {
-        console.error('[Profile] Error fetching roster data:', e);
+        console.error('[Profile] roster fallback error:', e);
+      }
+    }
+
+    // === Normalization & Fallback (핵심) ===
+    const normalizedAdm = normalizeReqs(admRaw);
+    let normalizedDeg = normalizeReqs(degRaw);
+
+    // degree reqs가 비어오면 동적 계산 API로 fallback
+    if ((!normalizedDeg || normalizedDeg.length === 0) && userId) {
+      try {
+        const statusData = await safeFetch(`${BASE}/api/degree-requirements-status/student/${userId}`).catch(() => null);
+        const transformed = transformFromStatus(statusData);
+        if (transformed.length > 0) {
+          normalizedDeg = transformed;
+        }
+      } catch (e) {
+        // 무시하고 빈 배열 유지
       }
     }
 
     if (sid) sinks.setProfile(p as StudentProfile | null);
     sinks.setDetails(d as FullStudentDetails | null);
-    // sinks.setSummary(...) — DO NOT set from backend; will compute from class history
     sinks.setSchedule(Array.isArray(sched) ? (sched as ScheduleClass[]) : []);
     sinks.setPlans(Array.isArray(planList) ? (planList as PlannedProgram[]) : []);
-    sinks.setAdmissionReqs(Array.isArray(adm) ? (adm as RequirementStatus[]) : []);
-    sinks.setDegreeReqs(Array.isArray(deg) ? (deg as RequirementStatus[]) : []);
+    sinks.setAdmissionReqs(normalizedAdm);
+    sinks.setDegreeReqs(normalizedDeg);
     sinks.setHolds(Array.isArray(h) ? (h as Hold[]) : []);
     sinks.setWaived(Array.isArray(w) ? (w as TimeConflictWaiver[]) : []);
     sinks.setAudit(Array.isArray(log) ? (log as AuditLogEntry[]) : []);
@@ -765,7 +917,7 @@ export default function ProfilePage() {
     await loadStudentBundle(searchResult.studentId, term, {
       setProfile,
       setDetails,
-      setSummary, // computed later
+      setSummary,
       setSchedule,
       setPlans,
       setAdmissionReqs,
@@ -813,8 +965,8 @@ export default function ProfilePage() {
     }
   };
 
-  /** ===== Render - Modified: Added My Account UI fields and removed NetID ===== */
   const isAdvisorOrRegistrar = (me?.roles || []).some(r => r === 'ADVISOR' || r === 'REGISTRAR');
+
   return (
     <div style={{ maxWidth: 1200, margin: "24px auto", padding: "0 16px" }}>
       <h1 style={{ marginBottom: 8 }}>Account & Student Profiles</h1>
@@ -828,7 +980,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* ===== Panel 1: My Account (works for any role; DB-backed) ===== */}
+      {/* ===== Panel 1: My Account ===== */}
       <section style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
         <h2 style={{ marginTop: 0 }}>My Account</h2>
         {!me && !myPerson ? (
@@ -903,7 +1055,7 @@ export default function ProfilePage() {
         )}
       </section>
 
-      {/* ===== Registration Status Summary (Holds & Waivers) ===== */}
+      {/* ===== Registration Status Summary ===== */}
       {myIsStudent && (
         <section style={{ border: "1px solid #e0f0ff", background: "#f0f5ff", borderRadius: 12, padding: 16, marginTop: 16 }}>
           <h3 style={{ marginTop: 0 }}>Registration Status Summary</h3>
@@ -925,7 +1077,7 @@ export default function ProfilePage() {
         </section>
       )}
 
-      {/* ===== Panel 2: My Student Profile (only if STUDENT) ===== */}
+      {/* ===== Panel 2: My Student Profile ===== */}
       {myIsStudent && (
         <StudentBundleView
           title="My Student Profile"
@@ -935,7 +1087,7 @@ export default function ProfilePage() {
           profile={myProfile}
           details={myDetails}
           plans={myPlans}
-          summary={mySummary}             // computed from history
+          summary={mySummary}
           schedule={mySchedule}
           admissionReqs={myAdmissionReqs}
           degreeReqs={myDegreeReqs}
@@ -991,7 +1143,7 @@ export default function ProfilePage() {
         />
       )}
 
-      {/* ===== Panel 3: Student Search & Target Profile (advisor/registrar) ===== */}
+      {/* ===== Panel 3: Student Search & Target Profile ===== */}
       {isAdvisorOrRegistrar && (
       <section style={{ background: "#f0f5ff", border: "1px solid #adc6ff", borderRadius: 12, padding: 16, marginTop: 16 }}>
         <h2 style={{ marginTop: 0 }}>Find a Student</h2>
@@ -1035,7 +1187,7 @@ export default function ProfilePage() {
         profile={profile}
         details={details}
         plans={plans}
-        summary={summary}               // computed from history
+        summary={summary}
         schedule={schedule}
         admissionReqs={admissionReqs}
         degreeReqs={degreeReqs}
@@ -1090,7 +1242,7 @@ export default function ProfilePage() {
         }}
       />)}
 
-      {/* ===== Admin: Academic calendar + system date (optional) ===== */}
+      {/* ===== Admin: Academic calendar ===== */}
       {isAdvisorOrRegistrar && (
       <section style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
         <h2 style={{ marginTop: 0 }}>Academic Calendar Import (YAML)</h2>
@@ -1126,29 +1278,6 @@ export default function ProfilePage() {
       )}
     </div>
   );
-
-  /** ===== Upload YAML ===== */
-  async function onUploadYaml(file: File | null) {
-    if (!file) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const result = await safeFetch(`${BASE}/api/admin/academic-calendar/import`, { method: "POST", body: fd });
-      setMsg(
-        `Imported: ${result.imported} (skipped ${result.skipped})${
-          result.errors?.length ? "\nErrors:\n- " + result.errors.join("\n- ") : ""
-        }`
-      );
-      const ev = await safeFetch(`${BASE}/api/admin/academic-calendar`);
-      setEvents(Array.isArray(ev) ? ev : []);
-    } catch (e: any) {
-      setMsg(`Upload failed: ${e.message}`);
-    } finally {
-      setBusy(false);
-    }
-  }
 }
 
 /** ===== Reusable bundle viewer ===== */
@@ -1160,7 +1289,7 @@ function StudentBundleView(props: {
   profile: StudentProfile | null;
   details: FullStudentDetails | null;
   plans: PlannedProgram[];
-  summary: GpaSummary | null;              // now computed on client
+  summary: GpaSummary | null;
   schedule: ScheduleClass[];
   admissionReqs: RequirementStatus[];
   degreeReqs: RequirementStatus[];
@@ -1211,27 +1340,30 @@ function StudentBundleView(props: {
   } = props;
 
   const backendBase = BASE;
-
-  // Compute local GPA summary from classHistory (defensive: prefer prop if provided)
   const localSummary: GpaSummary = summary ?? computeGpaFromHistory(classHistory || []);
 
-  // Hold management state
+  // Hold management
   const [showHoldModal, setShowHoldModal] = useState(false);
   const [holdType, setHoldType] = useState<'ACADEMIC_ADVISING' | 'FINANCIAL'>('ACADEMIC_ADVISING');
   const [holdReason, setHoldReason] = useState('');
   const [holdLoading, setHoldLoading] = useState(false);
   
-  // Drop class state
+  // Drop class
   const [droppingClassId, setDroppingClassId] = useState<number | null>(null);
 
-  // Create hold
+  // Filters for requirement tables
+  const [admFilter, setAdmFilter] = useState<'all'|'satisfied'|'pending'|'unsatisfied'>('all');
+  const [degFilter, setDegFilter] = useState<'all'|'satisfied'|'pending'|'unsatisfied'>('all');
+
+  const filteredAdmission = admissionReqs.filter(r => admFilter==='all' ? true : r.status===admFilter);
+  const filteredDegree = degreeReqs.filter(r => degFilter==='all' ? true : r.status===degFilter);
+
   const handleCreateHold = async () => {
     if (!studentId || !currentUserId) {
       alert('Student ID or current user ID is missing');
       return;
     }
 
-    // Convert studentId to userId
     let studentUserId: number | null = null;
     try {
       const studentRes = await fetch(`${backendBase}/api/profile/student-id/${studentId}`, { credentials: 'include' });
@@ -1278,7 +1410,6 @@ function StudentBundleView(props: {
     }
   };
 
-  // Drop class
   const handleDropClass = async (classId: number) => {
     if (!currentUserId) {
       alert('User ID not available. Please refresh the page.');
@@ -1311,15 +1442,9 @@ function StudentBundleView(props: {
     }
   };
   
-  // Remove hold
   const handleRemoveHold = async (holdId: number) => {
-    if (!currentUserId) {
-      alert('Current user ID is missing');
-      return;
-    }
-    if (!confirm('Are you sure you want to remove this hold?')) {
-      return;
-    }
+    if (!currentUserId) return;
+    if (!confirm('Are you sure you want to remove this hold?')) return;
     try {
       const response = await fetch(`${backendBase}/api/holds/${holdId}?removedById=${currentUserId}`, {
         method: 'DELETE',
@@ -1457,7 +1582,7 @@ function StudentBundleView(props: {
             </section>
           )}
 
-          {/* Programs */}
+          {/* Programs + Requirements */}
           <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Programs (Declared & Planned)</h3>
             {plans.length === 0 ? (
@@ -1485,18 +1610,46 @@ function StudentBundleView(props: {
 
             {/* Admission Requirements */}
             <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
-              <h3 style={{ marginTop: 0 }}>Admission Requirements</h3>
-              <ReqTable data={admissionReqs} />
+              <h3 style={{ marginTop: 0 }}>
+                Admission Requirements{" "}
+                <span style={{ fontSize: 12, color: "#888", marginLeft: 8 }}>
+                  ({admissionReqs.length})
+                </span>
+              </h3>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <label style={{ fontSize: 12, color: '#666' }}>Filter</label>
+                <select value={admFilter} onChange={e=>setAdmFilter(e.target.value as any)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #ddd' }}>
+                  <option value="all">All</option>
+                  <option value="satisfied">Satisfied</option>
+                  <option value="pending">Pending</option>
+                  <option value="unsatisfied">Unsatisfied</option>
+                </select>
+              </div>
+              <ReqTable data={admissionReqs.filter(r => admFilter==='all' ? true : r.status===admFilter)} />
             </section>
 
             {/* Degree Requirements */}
             <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
-              <h3 style={{ marginTop: 0 }}>Degree Requirements</h3>
-              <ReqTable data={degreeReqs} />
+              <h3 style={{ marginTop: 0 }}>
+                Degree Requirements{" "}
+                <span style={{ fontSize: 12, color: "#888", marginLeft: 8 }}>
+                  ({degreeReqs.length})
+                </span>
+              </h3>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <label style={{ fontSize: 12, color: '#666' }}>Filter</label>
+                <select value={degFilter} onChange={e=>setDegFilter(e.target.value as any)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #ddd' }}>
+                  <option value="all">All</option>
+                  <option value="satisfied">Satisfied</option>
+                  <option value="pending">Pending</option>
+                  <option value="unsatisfied">Unsatisfied</option>
+                </select>
+              </div>
+              <ReqTable data={degreeReqs.filter(r => degFilter==='all' ? true : r.status===degFilter)} />
             </section>
           </section>
 
-          {/* Academic Summary — GPA computed from classHistory */}
+          {/* Academic Summary — GPA */}
           <section style={{ background: "#f6ffed", border: "1px solid #b7eb8f", borderRadius: 12, padding: 16, marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Academic Summary</h3>
             {!localSummary ? (
@@ -1540,10 +1693,10 @@ function StudentBundleView(props: {
                   ))
                 ) : (
                   <>
-                    <option value="2026-Spring">2026-Spring</option>
-                    <option value="2025-Fall">2025-Fall</option>
-                    <option value="2025-Spring">2025-Spring</option>
-                    <option value="2024-Fall">2024-Fall</option>
+                      <option value="2026-Spring">2026-Spring</option>
+                      <option value="2025-Fall">2025-Fall</option>
+                      <option value="2025-Spring">2025-Spring</option>
+                      <option value="2024-Fall">2024-Fall</option>
                   </>
                 )}
               </select>
@@ -1829,7 +1982,6 @@ function StudentBundleView(props: {
           </section>
 
           {/* Audit Log */}
-          {/* NOTE: the JSX comment must be wrapped like this */}
           <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Audit Log</h3>
             {audit.length === 0 ? (
@@ -1862,9 +2014,34 @@ function StudentBundleView(props: {
 /** ===== Requirement table (reused) ===== */
 function ReqTable({ data }: { data: RequirementStatus[] }) {
   if (!data || data.length === 0) return <div>No requirements.</div>;
+
+  const badge = (s: RequirementStatus["status"]) => {
+    const map: Record<string, string> = {
+      satisfied: '#52c41a',
+      pending: '#faad14',
+      unsatisfied: '#ff4d4f'
+    };
+    const bg = map[s] || '#d9d9d9';
+    return (
+      <span style={{
+        background: bg, color: 'white', padding: '2px 8px',
+        borderRadius: 12, fontSize: 12, fontWeight: 600, textTransform: 'capitalize'
+      }}>
+        {s}
+      </span>
+    );
+  };
+
+  const renderUsing = (r: RequirementStatus) => {
+    if (!r.usingClasses || r.usingClasses.length === 0) return '-';
+    return r.usingClasses
+      .map(c => `${c.subject} ${c.courseNum}${c.term ? ` (${c.term}${c.grade ? ` ${c.grade}` : ""})` : ""}`)
+      .join(", ");
+  };
+
   return (
     <div style={{ border: "1px solid #eee", borderRadius: 8, overflow: "hidden" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "140px 140px 1fr 120px 1fr", background: "#fafafa", fontWeight: 600, padding: "8px 12px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "160px 140px 1fr 140px 1fr", background: "#fafafa", fontWeight: 600, padding: "8px 12px" }}>
         <div>Program</div>
         <div>Req Code</div>
         <div>Title</div>
@@ -1872,16 +2049,15 @@ function ReqTable({ data }: { data: RequirementStatus[] }) {
         <div>Using Classes</div>
       </div>
       {data.map((r, i) => (
-        <div key={`${r.programCode}-${r.code}-${i}`} style={{ display: "grid", gridTemplateColumns: "140px 140px 1fr 120px 1fr", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
+        <div key={`${r.programCode}-${r.code}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 140px 1fr 140px 1fr", padding: "8px 12px", borderTop: "1px solid #f0f0f0", alignItems: 'center' }}>
           <div>{r.programCode}</div>
           <div>{r.code}</div>
-          <div>{r.title}</div>
-          <div style={{ textTransform: "capitalize" }}>{r.status}</div>
-          <div style={{ fontSize: 13, color: "#666" }}>
-            {r.usingClasses && r.usingClasses.length
-              ? r.usingClasses.map((c) => `${c.subject} ${c.courseNum}${c.term ? ` (${c.term}${c.grade ? ` ${c.grade}` : ""})` : ""}`).join(", ")
-              : "-"}
+          <div>
+            <div style={{ fontWeight: 600 }}>{r.title}</div>
+            {r.note && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{r.note}</div>}
           </div>
+          <div>{badge(r.status)}</div>
+          <div style={{ fontSize: 13, color: "#666" }}>{renderUsing(r)}</div>
         </div>
       ))}
     </div>
