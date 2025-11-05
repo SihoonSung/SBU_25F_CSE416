@@ -545,4 +545,51 @@ public class MajorMinorDeclarationController {
             ));
         }
     }
+    
+    /**
+     * Get all available terms from academic calendar
+     */
+    @GetMapping("/available-terms")
+    public ResponseEntity<Map<String, Object>> getAvailableTerms() {
+        try {
+            List<Map<String, Object>> terms = declarationService.getAvailableTermsFromCalendar();
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "terms", terms
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to retrieve available terms: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Get declaration dates (begin and end) for a specific term
+     */
+    @GetMapping("/declaration-dates/{semester}/{year}")
+    public ResponseEntity<Map<String, Object>> getDeclarationDates(
+            @PathVariable String semester,
+            @PathVariable Integer year) {
+        try {
+            java.util.Optional<java.time.LocalDate> beginDate = declarationService.getMajorMinorChangesBegin(semester, year);
+            java.util.Optional<java.time.LocalDate> endDate = declarationService.getMajorMinorChangesEnd(semester, year);
+            
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("success", true);
+            response.put("semester", semester);
+            response.put("year", year);
+            response.put("beginDate", beginDate.orElse(null));
+            response.put("endDate", endDate.orElse(null));
+            response.put("hasPeriod", beginDate.isPresent() && endDate.isPresent());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to retrieve declaration dates: " + e.getMessage()
+            ));
+        }
+    }
 }

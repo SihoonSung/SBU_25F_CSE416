@@ -100,22 +100,70 @@ public class AcademicCalendarService {
                             String dateStr = String.valueOf(entry.getValue());
                             LocalDate date = parseIsoDate(dateStr);
 
-                            AcademicEvent ev = new AcademicEvent();
-                            ev.setDate(date);
-                            ev.setTitle(title);
-                            ev.setType("DEADLINE");
-                            // Set term information if available
-                            if (semester != null) {
-                                ev.setSemester(semester);
-                            }
+                            // Validate date against term year if term information is available
                             if (year != null) {
-                                ev.setYear(year);
+                                int dateYear = date.getYear();
+                                // Check if date year is significantly different from term year
+                                // (more than 1 year difference suggests placeholder data)
+                                int yearDiff = Math.abs(dateYear - year);
+                                if (yearDiff > 1) {
+                                    String warning = String.format(
+                                        "Warning: Date '%s' for '%s' (year: %d) does not match term year (%s %d). " +
+                                        "This might be placeholder data.",
+                                        dateStr, rawKey, dateYear, semester != null ? semester : "unknown", year
+                                    );
+                                    errors.add(warning);
+                                    System.err.println("[AcademicCalendarService] " + warning);
+                                    // Still import it, but with warning
+                                }
+                            }
+
+                            // Check if event with same title, semester, and year already exists
+                            AcademicEvent ev;
+                            if (semester != null && year != null) {
+                                Optional<AcademicEvent> existingEvent = repo.findByTitleAndSemesterAndYear(title, semester, year);
+                                if (existingEvent.isPresent()) {
+                                    // Update existing event
+                                    ev = existingEvent.get();
+                                    ev.setDate(date);
+                                    ev.setType("DEADLINE");
+                                } else {
+                                    // Create new event
+                                    ev = new AcademicEvent();
+                                    ev.setDate(date);
+                                    ev.setTitle(title);
+                                    ev.setType("DEADLINE");
+                                    ev.setSemester(semester);
+                                    ev.setYear(year);
+                                }
+                            } else {
+                                // No term information, create new event
+                                ev = new AcademicEvent();
+                                ev.setDate(date);
+                                ev.setTitle(title);
+                                ev.setType("DEADLINE");
+                                if (semester != null) {
+                                    ev.setSemester(semester);
+                                }
+                                if (year != null) {
+                                    ev.setYear(year);
+                                }
                             }
                             repo.save(ev);
                             imported++;
                         } catch (Exception ex) {
                             skipped++;
-                            errors.add("Key " + entry.getKey() + ": " + ex.getMessage());
+                            String errorMsg = String.format(
+                                "Failed to import '%s' (date: %s, term: %s %s): %s",
+                                rawKey,
+                                entry.getValue(),
+                                semester != null ? semester : "unknown",
+                                year != null ? year : "unknown",
+                                ex.getMessage()
+                            );
+                            errors.add(errorMsg);
+                            // Log to console for debugging
+                            System.err.println("[AcademicCalendarService] " + errorMsg);
                         }
                     }
                 } else if (calendar instanceof List<?> calList) {
@@ -194,12 +242,45 @@ public class AcademicCalendarService {
         return s;
     }
 
-    // TP: Used cursor to parse ISO date string (yyyy-MM-dd)
+    // TP: Used cursor to parse ISO date string (yyyy-MM-dd) with automatic correction
     private static LocalDate parseIsoDate(String s) {
         try {
             return LocalDate.parse(s);
         } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("Invalid date (expected yyyy-MM-dd): " + s);
+            // Try to auto-correct invalid dates (e.g., 2025-02-31 -> 2025-02-28)
+            try {
+                String[] parts = s.split("-");
+                if (parts.length == 3) {
+                    int year = Integer.parseInt(parts[0]);
+                    int month = Integer.parseInt(parts[1]);
+                    int day = Integer.parseInt(parts[2]);
+                    
+                    // If day is greater than expected for the month, adjust to last day of month
+                    if (day > 28) {
+                        // Try to create date with last day of month
+                        LocalDate lastDayOfMonth = LocalDate.of(year, month, 1)
+                            .withDayOfMonth(LocalDate.of(year, month, 1).lengthOfMonth());
+                        
+                        // Log the correction
+                        System.out.printf(
+                            "[AcademicCalendarService] Auto-corrected invalid date '%s' to '%s' (last day of month)%n",
+                            s, lastDayOfMonth
+                        );
+                        
+                        return lastDayOfMonth;
+                    }
+                }
+            } catch (Exception correctionException) {
+                // If correction fails, throw original error
+            }
+            
+            // Provide more helpful error message for invalid dates
+            String errorMsg = String.format(
+                "Invalid date '%s' (expected yyyy-MM-dd format, e.g., 2025-03-30). " +
+                "Note: Dates like 2025-02-31 are invalid because February only has 28/29 days.",
+                s
+            );
+            throw new IllegalArgumentException(errorMsg);
         }
     }
 

@@ -332,7 +332,220 @@ public class MajorMinorDeclarationService {
     }
     
     /**
-     * Validate academic calendar dates dynamically from AcademicEvents
+     * Registrar-style interpretation:
+     * The declaration BEGIN date for a given term is recorded in the PREVIOUS term's section.
+     * Example: Spring 2025 begin is stored under Fall 2024.
+     */
+    public Optional<LocalDate> getMajorMinorChangesBegin(String semester, Integer year) {
+        String[] possibleTitles = {
+            "Major And Minor Changes Begin",
+            "major_and_minor_changes_begin",
+            "Major Minor Changes Begin",
+            "Declaration Period Begin"
+        };
+
+        // Look ONLY in the PREVIOUS term's section
+        java.util.Map<String, Object> prevTerm = getPreviousTerm(semester, year);
+        String prevSemester = (String) prevTerm.get("semester");
+        Integer prevYear = (Integer) prevTerm.get("year");
+
+        if (prevSemester == null || prevYear == null) {
+            return Optional.empty();
+        }
+
+        for (String title : possibleTitles) {
+            Optional<AcademicEvent> event =
+                academicEventRepository.findByTitleAndSemesterAndYear(title, prevSemester, prevYear);
+            if (event.isPresent()) {
+                return Optional.of(event.get().getDate());
+            }
+        }
+
+        // Case-insensitive keyword search limited to previous term
+        List<AcademicEvent> prevEvents =
+            academicEventRepository.findByTitleKeyword("major and minor changes begin");
+        for (AcademicEvent event : prevEvents) {
+            if (event.getSemester() != null && event.getSemester().equalsIgnoreCase(prevSemester) &&
+                event.getYear() != null && event.getYear().equals(prevYear)) {
+                return Optional.of(event.getDate());
+            }
+        }
+
+        return Optional.empty();
+    }
+    
+    /**
+     * Registrar-style interpretation:
+     * The declaration END date for a given term is recorded in the CURRENT term's section.
+     * Example: Spring 2025 end is stored in Spring 2025 section.
+     */
+    public Optional<LocalDate> getMajorMinorChangesEnd(String semester, Integer year) {
+        String[] possibleTitles = {
+            "Major And Minor Changes End",
+            "major_and_minor_changes_end",
+            "Major Minor Changes End",
+            "Declaration Period End"
+        };
+
+        // Look ONLY in the CURRENT term's section
+        for (String title : possibleTitles) {
+            Optional<AcademicEvent> event =
+                academicEventRepository.findByTitleAndSemesterAndYear(title, semester, year);
+            if (event.isPresent()) {
+                return Optional.of(event.get().getDate());
+            }
+        }
+
+        // Case-insensitive keyword search limited to current term
+        List<AcademicEvent> events =
+            academicEventRepository.findByTitleKeyword("major and minor changes end");
+        for (AcademicEvent event : events) {
+            if (event.getSemester() != null && event.getSemester().equalsIgnoreCase(semester) &&
+                event.getYear() != null && event.getYear().equals(year)) {
+                return Optional.of(event.getDate());
+            }
+        }
+
+        return Optional.empty();
+    }
+    
+    /**
+     * Get the previous term (semester, year) before the given term
+     * Spring -> Fall (previous year)
+     * Fall -> Spring (same year)
+     */
+    // TP: Used cursor to calculate previous term for declaration begin date lookup
+    private java.util.Map<String, Object> getPreviousTerm(String semester, Integer year) {
+        java.util.Map<String, Object> prevTerm = new java.util.HashMap<>();
+        if (semester == null || year == null) {
+            return prevTerm;
+        }
+        
+        if (semester.equalsIgnoreCase("Spring")) {
+            // Spring -> Fall (previous year)
+            prevTerm.put("semester", "Fall");
+            prevTerm.put("year", year - 1);
+        } else if (semester.equalsIgnoreCase("Fall")) {
+            // Fall -> Spring (same year)
+            prevTerm.put("semester", "Spring");
+            prevTerm.put("year", year);
+        } else {
+            // Default to Fall previous year if unknown
+            prevTerm.put("semester", "Fall");
+            prevTerm.put("year", year - 1);
+        }
+        return prevTerm;
+    }
+    
+    /**
+     * Get the next term (semester, year) after the given term
+     * Fall -> Spring (same year if Fall, next year if Spring)
+     * Spring -> Fall (next year)
+     */
+    // TP: Used cursor to calculate next term for declaration end date lookup
+    private java.util.Map<String, Object> getNextTerm(String semester, Integer year) {
+        java.util.Map<String, Object> nextTerm = new java.util.HashMap<>();
+        if (semester == null || year == null) {
+            return nextTerm;
+        }
+        
+        if (semester.equalsIgnoreCase("Fall")) {
+            // Fall -> Spring (next year)
+            nextTerm.put("semester", "Spring");
+            nextTerm.put("year", year + 1);
+        } else if (semester.equalsIgnoreCase("Spring")) {
+            // Spring -> Fall (same year)
+            nextTerm.put("semester", "Fall");
+            nextTerm.put("year", year);
+        } else {
+            // Default to Spring next year if unknown
+            nextTerm.put("semester", "Spring");
+            nextTerm.put("year", year + 1);
+        }
+        return nextTerm;
+    }
+    
+    /**
+     * Get all available terms from academic calendar
+     */
+    // TP: Used cursor to get all available terms from academic calendar
+    public List<java.util.Map<String, Object>> getAvailableTermsFromCalendar() {
+        List<Object[]> distinctTerms = academicEventRepository.findDistinctSemesterAndYear();
+        List<java.util.Map<String, Object>> terms = new java.util.ArrayList<>();
+        
+        for (Object[] term : distinctTerms) {
+            String semester = (String) term[0];
+            Integer year = (Integer) term[1];
+            
+            if (semester != null && year != null) {
+                java.util.Map<String, Object> termMap = new java.util.HashMap<>();
+                termMap.put("semester", semester);
+                termMap.put("year", year);
+                termMap.put("displayName", semester + " " + year);
+                termMap.put("value", semester.toUpperCase() + " " + year);
+                
+                // Get declaration dates for this term using registrar-style rules:
+                // begin: from previous term section, end: from current term section
+                Optional<LocalDate> beginDate = getMajorMinorChangesBegin(semester, year);
+                Optional<LocalDate> endDate = getMajorMinorChangesEnd(semester, year);
+                
+                if (beginDate.isPresent()) {
+                    termMap.put("declarationBeginDate", beginDate.get().toString());
+                }
+                if (endDate.isPresent()) {
+                    termMap.put("declarationEndDate", endDate.get().toString());
+                }
+                
+                terms.add(termMap);
+            }
+        }
+        
+        return terms;
+    }
+    
+    /**
+     * Parse effectiveTerm to extract semester and year
+     * Supports formats: "Fall 2025", "SPRING 2026", "Fall2025", etc.
+     */
+    // TP: Used cursor to parse effective term into semester and year
+    private java.util.Map<String, Object> parseEffectiveTerm(String effectiveTerm) {
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        
+        if (effectiveTerm == null || effectiveTerm.trim().isEmpty()) {
+            return result;
+        }
+        
+        String normalized = effectiveTerm.trim();
+        // Handle formats like "Fall 2025", "SPRING 2026"
+        String[] parts = normalized.split("\\s+");
+        
+        if (parts.length >= 2) {
+            String semester = parts[0].trim();
+            String yearStr = parts[parts.length - 1].trim();
+            
+            // Normalize semester
+            if (semester.equalsIgnoreCase("FALL")) {
+                semester = "Fall";
+            } else if (semester.equalsIgnoreCase("SPRING")) {
+                semester = "Spring";
+            } else if (semester.equalsIgnoreCase("SUMMER")) {
+                semester = "Summer";
+            }
+            
+            try {
+                Integer year = Integer.parseInt(yearStr);
+                result.put("semester", semester);
+                result.put("year", year);
+            } catch (NumberFormatException e) {
+                // Invalid year format
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Validate academic calendar dates dynamically from AcademicEvents (registrar-style)
      */
     // TP: Used cursor to validate declaration period using academic events
     private void validateAcademicCalendarDates(String effectiveTerm) {
@@ -340,48 +553,50 @@ public class MajorMinorDeclarationService {
             throw new IllegalArgumentException("Effective term is required");
         }
         
-        // Get current date from system date service (respects registrar's override)
-        LocalDate currentDate = systemDateService.today();
+        // Parse effectiveTerm to get semester and year
+        java.util.Map<String, Object> termInfo = parseEffectiveTerm(effectiveTerm);
+        String semester = (String) termInfo.get("semester");
+        Integer year = (Integer) termInfo.get("year");
         
-        // Try to find academic events for major/minor changes period
-        List<AcademicEvent> beginEvents = academicEventRepository.findByTitleContainingIgnoreCase("Major And Minor Changes Begin");
-        List<AcademicEvent> endEvents = academicEventRepository.findByTitleContainingIgnoreCase("Major And Minor Changes End");
-        
-        // If no academic calendar events found, fall back to hardcoded dates (for backward compatibility)
-        if (beginEvents.isEmpty() || endEvents.isEmpty()) {
-            System.out.println("WARNING: No academic calendar events found, using fallback dates");
+        if (semester == null || year == null) {
+            // If parsing fails, fall back to old logic
+            System.out.println("WARNING: Could not parse effectiveTerm: " + effectiveTerm + ", using fallback");
             validateAcademicCalendarDatesFallback(effectiveTerm);
             return;
         }
         
-        // Use the most recent start and end dates
-        AcademicEvent startEvent = beginEvents.stream()
-            .max((e1, e2) -> e1.getDate().compareTo(e2.getDate()))
-            .orElse(null);
-        AcademicEvent endEvent = endEvents.stream()
-            .max((e1, e2) -> e1.getDate().compareTo(e2.getDate()))
-            .orElse(null);
+        // Get current date from system date service (respects registrar's override)
+        LocalDate currentDate = systemDateService.today();
         
-        if (startEvent == null || endEvent == null) {
-            throw new IllegalArgumentException("Academic calendar dates for major/minor declaration not found");
-        }
-        
-        LocalDate startDate = startEvent.getDate();
-        LocalDate endDate = endEvent.getDate();
-        
-        // Validate if current date is within the declaration period
-        if (currentDate.isBefore(startDate)) {
+        // Get dates from academic calendar following strict registrar-style mapping:
+        // begin is stored in previous term; end is stored in next term
+        Optional<LocalDate> beginDateOpt = getMajorMinorChangesBegin(semester, year);
+        Optional<LocalDate> endDateOpt = getMajorMinorChangesEnd(semester, year);
+
+        // Edge cases per registrar-style rules:
+        // - If only begin exists (no next term yet): allow from begin onward (no upper bound)
+        // - If only end exists (no previous term in calendar): allow until end (no lower bound)
+        LocalDate startDate = beginDateOpt.orElse(null);
+        LocalDate endDate = endDateOpt.orElse(null);
+
+        if (startDate == null && endDate == null) {
             throw new IllegalArgumentException(
-                "Declaration period for " + effectiveTerm + " has not started yet. " +
-                "It begins on " + startDate + ". Please check the academic calendar for available terms."
+                "Declaration period dates are not available in academic calendar for " + semester + " " + year + "."
             );
         }
-        if (currentDate.isAfter(endDate)) {
+        
+        // Validate if current date is within the declaration period (inclusive bounds where present)
+        if (startDate != null && currentDate.isBefore(startDate)) {
             throw new IllegalArgumentException(
-                "Declaration period for " + effectiveTerm + " has ended on " + endDate + ". " +
-                "Please check the academic calendar for available terms."
+                "Declaration period for " + effectiveTerm + " has not started yet. It begins on " + startDate + "."
             );
         }
+        if (endDate != null && currentDate.isAfter(endDate)) {
+            throw new IllegalArgumentException(
+                "Declaration period for " + effectiveTerm + " has ended on " + endDate + "."
+            );
+        }
+        // Valid when currentDate >= startDate (if present) and currentDate <= endDate (if present)
     }
     
     /**
@@ -395,6 +610,7 @@ public class MajorMinorDeclarationService {
             LocalDate startDate = LocalDate.of(2025, 3, 31);
             LocalDate endDate = LocalDate.of(2025, 8, 29);
             
+            // Inclusive of both start and end dates: currentDate >= startDate && currentDate <= endDate
             if (currentDate.isBefore(startDate) || currentDate.isAfter(endDate)) {
                 throw new IllegalArgumentException("Declaration period for Fall 2025 has ended. Please check the academic calendar for available terms.");
             }
@@ -402,6 +618,7 @@ public class MajorMinorDeclarationService {
             LocalDate startDate = LocalDate.of(2025, 10, 27);
             LocalDate endDate = LocalDate.of(2026, 1, 30);
             
+            // Inclusive of both start and end dates: currentDate >= startDate && currentDate <= endDate
             if (currentDate.isBefore(startDate) || currentDate.isAfter(endDate)) {
                 throw new IllegalArgumentException("Declaration period for Spring 2026 has ended. Please check the academic calendar for available terms.");
             }

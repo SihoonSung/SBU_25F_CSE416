@@ -26,4 +26,10 @@ public interface AcademicEventRepository extends JpaRepository<AcademicEvent, Lo
     Optional<AcademicEvent> findByTitleAndSemesterAndYear(@Param("title") String title, 
                                                            @Param("semester") String semester, 
                                                            @Param("year") Integer year);
+    
+    /**
+     * Find all distinct semester and year combinations from academic events
+     */
+    @Query("SELECT DISTINCT e.semester, e.year FROM AcademicEvent e WHERE e.semester IS NOT NULL AND e.year IS NOT NULL ORDER BY e.year DESC, CASE e.semester WHEN 'Spring' THEN 1 WHEN 'Fall' THEN 2 ELSE 3 END")
+    List<Object[]> findDistinctSemesterAndYear();
 }

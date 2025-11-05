@@ -45,6 +45,9 @@ public class RegistrationScheduleService {
     @Autowired
     private AcademicEventRepository academicEventRepository;
     
+    @Autowired
+    private MajorMinorDeclarationService majorMinorDeclarationService;
+    
     /**
      * Normalize class standing to standard format
      * U1, FRESHMEN, FRESHMAN -> FRESHMAN
@@ -367,6 +370,9 @@ public class RegistrationScheduleService {
             throw new RuntimeException("Start date must be before or equal to end date");
         }
         
+        // Validate against major/minor declaration dates from academic calendar
+        validateAgainstDeclarationDates(semester, year, startDate, endDate);
+        
         User createdBy = userRepository.findById(createdById)
             .orElseThrow(() -> new RuntimeException("User not found"));
         
@@ -437,6 +443,9 @@ public class RegistrationScheduleService {
             throw new RuntimeException("Start date must be before or equal to end date");
         }
         
+        // Validate against major/minor declaration dates from academic calendar
+        validateAgainstDeclarationDates(semester, year, startDate, endDate);
+        
         schedule.setSemester(semester);
         schedule.setYear(year);
         schedule.setClassStanding(normalizedClassStanding); // Use normalized version
@@ -468,7 +477,79 @@ public class RegistrationScheduleService {
     }
     
     /**
+     * Validate registration schedule dates against major/minor declaration dates from academic calendar
+     * Provides informational warnings if declaration dates exist for the term
+     */
+    // TP: Used cursor to validate registration schedule against declaration dates
+    private void validateAgainstDeclarationDates(String semester, Integer year, LocalDate startDate, LocalDate endDate) {
+        try {
+            // Get major/minor declaration dates from academic calendar
+            Optional<LocalDate> declarationBeginOpt = majorMinorDeclarationService.getMajorMinorChangesBegin(semester, year);
+            Optional<LocalDate> declarationEndOpt = majorMinorDeclarationService.getMajorMinorChangesEnd(semester, year);
+            
+            if (declarationBeginOpt.isPresent() && declarationEndOpt.isPresent()) {
+                LocalDate declarationBegin = declarationBeginOpt.get();
+                LocalDate declarationEnd = declarationEndOpt.get();
+                
+                // Check if registration schedule overlaps with declaration period
+                // Declaration period should typically not overlap with registration period
+                boolean overlaps = (startDate != null && !startDate.isAfter(declarationEnd) && !endDate.isBefore(declarationBegin)) ||
+                                  (startDate == null && !endDate.isBefore(declarationBegin));
+                
+                if (overlaps) {
+                    // Log warning but don't block - registration and declaration periods might intentionally overlap
+                    System.out.println(String.format(
+                        "WARNING: Registration schedule for %s %d overlaps with major/minor declaration period (%s - %s). " +
+                        "Please verify this is intentional.",
+                        semester, year, declarationBegin, declarationEnd));
+                }
+                
+                // Also check if registration schedule is entirely before declaration period
+                // This could be a problem if students need to register before they can declare majors/minors
+                if (endDate != null && endDate.isBefore(declarationBegin)) {
+                    System.out.println(String.format(
+                        "INFO: Registration schedule for %s %d ends (%s) before major/minor declaration period begins (%s). " +
+                        "Students will need to register before declaring majors/minors.",
+                        semester, year, endDate, declarationBegin));
+                }
+            }
+        } catch (Exception e) {
+            // If there's an error getting declaration dates, don't block registration schedule creation
+            // This could happen if academic calendar hasn't been imported yet
+            System.out.println("WARNING: Could not validate against declaration dates: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Get declaration dates for a term (for informational purposes)
+     */
+    // TP: Used cursor to get declaration dates for a term from academic calendar
+    public java.util.Map<String, Object> getDeclarationDatesForTerm(String semester, Integer year) {
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        
+        try {
+            Optional<LocalDate> beginOpt = majorMinorDeclarationService.getMajorMinorChangesBegin(semester, year);
+            Optional<LocalDate> endOpt = majorMinorDeclarationService.getMajorMinorChangesEnd(semester, year);
+            
+            if (beginOpt.isPresent() && endOpt.isPresent()) {
+                result.put("declarationBegin", beginOpt.get().toString());
+                result.put("declarationEnd", endOpt.get().toString());
+                result.put("declarationAvailable", true);
+            } else {
+                result.put("declarationAvailable", false);
+                result.put("message", "Declaration dates not found in academic calendar for " + semester + " " + year);
+            }
+        } catch (Exception e) {
+            result.put("declarationAvailable", false);
+            result.put("error", "Could not retrieve declaration dates: " + e.getMessage());
+        }
+        
+        return result;
+    }
+    
+    /**
      * Build response map from schedule entity
+     * Includes declaration dates from academic calendar for reference
      */
     private java.util.Map<String, Object> buildScheduleResponse(RegistrationSchedule schedule) {
         java.util.Map<String, Object> response = new java.util.HashMap<>();
@@ -487,6 +568,11 @@ public class RegistrationScheduleService {
                 schedule.getCreatedBy().getFirstName() + " " + schedule.getCreatedBy().getLastName());
         }
         response.put("createdAt", schedule.getCreatedAt());
+        
+        // Include declaration dates from academic calendar for reference
+        java.util.Map<String, Object> declarationDates = getDeclarationDatesForTerm(schedule.getSemester(), schedule.getYear());
+        response.put("declarationDates", declarationDates);
+        
         return response;
     }
 }

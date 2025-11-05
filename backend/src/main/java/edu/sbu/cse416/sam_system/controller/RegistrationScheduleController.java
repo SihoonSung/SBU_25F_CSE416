@@ -200,7 +200,26 @@ public class RegistrationScheduleController {
     }
     
     /**
+     * Get declaration dates for a term
+     * GET /api/admin/registration-schedules/declaration-dates?semester=Fall&year=2025
+     */
+    @GetMapping("/declaration-dates")
+    public ResponseEntity<Map<String, Object>> getDeclarationDates(
+            @RequestParam String semester,
+            @RequestParam Integer year) {
+        try {
+            Map<String, Object> declarationDates = scheduleService.getDeclarationDatesForTerm(semester, year);
+            return ResponseEntity.ok(declarationDates);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get declaration dates: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    /**
      * Build response map from schedule entity
+     * Includes declaration dates from academic calendar for reference
      */
     private Map<String, Object> buildScheduleResponse(RegistrationSchedule schedule) {
         Map<String, Object> response = new HashMap<>();
@@ -219,6 +238,12 @@ public class RegistrationScheduleController {
                 schedule.getCreatedBy().getFirstName() + " " + schedule.getCreatedBy().getLastName());
         }
         response.put("createdAt", schedule.getCreatedAt());
+        
+        // Include declaration dates from academic calendar for reference
+        Map<String, Object> declarationDates = scheduleService.getDeclarationDatesForTerm(
+            schedule.getSemester(), schedule.getYear());
+        response.put("declarationDates", declarationDates);
+        
         return response;
     }
 }

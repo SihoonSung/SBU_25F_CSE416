@@ -52,6 +52,19 @@ interface PlannedMajor {
 
 const MajorMinorDeclaration: React.FC = () => {
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+  // Helper to parse YYYY-MM-DD as local date (avoid timezone shifting)
+  const parseYmdLocal = (dateStr?: string | null): Date | null => {
+    if (!dateStr) return null;
+    const parts = String(dateStr).split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      return new Date(y, m, d);
+    }
+    const dObj = new Date(dateStr);
+    return isNaN(dObj.getTime()) ? null : dObj;
+  };
   const [degreeRequirements, setDegreeRequirements] = useState<DegreeRequirement[]>([]);
   const [myDeclarations, setMyDeclarations] = useState<MajorMinorDeclaration[]>([]);
   // Current approved majors and minors from User table
@@ -117,28 +130,130 @@ const MajorMinorDeclaration: React.FC = () => {
   const [myWaivers, setMyWaivers] = useState<any[]>([]);
   const [loadingWaivers, setLoadingWaivers] = useState(false);
 
-  // Available terms and subjects based on academic calendar
+  // Available terms from academic calendar
+  const [availableTerms, setAvailableTerms] = useState<Array<{
+    semester: string;
+    year: number;
+    displayName: string;
+    value: string;
+    declarationBeginDate?: string;
+    declarationEndDate?: string;
+  }>>([]);
+  
+  // Selected term's declaration dates
+  const [selectedTermDeclarationDates, setSelectedTermDeclarationDates] = useState<{
+    beginDate?: string;
+    endDate?: string;
+  } | null>(null);
+  
+  // TP: Used cursor to fetch available terms from academic calendar
+  const fetchAvailableTerms = async () => {
+    try {
+      const response = await fetch(`${backendBase}/api/major-minor-declarations/available-terms`, {
+        credentials: 'include',
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.terms) {
+          setAvailableTerms(data.terms || []);
+          console.log('Available terms loaded:', data.terms?.length || 0);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch available terms:', err);
+    }
+  };
+  
+  // TP: Used cursor to get available terms with declaration period info (inclusive of both start and end dates)
   const getAvailableTerms = () => {
     const currentDate = systemDate || new Date();
-    const allTerms = [
-      { value: 'FALL 2025', label: 'Fall 2025 (Mar 31 - Aug 29, 2025)', start: '2025-03-31', end: '2025-08-29' },
-      { value: 'SPRING 2026', label: 'Spring 2026 (Oct 27, 2025 - Jan 30, 2026)', start: '2025-10-27', end: '2026-01-30' }
-    ];
+    // Normalize currentDate to midnight for date-only comparison
+    const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
     
-    return allTerms.filter(term => {
-      const startDate = new Date(term.start);
-      const endDate = new Date(term.end);
-      endDate.setHours(23, 59, 59, 999);
+    return availableTerms.map(term => {
+      // Start date: beginning of day (00:00:00) - inclusive
+      // begin comes from previous term section (handled by backend)
+      const beginDate: Date | null = term.declarationBeginDate ? new Date(term.declarationBeginDate + 'T00:00:00') : null;
+      const beginDateOnly = beginDate ? new Date(beginDate.getFullYear(), beginDate.getMonth(), beginDate.getDate()) : null;
       
-      return currentDate >= startDate && currentDate <= endDate;
+      // End date: end of day (23:59:59.999) - inclusive
+      const endDate = term.declarationEndDate ? new Date(term.declarationEndDate + 'T23:59:59.999') : null;
+      const endDateOnly = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null;
+      
+      let label = term.displayName;
+      if (beginDate && endDate) {
+        const beginStr = beginDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const endStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        label += ` (${beginStr} - ${endStr})`;
+      } else if (beginDate && !endDate) {
+        const beginStr = beginDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        label += ` (From ${beginStr})`;
+      } else if (!beginDate && endDate) {
+        const endStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        label += ` (Until ${endStr})`;
+      }
+      
+      // Check if current date is within declaration period with one-sided bounds allowed
+      const afterStart = beginDateOnly ? currentDateOnly >= beginDateOnly : true;
+      const beforeEnd = endDateOnly ? currentDateOnly <= endDateOnly : true;
+      const isWithinPeriod = afterStart && beforeEnd;
+      
+      return {
+        value: term.value,
+        label,
+        semester: term.semester,
+        year: term.year,
+        beginDate: term.declarationBeginDate,
+        endDate: term.declarationEndDate,
+        isWithinPeriod
+      };
     });
   };
 
   useEffect(() => {
     fetchData();
+    fetchAvailableTerms();
     loadPlannedMajorsFromStorage();
     initializeUser();
   }, []);
+  
+  // Update declaration dates when effective term changes
+  useEffect(() => {
+    if (effectiveTerm) {
+      // Parse term to get semester and year
+      const parts = effectiveTerm.split(' ');
+      if (parts.length >= 2) {
+        const semester = parts[0].charAt(0) + parts[0].slice(1).toLowerCase();
+        const year = parseInt(parts[1]);
+        
+        // Fetch declaration dates for this term
+        fetch(`${backendBase}/api/major-minor-declarations/declaration-dates/${semester}/${year}`, {
+          credentials: 'include'
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              setSelectedTermDeclarationDates({
+                beginDate: data.beginDate || undefined,
+                endDate: data.endDate || undefined
+              });
+            }
+          })
+          .catch(err => {
+            console.warn('Failed to fetch declaration dates:', err);
+            setSelectedTermDeclarationDates(null);
+          });
+      }
+    } else {
+      setSelectedTermDeclarationDates(null);
+    }
+  }, [effectiveTerm]);
 
   useEffect(() => {
     if (userId) {
@@ -192,7 +307,7 @@ const MajorMinorDeclaration: React.FC = () => {
       setLoading(true);
       console.log('Starting to fetch data...');
       
-      // Fetch system date from backend
+      // Fetch system date from backend (parse as local date to avoid TZ rollback)
       try {
         const systemDateResponse = await fetch('/api/admin/system-date', {
           credentials: 'include',
@@ -206,7 +321,8 @@ const MajorMinorDeclaration: React.FC = () => {
         if (systemDateResponse.ok) {
           const systemDateData = await systemDateResponse.json();
           if (systemDateData.currentDate) {
-            setSystemDate(new Date(systemDateData.currentDate));
+            const parsed = parseYmdLocal(systemDateData.currentDate);
+            setSystemDate(parsed || new Date(systemDateData.currentDate));
             console.log('System date loaded:', systemDateData.currentDate);
           }
         }
@@ -737,40 +853,109 @@ const MajorMinorDeclaration: React.FC = () => {
     }
   }
 
-  // TP Used cursor to check declaration period validity
+  // TP: Used cursor to check declaration period validity using academic calendar dates (registrar-style)
+  // begin from previous term section, end from current term section (handled by backend)
   const checkDeclarationPeriod = (term: string, currentDate: Date): boolean => {
-    // Declaration periods based on academic calendar
-    const declarationPeriods: Record<string, { start: string, end: string }> = {
-      'FALL 2025': {
-        start: '2025-03-31',
-        end: '2025-08-29'
-      },
-      'SPRING 2026': {
-        start: '2025-10-27',
-        end: '2026-01-30'
+    // Normalize currentDate to midnight for date-only comparison
+    const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+    
+    // Helper to parse date string safely (avoid timezone issues)
+    const parseDateString = (dateStr: string): Date | null => {
+      if (!dateStr) return null;
+      // Parse "YYYY-MM-DD" format and create local date
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+        const day = parseInt(parts[2], 10);
+        return new Date(year, month, day);
       }
+      return new Date(dateStr);
     };
-
-    const period = declarationPeriods[term];
-    if (!period) {
+    
+    // First, try to get dates from selectedTermDeclarationDates (from API)
+    if (selectedTermDeclarationDates?.beginDate) {
+      startDate = parseDateString(selectedTermDeclarationDates.beginDate);
+    }
+    if (selectedTermDeclarationDates?.endDate) {
+      endDate = parseDateString(selectedTermDeclarationDates.endDate);
+    }
+    
+    // If not available from selectedTermDeclarationDates, try from available terms
+    // Parse term to match correctly (handle "SPRING 2026", "Spring 2026", etc.)
+    if ((!startDate || !endDate) && availableTerms.length > 0) {
+      // Try exact match first
+      let termInfo = availableTerms.find(t => t.value === term);
+      
+      // If not found, parse term and match by semester and year
+      if (!termInfo) {
+        const parts = term.split(' ');
+        if (parts.length >= 2) {
+          const semester = parts[0].charAt(0) + parts[0].slice(1).toLowerCase();
+          const year = parseInt(parts[1]);
+          termInfo = availableTerms.find(t => 
+            t.semester.toLowerCase() === semester.toLowerCase() && t.year === year
+          );
+        }
+      }
+      
+      if (termInfo) {
+        if (!startDate && termInfo.declarationBeginDate) {
+          startDate = parseDateString(termInfo.declarationBeginDate);
+        }
+        if (!endDate && termInfo.declarationEndDate) {
+          endDate = parseDateString(termInfo.declarationEndDate);
+        }
+      }
+    }
+    
+    if (!startDate && !endDate) {
+      console.warn('Declaration period dates not available for term:', term, {
+        selectedTermDeclarationDates,
+        availableTerms: availableTerms.map(t => ({ 
+          value: t.value, 
+          semester: t.semester, 
+          year: t.year,
+          beginDate: t.declarationBeginDate,
+          endDate: t.declarationEndDate
+        }))
+      });
       return false;
     }
-
-    const startDate = new Date(period.start);
-    const endDate = new Date(period.end);
     
-    // Set time to end of day for end date
-    endDate.setHours(23, 59, 59, 999);
+    // Normalize dates for comparison (nullable) - use local date components
+    const startDateOnly = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null;
+    const endDateOnly = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null;
+    
+    // One-sided bounds allowed per registrar-style edge cases
+    const afterStart = startDateOnly ? currentDateOnly >= startDateOnly : true;
+    const beforeEnd = endDateOnly ? currentDateOnly <= endDateOnly : true;
+    const result = afterStart && beforeEnd;
     
     console.log('Checking declaration period:', {
       term,
-      currentDate: currentDate.toISOString().split('T')[0],
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
-      isWithinPeriod: currentDate >= startDate && currentDate <= endDate
+      currentDate: currentDateOnly.toISOString().split('T')[0],
+      startDate: startDateOnly ? startDateOnly.toISOString().split('T')[0] : null,
+      endDate: endDateOnly ? endDateOnly.toISOString().split('T')[0] : null,
+      afterStart,
+      beforeEnd,
+      result,
+      selectedTermDeclarationDates,
+      availableTermsCount: availableTerms.length,
+      matchedTerm: availableTerms.find(t => {
+        const parts = term.split(' ');
+        if (parts.length >= 2) {
+          const semester = parts[0].charAt(0) + parts[0].slice(1).toLowerCase();
+          const year = parseInt(parts[1]);
+          return t.semester.toLowerCase() === semester.toLowerCase() && t.year === year;
+        }
+        return t.value === term;
+      })
     });
-
-    return currentDate >= startDate && currentDate <= endDate;
+    return result;
   };
 
   const getStatusColor = (status: string) => {
@@ -833,8 +1018,19 @@ const MajorMinorDeclaration: React.FC = () => {
           </p>
           <p>
             <strong>Declaration Periods:</strong><br/>
-            • <strong>Fall 2025:</strong> March 31 - August 29, 2025<br/>
-            • <strong>Spring 2026:</strong> October 27, 2025 - January 30, 2026
+            {availableTerms.length > 0 ? (
+              availableTerms.map(term => (
+                <span key={term.value}>
+                  • <strong>{term.displayName}:</strong> {
+                    term.declarationBeginDate && term.declarationEndDate 
+                      ? `${new Date(term.declarationBeginDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(term.declarationEndDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+                      : 'Dates TBD'
+                  }<br/>
+                </span>
+              ))
+            ) : (
+              <span>Dates will appear once the academic calendar is loaded.</span>
+            )}
           </p>
           <p>
             Restricted majors and minors have course requirements or GPA requirements for admission; 
@@ -908,9 +1104,16 @@ const MajorMinorDeclaration: React.FC = () => {
                   >
                     <option value="">Select Term</option>
                     {getAvailableTerms().map(term => (
-                      <option key={term.value} value={term.value}>{term.label}</option>
+                      <option key={term.value} value={term.value}>
+                        {term.label}
+                      </option>
                     ))}
                   </select>
+                  {selectedTermDeclarationDates && selectedTermDeclarationDates.beginDate && selectedTermDeclarationDates.endDate && (
+                    <small className="form-hint" style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
+                      Declaration period: {new Date(selectedTermDeclarationDates.beginDate).toLocaleDateString()} - {new Date(selectedTermDeclarationDates.endDate).toLocaleDateString()}
+                    </small>
+                  )}
                 </div>
                 
                 <div className="form-group">
@@ -1039,9 +1242,16 @@ const MajorMinorDeclaration: React.FC = () => {
                 >
                   <option value="">Select Term</option>
                   {getAvailableTerms().map(term => (
-                    <option key={term.value} value={term.value}>{term.label}</option>
+                    <option key={term.value} value={term.value}>
+                      {term.label}
+                    </option>
                   ))}
                 </select>
+                {selectedTermDeclarationDates && selectedTermDeclarationDates.beginDate && selectedTermDeclarationDates.endDate && (
+                  <small className="form-hint" style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
+                    Declaration period: {new Date(selectedTermDeclarationDates.beginDate).toLocaleDateString()} - {new Date(selectedTermDeclarationDates.endDate).toLocaleDateString()}
+                  </small>
+                )}
               </div>
               
               <div className="form-group">
