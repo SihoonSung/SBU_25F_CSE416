@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
  */
 
 /** ===== Types ===== */
-type Role = "STUDENT" | "ADVISOR" | "REGISTRAR" | "ADMIN";
+type Role = "STUDENT" | "ADVISOR" | "REGISTRAR" | "ADMIN"; 
 
 type CurrentUserInfo = { netId: string; roles: Role[] };
 
@@ -23,8 +23,8 @@ type PersonBasic = {
   role?: "student" | "advisor" | "registrar" | "instructor" | "unknown";
   
   // Advisor-specific fields
-  unitLevel?: "university" | "college" | "department" | null; 
-  academicUnit?: string | null; 
+  unitLevel?: "university" | "college" | "department" | null;  
+  academicUnit?: string | null;  
   
   // Additional fields from users table (Instructor/General fields)
   department?: string | null;
@@ -32,9 +32,9 @@ type PersonBasic = {
   officeLocation?: string | null;
 
   // Student/General fields
-  major?: string | null; 
-  gpa?: number | null; 
-  graduationYear?: number | null; 
+  major?: string | null;  
+  gpa?: number | null;  
+  graduationYear?: number | null;  
   profilePictureUrl?: string | null;
   
   // Additional fields for status display
@@ -130,12 +130,12 @@ type RequirementStatus = {
   note?: string | null;
 };
 
-type Hold = { 
+type Hold = {  
   holdId?: number;
-  code?: string; 
-  title?: string; 
+  code?: string;  
+  title?: string;  
   holdType?: string;
-  placedAt: string; 
+  placedAt: string;  
   placedBy?: string | { userId: number; name: string };
   reason?: string;
 };
@@ -234,7 +234,6 @@ function normalizeReqs(raw: any): RequirementStatus[] {
     : [];
 
   return (arr as any[]).map((r) => {
-    // 상태 문자열 방어적 파싱
     let status: RequirementStatus["status"] = "pending";
     const s = (r.status || r.requirementStatus || "").toString().toLowerCase();
     if (s.includes("sat") && !s.includes("un")) status = "satisfied";
@@ -307,7 +306,6 @@ function transformFromStatus(statusData: any): RequirementStatus[] {
         }
       }
 
-      // 전체 요약을 하나의 레코드로 표시(선택)
       if (major.overallStatus) {
         out.push({
           area: "DEGREE",
@@ -365,6 +363,36 @@ function transformFromStatus(statusData: any): RequirementStatus[] {
   }
 
   return out;
+}
+
+/** ===== Waiver normalizer ===== */
+function normalizeWaivers(raw: any): TimeConflictWaiver[] {
+  if (!raw) return [];
+  const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw?.items) ? raw.items : []));
+  return (arr as any[]).map((w) => {
+    const classA =
+      w.classA ?? w.class_a ?? w.courseA ?? w.course_a ?? w.course1 ?? w.class1 ?? "";
+    const classB =
+      w.classB ?? w.class_b ?? w.courseB ?? w.course_b ?? w.course2 ?? w.class2 ?? "";
+    // term: prefer provided string; otherwise combine year + semester
+    const term =
+      w.term ??
+      (w.termYear && w.termSemester
+        ? `${w.termYear}-${String(w.termSemester).charAt(0).toUpperCase()}${String(w.termSemester).slice(1)}`
+        : "");
+    const waivedBy =
+      w.waivedByName ?? w.waived_by_name ?? w.waivedBy ?? w.waived_by ?? w.approvedBy ?? w.approved_by ?? "";
+    const waivedAt =
+      w.waivedAt ?? w.timestamp ?? w.waived_at ?? w.createdAt ?? w.created_at ?? "";
+
+    return {
+      classA: String(classA || ""),
+      classB: String(classB || ""),
+      term: String(term || ""),
+      waivedBy: String(waivedBy || ""),
+      waivedAt: String(waivedAt || ""),
+    };
+  });
 }
 
 /** ===== Component ===== */
@@ -516,9 +544,59 @@ export default function ProfilePage() {
           : null;
         setMyPerson(person as PersonBasic | null);
 
+        // Term data load
+        const [ev, now, termsData] = await Promise.all([
+          safeFetch(`${BASE}/api/admin/academic-calendar`).catch(() => []),
+          safeFetch(`${BASE}/api/admin/system-date`).catch(() => null),
+          safeFetch(`${BASE}/api/classes/terms`).catch(() => []),
+        ]);
+        
+        let termStrings: string[] = [];
+        if (Array.isArray(termsData) && termsData.length > 0) {
+          termStrings = termsData.map((t: any) => {
+            const semester = t.semester || '';
+            const year = t.year || '';
+            if (semester && year) {
+              const semesterName = semester.charAt(0).toUpperCase() + semester.slice(1).toLowerCase();
+              // 'SummerI', 'SummerII' 처리를 위해 Fall/Spring/Summer로 정규화하지 않음
+              return `${year}-${semesterName}`;
+            }
+            return null;
+          }).filter((t: string | null) => t !== null) as string[];
+        }
+        
+        // --- Term 로직 수정: availableTerms는 서버 응답만 사용 ---
+        let uniqueTerms = [...new Set(termStrings)];
+
+        // 로딩 실패 시 임시 기본값 제공 (이전 로직 그대로 유지)
+        if (uniqueTerms.length === 0) {
+            const currentYear = new Date().getFullYear();
+            uniqueTerms = [
+                `${currentYear + 1}-Spring`,
+                `${currentYear}-Fall`,
+                `${currentYear}-SummerII`,
+                `${currentYear}-SummerI`,
+                `${currentYear}-Spring`,
+            ];
+        }
+
+        uniqueTerms.sort((a, b) => {
+          const [yearA, semA] = a.split('-');
+          const [yearB, semB] = b.split('-');
+          if (yearA !== yearB) return parseInt(yearB) - parseInt(yearA);
+          const semOrder: Record<string, number> = { 'Fall': 3, 'SummerII': 2, 'SummerI': 1.5, 'Spring': 1 };
+          return (semOrder[semB] || 0) - (semOrder[semA] || 0);
+        });
+        
+        const defaultTerm = uniqueTerms.length > 0 ? uniqueTerms[0] : "2025-Fall"; // 최종 안전 기본값
+        setAvailableTerms(uniqueTerms);
+        setMyTerm(defaultTerm);
+        setTerm(defaultTerm);
+        // ---------------------------------------------------------------------------------
+
         if (isStudent && person && (person.sbuId || (person as any).studentId)) {
           const sid = (person as any).studentId ?? person.sbuId!;
-          await loadStudentBundle(sid, myTerm, {
+          await loadStudentBundle(sid, defaultTerm, {
             setProfile: setMyProfile,
             setDetails: setMyDetails,
             setSummary: setMySummary,
@@ -535,39 +613,12 @@ export default function ProfilePage() {
           });
         }
 
-        const [ev, now, termsData] = await Promise.all([
-          safeFetch(`${BASE}/api/admin/academic-calendar`).catch(() => []),
-          safeFetch(`${BASE}/api/admin/system-date`).catch(() => null),
-          safeFetch(`${BASE}/api/classes/terms`).catch(() => []),
-        ]);
         setEvents(Array.isArray(ev) ? ev : []);
         if (now) {
           setSysDate(now.currentDate ?? "");
           setOverridden(!!now.overridden);
         }
         
-        const defaultTerms = ['2026-Spring', '2025-Fall', '2025-Spring', '2024-Fall'];
-        let termStrings: string[] = [];
-        if (Array.isArray(termsData) && termsData.length > 0) {
-          termStrings = termsData.map((t: any) => {
-            const semester = t.semester || '';
-            const year = t.year || '';
-            if (semester && year) {
-              const semesterName = semester.charAt(0).toUpperCase() + semester.slice(1).toLowerCase();
-              return `${year}-${semesterName}`;
-            }
-            return null;
-          }).filter((t: string | null) => t !== null) as string[];
-        }
-        const allTerms = [...new Set([...termStrings, ...defaultTerms])];
-        allTerms.sort((a, b) => {
-          const [yearA, semA] = a.split('-');
-          const [yearB, semB] = b.split('-');
-          if (yearA !== yearB) return parseInt(yearB) - parseInt(yearA);
-          const semOrder: Record<string, number> = { 'Fall': 3, 'Summer': 2, 'Spring': 1 };
-          return (semOrder[semB] || 0) - (semOrder[semA] || 0);
-        });
-        setAvailableTerms(allTerms);
       } catch (e: any) {
         setMsg(e.message || "Failed to load.");
         setMe(null);
@@ -597,7 +648,7 @@ export default function ProfilePage() {
           try {
             const rosterData = await safeFetch(`${BASE}/api/roster/student/${currentUserId}`).catch(() => []);
             if (Array.isArray(rosterData) && rosterData.length > 0) {
-              const normalizedSemester = termSemester.charAt(0).toUpperCase() + termSemester.slice(1).toLowerCase();
+              const normalizedSemester = termSemester?.charAt(0).toUpperCase() + termSemester?.slice(1).toLowerCase();
               const filteredRoster = rosterData.filter((item: any) => {
                 const itemYear = typeof item.year === 'number' ? item.year : parseInt(item.year);
                 const itemSemester = item.semester ? 
@@ -656,7 +707,7 @@ export default function ProfilePage() {
       setSchedule: (v: ScheduleClass[]) => void;
       setPlans: (v: PlannedProgram[]) => void;
       setAdmissionReqs: (v: RequirementStatus[]) => void;
-      setDegreeReqs: (v: RequirementStatus[]) => void;
+      setDegreeReqs: (v: (v: RequirementStatus[]) => void) => void;
       setHolds: (v: Hold[]) => void;
       setWaived: (v: TimeConflictWaiver[]) => void;
       setAudit: (v: AuditLogEntry[]) => void;
@@ -695,8 +746,7 @@ export default function ProfilePage() {
     const termYear = termParts.length === 2 ? parseInt(termParts[0]) : null;
     const termSemester = termParts.length === 2 ? termParts[1] : null;
 
-    // NOTE: no backend /gpa call; GPA computed later from classes
-    const [p, d, schedOld, planList, admRaw, degRaw, hOld, w, log, trOld, chOld, cpOld] = await Promise.all([
+    const [p, d, schedOld, planList, admRaw, degRaw, hOld, wRaw, log, trOld, chOld, cpOld] = await Promise.all([
       sid ? safeFetch(`${prefix}`).catch(() => null) : Promise.resolve(null),
       safeFetch(`${prefix}/details`).catch(() => null),
       safeFetch(`${prefix}/schedule?term=${encodeURIComponent(t)}`).catch(() => []),
@@ -714,6 +764,8 @@ export default function ProfilePage() {
     let userId: number | null = null;
     if (p && (p as any).id) {
       userId = (p as any).id;
+    } else if (p && (p as any).userId) {
+      userId = (p as any).userId;
     }
 
     // Holds best-effort
@@ -828,7 +880,7 @@ export default function ProfilePage() {
         if (uId) {
           const rosterData = await safeFetch(`${BASE}/api/roster/student/${uId}`).catch(() => []);
           if (Array.isArray(rosterData) && rosterData.length > 0) {
-            const normalizedSemester = termSemester.charAt(0).toUpperCase() + termSemester.slice(1).toLowerCase();
+            const normalizedSemester = termSemester?.charAt(0).toUpperCase() + termSemester?.slice(1).toLowerCase();
             const filteredRoster = rosterData.filter((item: any) => {
               const itemYear = typeof item.year === 'number' ? item.year : (item.year ? parseInt(String(item.year)) : null);
               const itemSemester = item.semester ? (String(item.semester).charAt(0).toUpperCase() + String(item.semester).slice(1).toLowerCase()) : null;
@@ -854,11 +906,10 @@ export default function ProfilePage() {
       }
     }
 
-    // === Normalization & Fallback (핵심) ===
+    // === Requirements normalize + fallback ===
     const normalizedAdm = normalizeReqs(admRaw);
     let normalizedDeg = normalizeReqs(degRaw);
 
-    // degree reqs가 비어오면 동적 계산 API로 fallback
     if ((!normalizedDeg || normalizedDeg.length === 0) && userId) {
       try {
         const statusData = await safeFetch(`${BASE}/api/degree-requirements-status/student/${userId}`).catch(() => null);
@@ -866,9 +917,17 @@ export default function ProfilePage() {
         if (transformed.length > 0) {
           normalizedDeg = transformed;
         }
-      } catch (e) {
-        // 무시하고 빈 배열 유지
-      }
+      } catch (e) {}
+    }
+
+    // === Waivers normalize + userId fallback ===
+    let w = normalizeWaivers(wRaw);
+    if ((!w || w.length === 0) && userId) {
+      try {
+        const waiversByUser = await safeFetch(`${BASE}/api/waivers/time-conflicts?studentId=${encodeURIComponent(String(userId))}`).catch(() => []);
+        const w2 = normalizeWaivers(waiversByUser);
+        if (w2.length > 0) w = w2;
+      } catch (e) {}
     }
 
     if (sid) sinks.setProfile(p as StudentProfile | null);
@@ -1480,6 +1539,109 @@ function StudentBundleView(props: {
     }
   };
 
+
+  // =============================================================================================
+  // START: 요청하신 새로운 Term/Semester 로직
+  // =============================================================================================
+
+  // 1) StudentBundleView 상단에 유틸 추가
+  const ALL_SEMS = ["Spring", "SummerI", "SummerII", "Fall"] as const;
+  const normSem = (s: string) => {
+    const k = String(s || "").toLowerCase();
+    if (k.startsWith("spring")) return "Spring";
+    // Summer I, SummerII, Summer 1, Summer 2 등 다양한 입력 처리
+    if (k.startsWith("summeri") || k === "summer1" || k === "summer i") return "SummerI";
+    if (k.startsWith("summerii") || k === "summer2" || k === "summer ii") return "SummerII";
+    return "Fall";
+  };
+  
+  // 현재 term 분해
+  const [curYearStr, curSemStr] = (term || "").split("-");
+  const currentYear = curYearStr || "";
+  const currentSem = curSemStr ? normSem(curSemStr) : "Fall";
+
+  // 연도 소스: 서버 terms + 수강 이력 + 플랜 (+ 현재 term)
+  const yearsFromTerms = (availableTerms || [])
+    .map(t => t.split("-")[0])
+    .filter(Boolean);
+  const yearsFromHistory = (classHistory || [])
+    .map(c => String(c.year))
+    .filter(Boolean);
+  const yearsFromPlan = (coursePlan || [])
+    .map(c => String(c.year))
+    .filter(Boolean);
+  const yearsFromTermProp = currentYear ? [currentYear] : [];
+  
+  const allYears = Array.from(new Set([
+    ...yearsFromTerms, ...yearsFromHistory, ...yearsFromPlan, ...yearsFromTermProp
+  ])).sort((a, b) => parseInt(b) - parseInt(a));
+
+  // 선택된 연도의 학기 후보: 서버 terms + 이력 + 플랜
+  const semsFromTerms = (availableTerms || [])
+    .filter(t => t.startsWith((currentYear || "") + "-"))
+    .map(t => normSem(t.split("-")[1] || ""));
+  const semsFromHistory = (classHistory || [])
+    .filter(c => String(c.year) === currentYear)
+    .map(c => normSem(String(c.semester)));
+  const semsFromPlan = (coursePlan || [])
+    .filter(c => String(c.year) === currentYear && c.semester)
+    .map(c => normSem(String(c.semester)));
+    
+  const displayedSemesters = Array.from(new Set([
+    ...semsFromTerms, ...semsFromHistory, ...semsFromPlan
+  ]));
+
+  displayedSemesters.sort((a, b) => semesterOrder(b) - semesterOrder(a));
+
+  // 해당 연도에 아무 데이터가 없어도 기본 4학기 보여주기
+  const semesterOptions = displayedSemesters.length ? displayedSemesters : [...ALL_SEMS];
+
+  // 현재 학기가 옵션에 없으면 가장 우선 학기로 보정
+  const safeCurrentSem = semesterOptions.includes(currentSem) ? currentSem : semesterOptions[0];
+
+
+  // 3) 연/학기 변경 핸들러
+  const changeYear = (y: string) => {
+    if (!y) return;
+    // 새 연도의 학기 재계산 (currentYear를 y로 대체하여 계산)
+    const semsForYear = Array.from(new Set([
+      ...((availableTerms || [])
+        .filter(t => t.startsWith(y + "-"))
+        .map(t => normSem(t.split("-")[1] || ""))),
+      ...((classHistory || [])
+        .filter(c => String(c.year) === y)
+        .map(c => normSem(String(c.semester)))),
+      ...((coursePlan || [])
+        .filter(c => String(c.year) === y && c.semester)
+        .map(c => normSem(String(c.semester))))
+    ]));
+    semsForYear.sort((a, b) => semesterOrder(b) - semesterOrder(a));
+    
+    // 이 연도의 새 학기 옵션 목록
+    const nextSemesterOptions = semsForYear.length ? semsForYear : [...ALL_SEMS];
+    
+    // 현재 학기가 새 옵션에 있으면 유지, 없으면 첫 번째 옵션 선택
+    const previousSem = (term || "").split("-")[1] || "Fall";
+    const nextSem = nextSemesterOptions.includes(normSem(previousSem))
+        ? normSem(previousSem)
+        : nextSemesterOptions[0];
+
+    setTerm(`${y}-${nextSem}`);
+  };
+
+  const changeSem = (s: string) => {
+    const ns = normSem(s);
+    // 현재 연도가 유효하지 않으면, 전체 연도 목록에서 가장 최근 연도 사용
+    const y = currentYear || (allYears[0] || "");
+    if (!y) return;
+    setTerm(`${y}-${ns}`);
+  };
+
+  // =============================================================================================
+  // END: 요청하신 새로운 Term/Semester 로직
+  // =============================================================================================
+
+
   return (
     <section style={{ background: "#fff", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
       <h2 style={{ marginTop: 0 }}>{title}</h2>
@@ -1487,7 +1649,7 @@ function StudentBundleView(props: {
         <div>No student profile loaded.</div>
       ) : (
         <>
-          {/* Basic profile */}
+          {/* Basic profile (이하 생략하지 않음) */}
           <div style={{ display: "grid", gridTemplateColumns: "150px 1fr", rowGap: 8, columnGap: 12, marginTop: 8 }}>
             <div style={{ color: "#666" }}>Name</div>
             <div>{profile.name}</div>
@@ -1706,25 +1868,42 @@ function StudentBundleView(props: {
             )}
           </section>
 
-          {/* Term Schedule */}
+          {/* Term Schedule (수정된 섹션) */}
           <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
               <h3 style={{ margin: 0 }}>Term Schedule</h3>
-              <select value={term} onChange={(e) => setTerm(e.target.value)} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd" }} disabled={busy}>
-                {availableTerms.length > 0 ? (
-                  availableTerms.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))
-                ) : (
-                  <>
-                      <option value="2026-Spring">2026-Spring</option>
-                      <option value="2025-Fall">2025-Fall</option>
-                      <option value="2025-Spring">2025-Spring</option>
-                      <option value="2024-Fall">2024-Fall</option>
-                  </>
-                )}
-              </select>
+
+              {/* Year */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "#666" }}>Year</span>
+                <select
+                  value={currentYear || (allYears[0] || "")}
+                  onChange={(e) => changeYear(e.target.value)}
+                  style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd" }}
+                  disabled={busy}
+                >
+                  {(allYears.length ? allYears : ["2026","2025","2024","2023"]).map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Semester */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "#666" }}>Semester</span>
+                <select
+                  value={safeCurrentSem}
+                  onChange={(e) => changeSem(e.target.value)}
+                  style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd" }}
+                  disabled={busy}
+                >
+                  {semesterOptions.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+
             <div style={{ border: "1px solid #eee", borderRadius: 8, overflow: "hidden" }}>
               <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr 1fr 1fr 100px", background: "#fafafa", fontWeight: 600, padding: "8px 12px" }}>
                 <div>Course</div>
@@ -1735,7 +1914,7 @@ function StudentBundleView(props: {
                 <div>Action</div>
               </div>
               {schedule.length === 0 ? (
-                <div style={{ padding: "12px" }}>No classes found</div>
+                <div style={{ padding: "12px" }}>No classes found for {term}</div>
               ) : (
                 schedule.map((c) => (
                   <div key={`${c.classId}`} style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr 1fr 1fr 100px", padding: "8px 12px", borderTop: "1px solid #f0f0f0", alignItems: "center" }}>
@@ -1993,7 +2172,7 @@ function StudentBundleView(props: {
                   <div>Timestamp</div>
                 </div>
                 {waivedConflicts.map((w, i) => (
-                  <div key={`${w.classA}-${w.classB}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 160px 140px 1fr 200px", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
+                  <div key={`${w.classA}-${w.classB}-${w.waivedAt}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 160px 140px 1fr 200px", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
                     <div>{w.classA}</div>
                     <div>{w.classB}</div>
                     <div>{w.term}</div>
