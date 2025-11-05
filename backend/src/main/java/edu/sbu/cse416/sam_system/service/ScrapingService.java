@@ -62,7 +62,7 @@ public class ScrapingService {
     private CourseRepository courseRepository;
     
     @Autowired
-    private TermRepository termRepository;
+    private TermRepository termRepository;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
 
     private static final String CATALOG_BASE_URL = "https://catalog.stonybrook.edu/content.php?catoid=7&navoid=225";
     private static final String COURSE_DETAIL_BASE_URL = "https://catalog.stonybrook.edu/preview_course_nopop.php";

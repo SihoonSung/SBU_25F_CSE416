@@ -8,11 +8,16 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import edu.sbu.cse416.sam_system.entity.User;
+import edu.sbu.cse416.sam_system.entity.DegreeRequirement;
+import edu.sbu.cse416.sam_system.entity.DegreeType;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
+import edu.sbu.cse416.sam_system.repository.DegreeRequirementRepository;
 import edu.sbu.cse416.sam_system.security.CurrentUser;
 import edu.sbu.cse416.sam_system.service.PersonProfileService; 
 import edu.sbu.cse416.sam_system.service.PersonProfileService.TermRef; // Import TermRef from PersonProfileService for use
 import edu.sbu.cse416.sam_system.service.SystemDateService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -31,14 +36,19 @@ public class ProfileController {
     private final CurrentUser currentUser;
     private final PersonProfileService personProfileService;
     private final SystemDateService systemDateService;
+    private final DegreeRequirementRepository degreeRequirementRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
-    public ProfileController(UserRepository userRepository, JdbcTemplate jdbc, CurrentUser currentUser, PersonProfileService personProfileService, SystemDateService systemDateService) {
+    public ProfileController(UserRepository userRepository, JdbcTemplate jdbc, CurrentUser currentUser, 
+                           PersonProfileService personProfileService, SystemDateService systemDateService,
+                           DegreeRequirementRepository degreeRequirementRepository) {
         this.userRepository = userRepository;
         this.jdbc = jdbc;
         this.currentUser = currentUser;
         this.personProfileService = personProfileService;
         this.systemDateService = systemDateService;
+        this.degreeRequirementRepository = degreeRequirementRepository;
     }
 
     /* ======================================================================
@@ -211,6 +221,28 @@ public class ProfileController {
              throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User is not a student");
         }
         return FullStudentDetailsDto.fromUser(u);
+    }
+
+    @GetMapping("/me/requirements/admission")
+    @PreAuthorize("isAuthenticated()")
+    public List<Map<String, Object>> getAdmissionReqsMe() {
+        User u = resolveUserForMe();
+        if (!u.isStudent()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User is not a student");
+        }
+        if (u.getStudentId() == null) return Collections.emptyList();
+        return queryRequirements(u.getStudentId(), "ADMISSION");
+    }
+
+    @GetMapping("/me/requirements/degree")
+    @PreAuthorize("isAuthenticated()")
+    public List<Map<String, Object>> getDegreeReqsMe() {
+        User u = resolveUserForMe();
+        if (!u.isStudent()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User is not a student");
+        }
+        if (u.getStudentId() == null) return Collections.emptyList();
+        return queryRequirements(u.getStudentId(), "DEGREE");
     }
 
     /* ======================================================================
@@ -573,6 +605,8 @@ public class ProfileController {
     }
 
     private List<Map<String, Object>> queryRequirements(String studentId, String area) {
+        System.out.println("DEBUG: queryRequirements called for studentId: " + studentId + ", area: " + area);
+        
         String baseSql =
             "SELECT r.id AS rid, r.area, r.program_code AS programCode, r.program_name AS programName, " +
             "       r.req_code AS code, r.title, r.status " +
@@ -596,6 +630,8 @@ public class ProfileController {
             }, studentId, area)
         );
 
+        System.out.println("DEBUG: Found " + rows.size() + " rows from requirement_status table");
+
         String usedSql =
             "SELECT subject, course_num AS courseNum, term_code AS term, grade " +
             "FROM requirement_used_classes " +
@@ -617,7 +653,192 @@ public class ProfileController {
             r.remove("rid");
             r.put("usingClasses", used);
         }
+        
+        // If no rows found and area is ADMISSION, try to generate from AOI
+        if (rows.isEmpty() && "ADMISSION".equals(area)) {
+            System.out.println("DEBUG: No rows found, generating from AOI");
+            rows = generateAdmissionRequirementsFromAOI(studentId);
+            System.out.println("DEBUG: Generated " + rows.size() + " requirements from AOI");
+        }
+        
         return rows;
+    }
+    
+    /**
+     * Generate admission requirements dynamically from student's AOI
+     * if requirement_status table doesn't have entries
+     */
+    private List<Map<String, Object>> generateAdmissionRequirementsFromAOI(String studentId) {
+        List<Map<String, Object>> requirements = new ArrayList<>();
+        
+        try {
+            System.out.println("DEBUG: generateAdmissionRequirementsFromAOI called for studentId: " + studentId);
+            
+            // Get student user
+            User student = userRepository.findByStudentId(studentId)
+                .orElse(null);
+            
+            if (student == null) {
+                System.out.println("DEBUG: Student not found for studentId: " + studentId);
+                return requirements;
+            }
+            
+            if (student.getAoi() == null || student.getAoi().trim().isEmpty()) {
+                System.out.println("DEBUG: Student has no AOI");
+                return requirements;
+            }
+            
+            String aoi = student.getAoi().trim();
+            System.out.println("DEBUG: Student AOI: " + aoi);
+            
+            // Find degree requirement for AOI (prefer BS, fallback to BA)
+            List<DegreeRequirement> aoiRequirements = degreeRequirementRepository
+                .findBySubjectCodeAndActive(aoi);
+            
+            if (aoiRequirements.isEmpty()) {
+                System.out.println("DEBUG: No degree requirements found for AOI: " + aoi);
+                return requirements;
+            }
+            
+            System.out.println("DEBUG: Found " + aoiRequirements.size() + " degree requirements for AOI: " + aoi);
+            
+            // Prefer BS, then BA
+            DegreeRequirement requirement = aoiRequirements.stream()
+                .filter(r -> r.getDegreeType() == DegreeType.BS)
+                .findFirst()
+                .orElse(aoiRequirements.stream()
+                    .filter(r -> r.getDegreeType() == DegreeType.BA)
+                    .findFirst()
+                    .orElse(aoiRequirements.get(0)));
+            
+            System.out.println("DEBUG: Using degree requirement: " + requirement.getSubjectCode() + " " + requirement.getDegreeType());
+            
+            // Parse admission requirements from JSON
+            String admissionJson = requirement.getAdmissionRequirements();
+            if (admissionJson == null || admissionJson.trim().isEmpty()) {
+                System.out.println("DEBUG: No admission requirements JSON found");
+                return requirements;
+            }
+            
+            System.out.println("DEBUG: Admission requirements JSON: " + admissionJson.substring(0, Math.min(200, admissionJson.length())));
+            
+            Map<String, Object> admissionData = objectMapper.readValue(
+                admissionJson, new TypeReference<Map<String, Object>>() {});
+            
+            // Get core courses from admission requirements
+            List<Map<String, Object>> coreCourses = null;
+            if (admissionData.containsKey("core_courses")) {
+                Object coreCoursesObj = admissionData.get("core_courses");
+                if (coreCoursesObj instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> temp = (List<Map<String, Object>>) coreCoursesObj;
+                    coreCourses = temp;
+                }
+            }
+            
+            if (coreCourses == null || coreCourses.isEmpty()) {
+                System.out.println("DEBUG: No core courses found in admission requirements");
+                return requirements;
+            }
+            
+            System.out.println("DEBUG: Found " + coreCourses.size() + " core courses");
+            
+            // Get student's enrolled classes
+            String classesSql = 
+                "SELECT uc.department AS subject, uc.course_num AS courseNum, " +
+                "       CONCAT(uc.year, '-', uc.semester) AS term, " +
+                "       uc.grade " +
+                "FROM user_classes uc " +
+                "JOIN users u ON u.user_id = uc.user_id " +
+                "WHERE u.student_id = ? " +
+                "ORDER BY uc.year DESC, uc.semester DESC";
+            
+            List<Map<String, Object>> studentClasses = safeQueryList(() ->
+                jdbc.query(classesSql, (rs, rowNum) -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("subject", rs.getString("subject"));
+                    m.put("courseNum", readInt(rs, "courseNum"));
+                    m.put("term", rs.getString("term"));
+                    m.put("grade", rs.getString("grade"));
+                    return m;
+                }, studentId)
+            );
+            
+            System.out.println("DEBUG: Found " + studentClasses.size() + " student classes");
+            for (Map<String, Object> sc : studentClasses) {
+                System.out.println("DEBUG: Student class: " + sc.get("subject") + " " + sc.get("courseNum") + " grade: " + sc.get("grade"));
+            }
+            
+            // Create requirement status for each core course
+            String programCode = aoi;
+            String programName = aoi + " " + requirement.getDegreeType();
+            
+            for (Map<String, Object> coreCourse : coreCourses) {
+                String courseCode = (String) coreCourse.get("code");
+                if (courseCode == null) {
+                    System.out.println("DEBUG: Core course has no code field");
+                    continue;
+                }
+                
+                System.out.println("DEBUG: Processing core course: " + courseCode);
+                
+                // Parse course code (e.g., "CSE 114")
+                String[] parts = courseCode.split("\\s+");
+                if (parts.length != 2) {
+                    System.out.println("DEBUG: Invalid course code format: " + courseCode);
+                    continue;
+                }
+                
+                String subject = parts[0];
+                int courseNum = Integer.parseInt(parts[1]);
+                
+                // Find matching class in student's classes
+                List<Map<String, Object>> matchingClasses = new ArrayList<>();
+                for (Map<String, Object> studentClass : studentClasses) {
+                    String classSubject = (String) studentClass.get("subject");
+                    Integer classCourseNum = (Integer) studentClass.get("courseNum");
+                    
+                    if (subject.equals(classSubject) && courseNum == classCourseNum) {
+                        matchingClasses.add(studentClass);
+                        System.out.println("DEBUG: Matched class: " + classSubject + " " + classCourseNum);
+                    }
+                }
+                
+                // Determine status
+                String status = "unsatisfied";
+                if (!matchingClasses.isEmpty()) {
+                    // Check if any class has a grade (completed) or grade is null (in progress)
+                    boolean hasGrade = matchingClasses.stream()
+                        .anyMatch(c -> c.get("grade") != null);
+                    if (hasGrade) {
+                        status = "satisfied";
+                    } else {
+                        status = "pending"; // In progress
+                    }
+                }
+                
+                System.out.println("DEBUG: Requirement status for " + courseCode + ": " + status);
+                
+                Map<String, Object> req = new LinkedHashMap<>();
+                req.put("area", "ADMISSION");
+                req.put("programCode", programCode);
+                req.put("programName", programName);
+                req.put("code", courseCode);
+                req.put("title", courseCode);
+                req.put("status", status);
+                req.put("usingClasses", matchingClasses);
+                
+                requirements.add(req);
+            }
+            
+            System.out.println("DEBUG: Generated " + requirements.size() + " admission requirements");
+            
+        } catch (Exception e) {
+            System.err.println("Error generating admission requirements from AOI: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return requirements;
     }
 
     private List<Map<String, Object>> queryHolds(String studentId) {

@@ -75,6 +75,20 @@ type FullStudentDetails = {
   plannedMinorRequirementVersions: TermRef[];
   graduation: TermRef | null;
 };
+// Subject code to display name map for AOI/subjects
+const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
+  CSE: 'Computer Science',
+  AMS: 'Applied Mathematics & Statistics',
+  ECE: 'Electrical & Computer Engineering',
+  MEC: 'Mechanical Engineering',
+  ISE: 'Information Systems',
+  BME: 'Biomedical Engineering',
+  ESE: 'Electrical Engineering',
+  ESG: 'Engineering Science',
+  CME: 'Chemical & Molecular Engineering',
+  CIV: 'Civil Engineering',
+  TSM: 'Technological Systems Management',
+};
 
 type AcademicEvent = { date: string; title: string; type: string };
 
@@ -1503,7 +1517,13 @@ function StudentBundleView(props: {
                 <div style={{ color: "#666" }}>Direct Admit</div>
                 <div>{details.directAdmit || "-"}</div>
                 <div style={{ color: "#666" }}>AOI</div>
-                <div>{details.aoi || "-"}</div>
+                <div>
+                  {details.aoi ? (
+                    SUBJECT_DISPLAY_NAMES[details.aoi]
+                      ? `${details.aoi} (${SUBJECT_DISPLAY_NAMES[details.aoi]})`
+                      : details.aoi
+                  ) : "-"}
+                </div>
                 <div style={{ color: "#666" }}>College</div>
                 <div>{details.college || "-"}</div>
                 <div style={{ color: "#666" }}>Graduation</div>
@@ -2039,8 +2059,13 @@ function ReqTable({ data }: { data: RequirementStatus[] }) {
   const renderUsing = (r: RequirementStatus) => {
     if (!r.usingClasses || r.usingClasses.length === 0) return '-';
     return r.usingClasses
-      .map(c => `${c.subject} ${c.courseNum}${c.term ? ` (${c.term}${c.grade ? ` ${c.grade}` : ""})` : ""}`)
-      .join(", ");
+      .map(c => {
+        const termPart = c.term ? ` (${c.term}` : '';
+        const gradePart = c.grade ? ` ${c.grade}` : (c.term ? ' In progress' : '');
+        const closeParen = c.term ? ')' : '';
+        return `${c.subject} ${c.courseNum}${termPart}${gradePart}${closeParen}`;
+      })
+      .join(', ');
   };
 
   return (

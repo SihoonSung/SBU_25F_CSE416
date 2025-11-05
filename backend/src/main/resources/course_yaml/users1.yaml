@@ -62,13 +62,13 @@ students:
 - SBU_ID: 100123456
   first_name: Charles
   last_name: Brown
-  email: charlie.brown@stonybrook.edu
+  email: minseohappy07@gmail.com
   university_entry: {semester: Fall, year: 2020} # term in which the student entered the university.  valid values for semester: Fall, Spring, SummerI, SummerII
   direct_admit: null # major to which the student was directly admitted when accepted to the university, if any, otherwise null
   AOI: CSE # major for which the student is AOI if any, otherwise null
   college: # college or school that the student is in, identified by acronym, e.g., CEAS
-  majors: [CSE,AMS] # list of majors, identified by 3-letter codes, e.g., CSE
-  degrees: [BS,BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
+  majors: [CSE] # list of majors, identified by 3-letter codes, e.g., CSE
+  degrees: [BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
   major_requirement_versions: [{semester: Fall, year: 2020}, {semester: Fall, year: 2021}] # the degree requirements version the student is following for each major.  entry i in this list corresponds to entry i in the majors list.
   minors: [] # list of minors, identified by 3-letter codes
   minor_requirement_versions: []
@@ -84,11 +84,8 @@ students:
     - {class: CSE999, university: SCCC, credits: 3, department: null, course_num: null, grade : A}
   classes:  # list of classes the student took, is taking, or is registered for in a future semester.
     # GPNC is a boolean flag indicating whether GPMC option was selected.
-    - {class_id: 12345, department: CSE, course_num: 101, section: 2, semester: Fall, year: 2020, credits: 3, GPNC: false, grade: A}
-    - {class_id: 23456, department: AMS, course_num: 151, section: 1, semester: Spring, year: 2021, credits: 3, GPNC: false, grade: A-}
-    - {class_id: 34567, department: CSE, course_num: 214, section: 2, semester: SummerI, year: 2020, credits: 3, GPNC: true, grade: P}
-    - {class_id: 45678, department: AMS, course_num: 261, section: 1, semester: Fall, year: 2025, credits: 3, GPNC: false, grade : A}
-    - {class_id: 56789, department: CSE, course_num: 220, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
+    - {class_id: 23456, department: CSE, course_num: 114, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: A-}
+    - {class_id: 34567, department: CSE, course_num: 214, section: 2, semester: SummerI, year: 2021, credits: 4, GPNC: true, grade: null}
   course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
     - {department: CSE, course_num: 216, semester: Fall, year: 2026, credits: 3}
     - {department: CSE, course_num: 320, semester: Spring, year: 2027, credits: 3}
@@ -96,7 +93,7 @@ students:
 - SBU_ID: 114665644
   first_name: Minseo2
   last_name: Student
-  email: minseohappy07@gmail.com
+  email: minseohappy08@gmail.com
   university_entry: {semester: Spring, year: 2025}
   direct_admit: null
   AOI: null
