@@ -129,6 +129,11 @@ const MajorMinorDeclaration: React.FC = () => {
   const [submittingWaiver, setSubmittingWaiver] = useState(false);
   const [myWaivers, setMyWaivers] = useState<any[]>([]);
   const [loadingWaivers, setLoadingWaivers] = useState(false);
+  // Search functionality for conflicting class
+  const [conflictingClassSearch, setConflictingClassSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   // Available terms from academic calendar
   const [availableTerms, setAvailableTerms] = useState<Array<{
@@ -260,6 +265,24 @@ const MajorMinorDeclaration: React.FC = () => {
       loadMyWaivers();
     }
   }, [userId]);
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const formGroup = target.closest('[style*="position: relative"]');
+      if (!formGroup) {
+        setShowSearchResults(false);
+      }
+    };
+
+    if (showSearchResults) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showSearchResults]);
 
   /**
    * Initialize user ID for waiver requests
@@ -798,6 +821,77 @@ const MajorMinorDeclaration: React.FC = () => {
   }
 
   /**
+   * Search for conflicting classes
+   */
+  const handleSearchConflictingClass = async (searchTerm: string) => {
+    if (!searchTerm.trim() || !waiverTerm.semester || !waiverTerm.year) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    setSearching(true);
+    try {
+      const response = await fetch(`${backendBase}/api/classes/search?q=${encodeURIComponent(searchTerm)}`, {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Filter by selected term
+        const normalizedSemester = waiverTerm.semester.charAt(0).toUpperCase() + waiverTerm.semester.slice(1).toLowerCase();
+        const yearNum = parseInt(waiverTerm.year);
+        
+        const filtered = Array.isArray(data) ? data.filter((cls: any) => {
+          const clsYear = typeof cls.year === 'number' ? cls.year : parseInt(String(cls.year));
+          const clsSemester = cls.semester ? 
+            (String(cls.semester).charAt(0).toUpperCase() + String(cls.semester).slice(1).toLowerCase()) : null;
+          return clsYear === yearNum && clsSemester === normalizedSemester;
+        }) : [];
+
+        setSearchResults(filtered);
+        setShowSearchResults(true);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    } catch (error) {
+      console.error('Error searching classes:', error);
+      setSearchResults([]);
+      setShowSearchResults(false);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  /**
+   * Debounce search for conflicting classes
+   */
+  useEffect(() => {
+    if (!conflictingClassSearch.trim() || !waiverTerm.semester || !waiverTerm.year) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      handleSearchConflictingClass(conflictingClassSearch);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conflictingClassSearch, waiverTerm.semester, waiverTerm.year]);
+
+  /**
+   * Select a conflicting class from search results
+   */
+  const handleSelectConflictingClass = (classItem: any) => {
+    setSelectedConflictingClass(classItem.classId);
+    setConflictingClassSearch(`${classItem.department}${classItem.courseNum}.${classItem.section} - ${classItem.title}`);
+    setShowSearchResults(false);
+  };
+
+  /**
    * Handle waiver request submission
    */
   const handleSubmitWaiver = async (e: React.FormEvent) => {
@@ -836,6 +930,9 @@ const MajorMinorDeclaration: React.FC = () => {
         setSelectedConflictingClass(null)
         setWaiverReason('')
         setWaiverTerm({ semester: '', year: '' })
+        setConflictingClassSearch('')
+        setSearchResults([])
+        setShowSearchResults(false)
         // Reload waivers to show the new request
         loadMyWaivers()
       } else {
@@ -1662,6 +1759,9 @@ const MajorMinorDeclaration: React.FC = () => {
                 setSelectedConflictingClass(null);
                 setWaiverReason('');
                 setWaiverTerm({ semester: '', year: '' });
+                setConflictingClassSearch('');
+                setSearchResults([]);
+                setShowSearchResults(false);
               }
             }}
           >
@@ -1813,24 +1913,97 @@ const MajorMinorDeclaration: React.FC = () => {
                   )}
                 </div>
 
-                <div className="form-group">
+                <div className="form-group" style={{ position: 'relative' }}>
                   <label>Conflicting Class to Add:</label>
-                  <select
-                    value={selectedConflictingClass || ''}
-                    onChange={(e) => setSelectedConflictingClass(e.target.value ? parseInt(e.target.value) : null)}
-                    required
-                    disabled={availableClasses.length === 0 || loadingClasses}
-                  >
-                    <option value="">Select conflicting class</option>
-                    {availableClasses.map(cls => (
-                      <option key={cls.classId} value={cls.classId}>
-                        {cls.department}{cls.courseNum}.{cls.section} - {cls.title} ({cls.schedule})
-                      </option>
-                    ))}
-                  </select>
-                  {availableClasses.length === 0 && !loadingClasses && waiverTerm.semester && waiverTerm.year && (
-                    <small className="form-hint">No available classes found for the selected term.</small>
+                  <input
+                    type="text"
+                    value={conflictingClassSearch}
+                    onChange={(e) => {
+                      setConflictingClassSearch(e.target.value);
+                      if (!e.target.value.trim()) {
+                        setSelectedConflictingClass(null);
+                        setShowSearchResults(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (conflictingClassSearch.trim() && searchResults.length > 0) {
+                        setShowSearchResults(true);
+                      }
+                    }}
+                    placeholder="Search for class (e.g., CSE101, Mathematics, or instructor name)"
+                    required={!selectedConflictingClass}
+                    disabled={!waiverTerm.semester || !waiverTerm.year || loadingClasses}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px'
+                    }}
+                  />
+                  {searching && (
+                    <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>Searching...</small>
                   )}
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      backgroundColor: 'white',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                      maxHeight: '300px',
+                      overflowY: 'auto',
+                      zIndex: 1000,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      marginTop: '4px'
+                    }}>
+                      {searchResults.map(cls => (
+                        <div
+                          key={cls.classId}
+                          onClick={() => handleSelectConflictingClass(cls)}
+                          style={{
+                            padding: '10px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #eee',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f5f5f5';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'white';
+                          }}
+                        >
+                          <div style={{ fontWeight: 'bold' }}>
+                            {cls.department}{cls.courseNum}.{cls.section} - {cls.title}
+                          </div>
+                          <div style={{ fontSize: '0.875rem', color: '#666', marginTop: '4px' }}>
+                            {cls.schedule} | {cls.instructor ? `Instructor: ${cls.instructor}` : 'TBA'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {showSearchResults && searchResults.length === 0 && conflictingClassSearch.trim() && !searching && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      backgroundColor: 'white',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                      padding: '10px',
+                      zIndex: 1000,
+                      marginTop: '4px'
+                    }}>
+                      <small style={{ color: '#666' }}>No classes found matching your search.</small>
+                    </div>
+                  )}
+                  {!waiverTerm.semester || !waiverTerm.year ? (
+                    <small className="form-hint">Please select term semester and year first.</small>
+                  ) : null}
                 </div>
               </div>
 
@@ -1859,6 +2032,9 @@ const MajorMinorDeclaration: React.FC = () => {
                     setSelectedConflictingClass(null);
                     setWaiverReason('');
                     setWaiverTerm({ semester: '', year: '' });
+                    setConflictingClassSearch('');
+                    setSearchResults([]);
+                    setShowSearchResults(false);
                   }}
                   disabled={submittingWaiver}
                 >
