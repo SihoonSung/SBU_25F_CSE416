@@ -17,7 +17,6 @@ registrars:
   first_name: Ralph
   last_name: Randall
   email: ralph.randall@stonybrook.edu
-
 - SBU_ID: 114665632
   first_name: Minseo1
   last_name: Registrar
@@ -36,13 +35,13 @@ academic_advisors:
   last_name: Kamper
   email: kevin.kamper@stonybrook.edu
   level: department
-  academic_unit: CSE
+  academic_unit: [CSE]
 - SBU_ID: 114665641
   first_name: Minseo1
   last_name: advisor
-  email: minseo.kim@stonybrook.edu
-  level: CEAS
-  academic_unit: [AMS,BIO,POL,CSE,ECO,PSY]
+  level: department
+  email: minseohappy06@gmail.com
+  academic_unit: [POL]
 
 instructors:
 - SBU_ID: 100987654
