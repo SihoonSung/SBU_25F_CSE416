@@ -220,7 +220,6 @@ function computeGpaFromHistory(history: HistoricClass[]): GpaSummary {
 }
 
 /** ===== Requirement normalizer & transformer ===== */
-// 응답 포맷이 배열/객체( data / items / requirements ) 등 다양한 경우를 흡수
 function normalizeReqs(raw: any): RequirementStatus[] {
   if (!raw) return [];
   const arr = Array.isArray(raw)
@@ -266,7 +265,6 @@ function normalizeReqs(raw: any): RequirementStatus[] {
   });
 }
 
-// DegreeRequirementStatusService 응답을 RequirementStatus[]로 변환
 function transformFromStatus(statusData: any): RequirementStatus[] {
   if (!statusData) return [];
   const out: RequirementStatus[] = [];
@@ -558,17 +556,14 @@ export default function ProfilePage() {
             const year = t.year || '';
             if (semester && year) {
               const semesterName = semester.charAt(0).toUpperCase() + semester.slice(1).toLowerCase();
-              // 'SummerI', 'SummerII' 처리를 위해 Fall/Spring/Summer로 정규화하지 않음
               return `${year}-${semesterName}`;
             }
             return null;
           }).filter((t: string | null) => t !== null) as string[];
         }
         
-        // --- Term 로직 수정: availableTerms는 서버 응답만 사용 ---
         let uniqueTerms = [...new Set(termStrings)];
 
-        // 로딩 실패 시 임시 기본값 제공 (이전 로직 그대로 유지)
         if (uniqueTerms.length === 0) {
             const currentYear = new Date().getFullYear();
             uniqueTerms = [
@@ -588,7 +583,7 @@ export default function ProfilePage() {
           return (semOrder[semB] || 0) - (semOrder[semA] || 0);
         });
         
-        const defaultTerm = uniqueTerms.length > 0 ? uniqueTerms[0] : "2025-Fall"; // 최종 안전 기본값
+        const defaultTerm = uniqueTerms.length > 0 ? uniqueTerms[0] : "2025-Fall";
         setAvailableTerms(uniqueTerms);
         setMyTerm(defaultTerm);
         setTerm(defaultTerm);
@@ -1540,27 +1535,19 @@ function StudentBundleView(props: {
   };
 
 
-  // =============================================================================================
-  // START: 요청하신 새로운 Term/Semester 로직
-  // =============================================================================================
-
-  // 1) StudentBundleView 상단에 유틸 추가
   const ALL_SEMS = ["Spring", "SummerI", "SummerII", "Fall"] as const;
   const normSem = (s: string) => {
     const k = String(s || "").toLowerCase();
     if (k.startsWith("spring")) return "Spring";
-    // Summer I, SummerII, Summer 1, Summer 2 등 다양한 입력 처리
     if (k.startsWith("summeri") || k === "summer1" || k === "summer i") return "SummerI";
     if (k.startsWith("summerii") || k === "summer2" || k === "summer ii") return "SummerII";
     return "Fall";
   };
   
-  // 현재 term 분해
   const [curYearStr, curSemStr] = (term || "").split("-");
   const currentYear = curYearStr || "";
   const currentSem = curSemStr ? normSem(curSemStr) : "Fall";
 
-  // 연도 소스: 서버 terms + 수강 이력 + 플랜 (+ 현재 term)
   const yearsFromTerms = (availableTerms || [])
     .map(t => t.split("-")[0])
     .filter(Boolean);
@@ -1576,7 +1563,6 @@ function StudentBundleView(props: {
     ...yearsFromTerms, ...yearsFromHistory, ...yearsFromPlan, ...yearsFromTermProp
   ])).sort((a, b) => parseInt(b) - parseInt(a));
 
-  // 선택된 연도의 학기 후보: 서버 terms + 이력 + 플랜
   const semsFromTerms = (availableTerms || [])
     .filter(t => t.startsWith((currentYear || "") + "-"))
     .map(t => normSem(t.split("-")[1] || ""));
@@ -1593,17 +1579,13 @@ function StudentBundleView(props: {
 
   displayedSemesters.sort((a, b) => semesterOrder(b) - semesterOrder(a));
 
-  // 해당 연도에 아무 데이터가 없어도 기본 4학기 보여주기
   const semesterOptions = displayedSemesters.length ? displayedSemesters : [...ALL_SEMS];
 
-  // 현재 학기가 옵션에 없으면 가장 우선 학기로 보정
   const safeCurrentSem = semesterOptions.includes(currentSem) ? currentSem : semesterOptions[0];
 
 
-  // 3) 연/학기 변경 핸들러
   const changeYear = (y: string) => {
     if (!y) return;
-    // 새 연도의 학기 재계산 (currentYear를 y로 대체하여 계산)
     const semsForYear = Array.from(new Set([
       ...((availableTerms || [])
         .filter(t => t.startsWith(y + "-"))
@@ -1616,11 +1598,9 @@ function StudentBundleView(props: {
         .map(c => normSem(String(c.semester))))
     ]));
     semsForYear.sort((a, b) => semesterOrder(b) - semesterOrder(a));
-    
-    // 이 연도의 새 학기 옵션 목록
+
     const nextSemesterOptions = semsForYear.length ? semsForYear : [...ALL_SEMS];
-    
-    // 현재 학기가 새 옵션에 있으면 유지, 없으면 첫 번째 옵션 선택
+
     const previousSem = (term || "").split("-")[1] || "Fall";
     const nextSem = nextSemesterOptions.includes(normSem(previousSem))
         ? normSem(previousSem)
@@ -1631,15 +1611,11 @@ function StudentBundleView(props: {
 
   const changeSem = (s: string) => {
     const ns = normSem(s);
-    // 현재 연도가 유효하지 않으면, 전체 연도 목록에서 가장 최근 연도 사용
+
     const y = currentYear || (allYears[0] || "");
     if (!y) return;
     setTerm(`${y}-${ns}`);
   };
-
-  // =============================================================================================
-  // END: 요청하신 새로운 Term/Semester 로직
-  // =============================================================================================
 
 
   return (
@@ -1649,7 +1625,7 @@ function StudentBundleView(props: {
         <div>No student profile loaded.</div>
       ) : (
         <>
-          {/* Basic profile (이하 생략하지 않음) */}
+          {}
           <div style={{ display: "grid", gridTemplateColumns: "150px 1fr", rowGap: 8, columnGap: 12, marginTop: 8 }}>
             <div style={{ color: "#666" }}>Name</div>
             <div>{profile.name}</div>
@@ -1868,7 +1844,7 @@ function StudentBundleView(props: {
             )}
           </section>
 
-          {/* Term Schedule (수정된 섹션) */}
+          {/* Term Schedule */}
           <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
               <h3 style={{ margin: 0 }}>Term Schedule</h3>
