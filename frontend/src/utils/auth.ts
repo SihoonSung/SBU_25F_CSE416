@@ -1,7 +1,22 @@
 // src/utils/auth.ts
 
-const BACKEND_BASE =
-  import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
+// Support both Vite (import.meta.env) and Jest (process.env) environments
+let BACKEND_BASE = 'http://localhost:8080'
+try {
+  // @ts-ignore - import.meta is Vite-specific
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  // eslint-disable-next-line no-eval
+  const viteEnv = eval('import.meta?.env')
+  if (viteEnv && viteEnv.VITE_BACKEND_URL) {
+    BACKEND_BASE = viteEnv.VITE_BACKEND_URL
+  }
+} catch (e) {
+  // In Jest environment, use process.env
+  if (typeof process !== 'undefined' && process.env && process.env.VITE_BACKEND_URL) {
+    BACKEND_BASE = process.env.VITE_BACKEND_URL
+  }
+}
 
 export async function getCurrentUser(): Promise<{
   user?: {
