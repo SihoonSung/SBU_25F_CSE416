@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement authentication utilities with OAuth2 integration
+ */
+
 // src/utils/auth.ts
 
 // Support both Vite (import.meta.env) and Jest (process.env) environments

@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement dashboard page with Google OAuth2 integration and user dashboard
+ */
+
 import React, { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import './Dashboard.css'

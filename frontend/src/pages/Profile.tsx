@@ -220,6 +220,10 @@ function computeGpaFromHistory(history: HistoricClass[]): GpaSummary {
 }
 
 /** ===== Requirement normalizer & transformer ===== */
+<<<<<<< HEAD
+=======
+// TP: Used Cursor to normalize response formats that may be arrays/objects (data/items/requirements) in various cases
+>>>>>>> 833643e (add comments)
 function normalizeReqs(raw: any): RequirementStatus[] {
   if (!raw) return [];
   const arr = Array.isArray(raw)
@@ -265,6 +269,10 @@ function normalizeReqs(raw: any): RequirementStatus[] {
   });
 }
 
+<<<<<<< HEAD
+=======
+// TP: Used Cursor to transform DegreeRequirementStatusService response to RequirementStatus[]
+>>>>>>> 833643e (add comments)
 function transformFromStatus(statusData: any): RequirementStatus[] {
   if (!statusData) return [];
   const out: RequirementStatus[] = [];
@@ -364,6 +372,7 @@ function transformFromStatus(statusData: any): RequirementStatus[] {
 }
 
 /** ===== Waiver normalizer ===== */
+// TP: Used Cursor to normalize time conflict waiver response formats
 function normalizeWaivers(raw: any): TimeConflictWaiver[] {
   if (!raw) return [];
   const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw?.items) ? raw.items : []));
@@ -556,14 +565,25 @@ export default function ProfilePage() {
             const year = t.year || '';
             if (semester && year) {
               const semesterName = semester.charAt(0).toUpperCase() + semester.slice(1).toLowerCase();
+<<<<<<< HEAD
+=======
+              // TP: Used Cursor - Do not normalize to Fall/Spring/Summer to preserve 'SummerI', 'SummerII' format
+>>>>>>> 833643e (add comments)
               return `${year}-${semesterName}`;
             }
             return null;
           }).filter((t: string | null) => t !== null) as string[];
         }
         
+<<<<<<< HEAD
         let uniqueTerms = [...new Set(termStrings)];
 
+=======
+        // TP: Used Cursor - Term logic updated: availableTerms uses only server response
+        let uniqueTerms = [...new Set(termStrings)];
+
+        // TP: Used Cursor - Provide temporary default values if loading fails (maintains previous logic)
+>>>>>>> 833643e (add comments)
         if (uniqueTerms.length === 0) {
             const currentYear = new Date().getFullYear();
             uniqueTerms = [
@@ -702,7 +722,7 @@ export default function ProfilePage() {
       setSchedule: (v: ScheduleClass[]) => void;
       setPlans: (v: PlannedProgram[]) => void;
       setAdmissionReqs: (v: RequirementStatus[]) => void;
-      setDegreeReqs: (v: (v: RequirementStatus[]) => void) => void;
+      setDegreeReqs: (v: RequirementStatus[]) => void;
       setHolds: (v: Hold[]) => void;
       setWaived: (v: TimeConflictWaiver[]) => void;
       setAudit: (v: AuditLogEntry[]) => void;
@@ -1353,6 +1373,7 @@ export default function ProfilePage() {
 }
 
 /** ===== Reusable bundle viewer ===== */
+// TP: Used Cursor to implement reusable student bundle viewer component
 function StudentBundleView(props: {
   title: string;
   term: string;
@@ -1535,19 +1556,39 @@ function StudentBundleView(props: {
   };
 
 
+<<<<<<< HEAD
+=======
+  // =============================================================================================
+  // TP: Used Cursor - START: New Term/Semester logic implementation
+  // =============================================================================================
+
+  // TP: Used Cursor - Utility functions added at top of StudentBundleView
+>>>>>>> 833643e (add comments)
   const ALL_SEMS = ["Spring", "SummerI", "SummerII", "Fall"] as const;
   const normSem = (s: string) => {
     const k = String(s || "").toLowerCase();
     if (k.startsWith("spring")) return "Spring";
+<<<<<<< HEAD
+=======
+    // TP: Used Cursor - Handle various input formats: Summer I, SummerII, Summer 1, Summer 2, etc.
+>>>>>>> 833643e (add comments)
     if (k.startsWith("summeri") || k === "summer1" || k === "summer i") return "SummerI";
     if (k.startsWith("summerii") || k === "summer2" || k === "summer ii") return "SummerII";
     return "Fall";
   };
   
+<<<<<<< HEAD
+=======
+  // TP: Used Cursor - Decompose current term
+>>>>>>> 833643e (add comments)
   const [curYearStr, curSemStr] = (term || "").split("-");
   const currentYear = curYearStr || "";
   const currentSem = curSemStr ? normSem(curSemStr) : "Fall";
 
+<<<<<<< HEAD
+=======
+  // TP: Used Cursor - Year sources: server terms + class history + plan (+ current term)
+>>>>>>> 833643e (add comments)
   const yearsFromTerms = (availableTerms || [])
     .map(t => t.split("-")[0])
     .filter(Boolean);
@@ -1563,6 +1604,10 @@ function StudentBundleView(props: {
     ...yearsFromTerms, ...yearsFromHistory, ...yearsFromPlan, ...yearsFromTermProp
   ])).sort((a, b) => parseInt(b) - parseInt(a));
 
+<<<<<<< HEAD
+=======
+  // TP: Used Cursor - Semester candidates for selected year: server terms + history + plan
+>>>>>>> 833643e (add comments)
   const semsFromTerms = (availableTerms || [])
     .filter(t => t.startsWith((currentYear || "") + "-"))
     .map(t => normSem(t.split("-")[1] || ""));
@@ -1579,6 +1624,7 @@ function StudentBundleView(props: {
 
   displayedSemesters.sort((a, b) => semesterOrder(b) - semesterOrder(a));
 
+<<<<<<< HEAD
   const semesterOptions = displayedSemesters.length ? displayedSemesters : [...ALL_SEMS];
 
   const safeCurrentSem = semesterOptions.includes(currentSem) ? currentSem : semesterOptions[0];
@@ -1586,6 +1632,19 @@ function StudentBundleView(props: {
 
   const changeYear = (y: string) => {
     if (!y) return;
+=======
+  // TP: Used Cursor - Show default 4 semesters even if no data exists for that year
+  const semesterOptions = displayedSemesters.length ? displayedSemesters : [...ALL_SEMS];
+
+  // TP: Used Cursor - If current semester is not in options, correct to highest priority semester
+  const safeCurrentSem = semesterOptions.includes(currentSem) ? currentSem : semesterOptions[0];
+
+
+  // TP: Used Cursor - Year/semester change handlers
+  const changeYear = (y: string) => {
+    if (!y) return;
+    // TP: Used Cursor - Recalculate semesters for new year (replace currentYear with y)
+>>>>>>> 833643e (add comments)
     const semsForYear = Array.from(new Set([
       ...((availableTerms || [])
         .filter(t => t.startsWith(y + "-"))
@@ -1598,9 +1657,17 @@ function StudentBundleView(props: {
         .map(c => normSem(String(c.semester))))
     ]));
     semsForYear.sort((a, b) => semesterOrder(b) - semesterOrder(a));
+<<<<<<< HEAD
 
     const nextSemesterOptions = semsForYear.length ? semsForYear : [...ALL_SEMS];
 
+=======
+    
+    // TP: Used Cursor - New semester options list for this year
+    const nextSemesterOptions = semsForYear.length ? semsForYear : [...ALL_SEMS];
+    
+    // TP: Used Cursor - If current semester is in new options, keep it; otherwise select first option
+>>>>>>> 833643e (add comments)
     const previousSem = (term || "").split("-")[1] || "Fall";
     const nextSem = nextSemesterOptions.includes(normSem(previousSem))
         ? normSem(previousSem)
@@ -1611,12 +1678,23 @@ function StudentBundleView(props: {
 
   const changeSem = (s: string) => {
     const ns = normSem(s);
+<<<<<<< HEAD
 
+=======
+    // TP: Used Cursor - If current year is invalid, use most recent year from full year list
+>>>>>>> 833643e (add comments)
     const y = currentYear || (allYears[0] || "");
     if (!y) return;
     setTerm(`${y}-${ns}`);
   };
 
+<<<<<<< HEAD
+=======
+  // =============================================================================================
+  // TP: Used Cursor - END: New Term/Semester logic
+  // =============================================================================================
+
+>>>>>>> 833643e (add comments)
 
   return (
     <section style={{ background: "#fff", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
@@ -1787,7 +1865,7 @@ function StudentBundleView(props: {
                   <option value="unsatisfied">Unsatisfied</option>
                 </select>
               </div>
-              <ReqTable data={admissionReqs.filter(r => admFilter==='all' ? true : r.status===admFilter)} />
+              <ReqTable data={filteredAdmission} />
             </section>
 
             {/* Degree Requirements */}
@@ -1807,7 +1885,7 @@ function StudentBundleView(props: {
                   <option value="unsatisfied">Unsatisfied</option>
                 </select>
               </div>
-              <ReqTable data={degreeReqs.filter(r => degFilter==='all' ? true : r.status===degFilter)} />
+              <ReqTable data={filteredDegree} />
             </section>
           </section>
 
@@ -1844,7 +1922,11 @@ function StudentBundleView(props: {
             )}
           </section>
 
+<<<<<<< HEAD
           {/* Term Schedule */}
+=======
+          {/* TP: Used Cursor - Term Schedule (updated section) */}
+>>>>>>> 833643e (add comments)
           <section style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
               <h3 style={{ margin: 0 }}>Term Schedule</h3>
@@ -2191,6 +2273,7 @@ function StudentBundleView(props: {
 }
 
 /** ===== Requirement table (reused) ===== */
+// TP: Used Cursor to implement requirement status table component
 function ReqTable({ data }: { data: RequirementStatus[] }) {
   if (!data || data.length === 0) return <div>No requirements.</div>;
 

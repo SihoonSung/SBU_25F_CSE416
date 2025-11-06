@@ -19,8 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * //tp : Used CURSOR to implement this :
- * Service for managing major/minor declaration requests.
+ * TP: Used Cursor to implement service for managing major/minor declaration requests.
  * Handles business logic for student declarations and advisor approvals.
  */
 @Service

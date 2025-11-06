@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement time conflict checking utility
+ */
+
 // Simple time conflict checking utility
 
 // Support both Vite (import.meta.env) and Jest (process.env) environments

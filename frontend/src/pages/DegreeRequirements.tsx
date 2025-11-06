@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement degree requirements viewing page
+ */
+
 import React, { useState, useEffect } from 'react';
 import './DegreeRequirements.css';
 

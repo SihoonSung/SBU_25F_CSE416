@@ -17,7 +17,7 @@ import java.util.Optional;
 
 /**
  * Controller for planned major operations.
- * Handles API endpoints for students to plan/unplan majors.
+ * TP used cursor to Handles API endpoints for students to plan/unplan majors.
  */
 @RestController
 @RequestMapping("/api/planned-majors")

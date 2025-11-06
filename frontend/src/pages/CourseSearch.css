@@ -164,7 +164,7 @@
   border-radius: 20px;
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  padding: 12px; /* 헤더+행을 하나의 박스 안 모듈처럼 보이게 내부 여백 추가 */
+  padding: 12px; /* TP: Used Cursor - Add internal padding to make header+rows appear as a module-like box */
 }
 
 .results-header {
@@ -184,7 +184,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 16px 6px 6px 6px; /* 헤더와 간격 좁게, 외곽 padding은 shell에서 처리 */
+  padding: 16px 6px 6px 6px; /* TP: Used Cursor - Narrow spacing with header, outer padding handled by shell */
 }
 
 .search-row {

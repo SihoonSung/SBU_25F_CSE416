@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to implement navigation bar component with authentication and routing
+ */
+
 import { useEffect, useState } from 'react';
 import './NavigationBar.css';
 import { Link, useNavigate, useLocation } from 'react-router-dom';

@@ -1,3 +1,7 @@
+/*
+ * TP: Used Cursor to define TypeScript interfaces for User data from backend
+ */
+
 // TypeScript interfaces for User data from backend
 
 export interface User {
