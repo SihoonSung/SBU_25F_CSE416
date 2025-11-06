@@ -38,9 +38,4 @@ build/
 ### Log files
 *.log
 
-<<<<<<< HEAD
-### Test configuration files
-=======
-# Ignore sample YAML test data used for local development
->>>>>>> f755546 (pulled some UI)
 src/main/resources/course_yaml/users1.yaml
