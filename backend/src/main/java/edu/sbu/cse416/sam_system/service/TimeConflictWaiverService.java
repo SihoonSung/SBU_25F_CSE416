@@ -126,7 +126,18 @@ public class TimeConflictWaiverService {
         waiver.setEnrolledInstructorApprovedAt(LocalDateTime.now());
         waiver.updateStatus();
         
-        return waiverRepository.save(waiver);
+        waiver = waiverRepository.save(waiver);
+        
+        // Log audit entry if waiver is fully approved
+        if (waiver.getStatus() == TimeConflictWaiver.WaiverStatus.APPROVED) {
+            String classA = waiver.getEnrolledClass().getDepartment() + " " + waiver.getEnrolledClass().getCourseNum();
+            String classB = waiver.getConflictingClass().getDepartment() + " " + waiver.getConflictingClass().getCourseNum();
+            // Use advisor if available, otherwise use the last approver (this instructor)
+            User performingUser = waiver.getAdvisorApprovedBy() != null ? waiver.getAdvisorApprovedBy() : instructor;
+            auditLogService.logTimeConflictWaived(waiver.getStudent(), performingUser, classA, classB, null);
+        }
+        
+        return waiver;
     }
     
     /**
@@ -164,7 +175,18 @@ public class TimeConflictWaiverService {
         waiver.setConflictingInstructorApprovedAt(LocalDateTime.now());
         waiver.updateStatus();
         
-        return waiverRepository.save(waiver);
+        waiver = waiverRepository.save(waiver);
+        
+        // Log audit entry if waiver is fully approved
+        if (waiver.getStatus() == TimeConflictWaiver.WaiverStatus.APPROVED) {
+            String classA = waiver.getEnrolledClass().getDepartment() + " " + waiver.getEnrolledClass().getCourseNum();
+            String classB = waiver.getConflictingClass().getDepartment() + " " + waiver.getConflictingClass().getCourseNum();
+            // Use advisor if available, otherwise use the last approver (this instructor)
+            User performingUser = waiver.getAdvisorApprovedBy() != null ? waiver.getAdvisorApprovedBy() : instructor;
+            auditLogService.logTimeConflictWaived(waiver.getStudent(), performingUser, classA, classB, null);
+        }
+        
+        return waiver;
     }
     
     /**

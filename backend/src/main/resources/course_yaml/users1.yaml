@@ -35,7 +35,7 @@ academic_advisors:
   last_name: Kamper
   email: kevin.kamper@stonybrook.edu
   level: department
-  academic_unit: [CSE]
+  academic_unit: [AAS, CSE]
 - SBU_ID: 114665641
   first_name: Minseo1
   last_name: advisor
@@ -56,6 +56,14 @@ instructors:
   first_name: Sihoon
   last_name: Sung
   email: sihoonsg0605@gmail.com
+- SBU_ID: 100987654
+  first_name: Eva
+  last_name: Nagase
+  email: seongbeenna@gmail.com
+- SBU_ID: 100876543
+  first_name: William
+  last_name: Chittick
+  email: sktjdqls1223@gmail.com
 
 students:
 - SBU_ID: 100123456
