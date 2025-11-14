@@ -67,11 +67,13 @@ public class AuditLog {
         DEGREE_REQUIREMENT_WAIVED,
         PREREQUISITE_WAIVED,
         COREQUISITE_WAIVED,
+        ANTIREQUISITE_WAIVED,
         TIME_CONFLICT_WAIVED,
         
         // Waiver requests (student-initiated)
         PREREQUISITE_WAIVER_REQUESTED,
         COREQUISITE_WAIVER_REQUESTED,
+        ANTIREQUISITE_WAIVER_REQUESTED,
         TIME_CONFLICT_WAIVER_REQUESTED,
         
         // Class schedule

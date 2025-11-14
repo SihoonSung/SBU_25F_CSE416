@@ -313,11 +313,71 @@ public class AuditLogService {
     }
     
     /**
+     * Log antirequisite waiver request (student-initiated)
+     */
+    public AuditLog logAntirequisiteWaiverRequested(User student, String course, String antirequisite, String reason) {
+        String details = String.format("{\"course\":\"%s\",\"antirequisite\":\"%s\",\"reason\":\"%s\"}", course, antirequisite, reason);
+        return logAction(student, student, AuditLog.ActionType.ANTIREQUISITE_WAIVER_REQUESTED, details, null);
+    }
+    
+    /**
      * Log time conflict waiver request (student-initiated)
      */
     public AuditLog logTimeConflictWaiverRequested(User student, String classA, String classB, String reason) {
         String details = String.format("{\"classA\":\"%s\",\"classB\":\"%s\",\"reason\":\"%s\"}", classA, classB, reason);
         return logAction(student, student, AuditLog.ActionType.TIME_CONFLICT_WAIVER_REQUESTED, details, null);
+    }
+    
+    /**
+     * Log requisite waiver request (student-initiated) - generic method
+     */
+    public AuditLog logRequisiteWaiverRequested(User student, String courseCode, String requisiteType, String reason) {
+        AuditLog.ActionType actionType;
+        switch (requisiteType.toUpperCase()) {
+            case "PREREQUISITE":
+                actionType = AuditLog.ActionType.PREREQUISITE_WAIVER_REQUESTED;
+                break;
+            case "COREQUISITE":
+                actionType = AuditLog.ActionType.COREQUISITE_WAIVER_REQUESTED;
+                break;
+            case "ANTIREQUISITE":
+                actionType = AuditLog.ActionType.ANTIREQUISITE_WAIVER_REQUESTED;
+                break;
+            default:
+                actionType = AuditLog.ActionType.PREREQUISITE_WAIVER_REQUESTED; // Default fallback
+        }
+        String details = String.format("{\"course\":\"%s\",\"requisiteType\":\"%s\",\"reason\":\"%s\"}", courseCode, requisiteType, reason);
+        return logAction(student, student, actionType, details, null);
+    }
+    
+    /**
+     * Log antirequisite waived (approved by advisor or registrar)
+     */
+    public AuditLog logAntirequisiteWaived(User student, User performingUser, String course, String note) {
+        String details = String.format("{\"course\":\"%s\"}", course);
+        return logAction(student, performingUser, AuditLog.ActionType.ANTIREQUISITE_WAIVED, details, note);
+    }
+    
+    /**
+     * Log requisite waived (approved by advisor or registrar) - generic method
+     */
+    public AuditLog logRequisiteWaived(User student, User performingUser, String courseCode, String requisiteType, String note) {
+        AuditLog.ActionType actionType;
+        switch (requisiteType.toUpperCase()) {
+            case "PREREQUISITE":
+                actionType = AuditLog.ActionType.PREREQUISITE_WAIVED;
+                break;
+            case "COREQUISITE":
+                actionType = AuditLog.ActionType.COREQUISITE_WAIVED;
+                break;
+            case "ANTIREQUISITE":
+                actionType = AuditLog.ActionType.ANTIREQUISITE_WAIVED;
+                break;
+            default:
+                actionType = AuditLog.ActionType.PREREQUISITE_WAIVED; // Default fallback
+        }
+        String details = String.format("{\"course\":\"%s\"}", courseCode);
+        return logAction(student, performingUser, actionType, details, note);
     }
     
     /**

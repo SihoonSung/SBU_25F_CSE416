@@ -40,6 +40,9 @@ public class RequisiteWaiverService {
     @Autowired
     private ClassRepository classRepository;
     
+    @Autowired
+    private AuditLogService auditLogService;
+    
     /**
      * Create a new waiver request
      * @param studentId Student requesting the waiver
@@ -73,6 +76,10 @@ public class RequisiteWaiverService {
         waiver.setStatus(RequisiteWaiver.WaiverStatus.PENDING);
         
         waiver = waiverRepository.save(waiver);
+        
+        // Log audit entry for student-initiated waiver request
+        String courseCode = classEntity.getDepartment() + " " + classEntity.getCourseNum();
+        auditLogService.logRequisiteWaiverRequested(student, courseCode, requisiteType.toString(), reason != null ? reason : "");
         
         return waiver;
     }
@@ -126,6 +133,14 @@ public class RequisiteWaiverService {
         waiver.updateStatus();
         
         waiver = waiverRepository.save(waiver);
+        
+        // Log audit entry if waiver is fully approved
+        if (waiver.getStatus() == RequisiteWaiver.WaiverStatus.APPROVED) {
+            String courseCode = waiver.getClassEntity().getDepartment() + " " + waiver.getClassEntity().getCourseNum();
+            // Use advisor (current approver) as performingUser
+            auditLogService.logRequisiteWaived(waiver.getStudent(), advisor, courseCode, 
+                waiver.getRequisiteType().toString(), null);
+        }
         
         return waiver;
     }
@@ -204,6 +219,14 @@ public class RequisiteWaiverService {
         waiver.updateStatus();
         
         waiver = waiverRepository.save(waiver);
+        
+        // Log audit entry if waiver is fully approved
+        if (waiver.getStatus() == RequisiteWaiver.WaiverStatus.APPROVED) {
+            String courseCode = waiver.getClassEntity().getDepartment() + " " + waiver.getClassEntity().getCourseNum();
+            // Use registrar (current approver) as performingUser
+            auditLogService.logRequisiteWaived(waiver.getStudent(), registrar, courseCode, 
+                waiver.getRequisiteType().toString(), null);
+        }
         
         return waiver;
     }
