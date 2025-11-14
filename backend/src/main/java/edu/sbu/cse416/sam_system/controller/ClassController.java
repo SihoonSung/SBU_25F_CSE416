@@ -114,7 +114,6 @@ public class ClassController {
             classEntity.setInstructor(classDetails.getInstructor());
             classEntity.setSchedule(classDetails.getSchedule());
             classEntity.setLocation(classDetails.getLocation());
-            classEntity.setPrerequisites(classDetails.getPrerequisites());
             
             ClassEntity updatedClass = classService.saveClass(classEntity);
             return new ResponseEntity<>(updatedClass, HttpStatus.OK);

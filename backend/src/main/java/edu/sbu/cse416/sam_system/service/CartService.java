@@ -5,15 +5,17 @@ import edu.sbu.cse416.sam_system.entity.ClassEntity;
 import edu.sbu.cse416.sam_system.entity.User;
 import edu.sbu.cse416.sam_system.entity.UserClasses;
 import edu.sbu.cse416.sam_system.entity.ClassRoster;
+import edu.sbu.cse416.sam_system.entity.Course;
+import edu.sbu.cse416.sam_system.entity.Term;
 import edu.sbu.cse416.sam_system.repository.CartRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRepository;
+import edu.sbu.cse416.sam_system.repository.CourseRepository;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRosterRepository;
-import edu.sbu.cse416.sam_system.service.PrerequisitesValidationService;
 import edu.sbu.cse416.sam_system.entity.WaitlistEntry;
 import edu.sbu.cse416.sam_system.repository.WaitlistRepository;
-import edu.sbu.cse416.sam_system.service.RegistrationHoldService;
+import edu.sbu.cse416.sam_system.repository.TermRepository;
 import edu.sbu.cse416.sam_system.util.TimeConflictChecker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Optional;
 
 /**
  * Service class for cart functionality.
@@ -44,6 +47,9 @@ public class CartService {
     
     @Autowired
     private ClassRepository classRepository;
+
+    @Autowired
+    private CourseRepository courseRepository;
     
     @Autowired
     private UserRepository userRepository;
@@ -56,6 +62,9 @@ public class CartService {
 
     @Autowired
     private WaitlistRepository waitlistRepository;
+
+    @Autowired
+    private TermRepository termRepository;
     
     @Autowired
     private PrerequisitesValidationService prerequisitesValidationService;
@@ -95,9 +104,13 @@ public class CartService {
             status = "Waitlist";
         }
 
-        // Check prerequisites
-        String prerequisites = classEntity.getPrerequisites();
-        
+        // Resolve requisites from scraped course catalog data
+        CourseRequisiteInfo requisites = resolveRequisitesForClass(classEntity);
+        String prerequisites = requisites.getPrerequisites();
+        String antirequisites = requisites.getAntirequisites();
+        String corequisites = requisites.getCorequisites();
+
+        // Check prerequisites        
         if (prerequisites != null && !prerequisites.trim().isEmpty() && !prerequisites.trim().equalsIgnoreCase("None")) {
             boolean prerequisitesMet = prerequisitesValidationService.validatePrerequisites(userId, prerequisites);
             if (!prerequisitesMet) {
@@ -107,7 +120,6 @@ public class CartService {
         }
         
         // Check antirequisites
-        String antirequisites = classEntity.getAntirequisites();
         if (antirequisites != null && !antirequisites.trim().isEmpty()) {
             boolean antirequisitesOk = prerequisitesValidationService.validateAntirequisites(userId, antirequisites);
             if (!antirequisitesOk) {
@@ -117,7 +129,6 @@ public class CartService {
         }
         
         // Check corequisites
-        String corequisites = classEntity.getCorequisites();
         if (corequisites != null && !corequisites.trim().isEmpty() && !corequisites.trim().equalsIgnoreCase("None")) {
             // For now, use current semester/year from the class entity
             String currentSemester = classEntity.getSemester();
@@ -360,8 +371,12 @@ public class CartService {
             
             for (CartEntity cartItem : cartItems) {
                 if (cartItem.getStatus().equals("Added")) {
+                    CourseRequisiteInfo requisites = resolveRequisitesForClass(cartItem.getClassEntity());
+                    String prerequisites = requisites.getPrerequisites();
+                    String antirequisites = requisites.getAntirequisites();
+                    String corequisites = requisites.getCorequisites();
+
                     // Check prerequisites
-                    String prerequisites = cartItem.getClassEntity().getPrerequisites();
                     if (prerequisites != null && !prerequisites.trim().isEmpty() && !prerequisites.trim().equalsIgnoreCase("None")) {
                         boolean prerequisitesMet = prerequisitesValidationService.validatePrerequisites(userId, prerequisites);
                         if (!prerequisitesMet) {
@@ -373,7 +388,6 @@ public class CartService {
                     }
                     
                     // Check antirequisites
-                    String antirequisites = cartItem.getClassEntity().getAntirequisites();
                     if (antirequisites != null && !antirequisites.trim().isEmpty()) {
                         boolean antirequisitesOk = prerequisitesValidationService.validateAntirequisites(userId, antirequisites);
                         if (!antirequisitesOk) {
@@ -385,7 +399,6 @@ public class CartService {
                     }
                     
                     // Check corequisites
-                    String corequisites = cartItem.getClassEntity().getCorequisites();
                     if (corequisites != null && !corequisites.trim().isEmpty() && !corequisites.trim().equalsIgnoreCase("None")) {
                         String currentSemester = cartItem.getClassEntity().getSemester();
                         Integer currentYear = cartItem.getClassEntity().getYear();
@@ -674,5 +687,108 @@ public class CartService {
         }
         
         return message.toString().trim();
+    }
+
+    /**
+     * Resolve requisite information for a class from the scraped course catalog.
+     * Falls back to empty values if the course could not be found.
+     */
+    private CourseRequisiteInfo resolveRequisitesForClass(ClassEntity classEntity) {
+        if (classEntity == null) {
+            return CourseRequisiteInfo.empty();
+        }
+
+        Optional<Course> courseOpt = findCourseForClass(classEntity);
+        if (courseOpt.isPresent()) {
+            Course course = courseOpt.get();
+            return new CourseRequisiteInfo(
+                normalizeRequisite(course.getPrerequisites()),
+                normalizeRequisite(course.getCorequisites()),
+                normalizeRequisite(course.getAntirequisites())
+            );
+        }
+
+        // No matching course found (e.g., catalog not scraped yet)
+        return CourseRequisiteInfo.empty();
+    }
+
+    /**
+     * Attempt to find the scraped Course entry that matches the given class.
+     * Tries term-specific lookup first, then falls back to subject/course number only.
+     */
+    private Optional<Course> findCourseForClass(ClassEntity classEntity) {
+        String subject = classEntity.getDepartment();
+        Integer courseNum = classEntity.getCourseNum();
+
+        if (subject == null || courseNum == null) {
+            return Optional.empty();
+        }
+
+        String courseNumber = String.valueOf(courseNum);
+        String termName = buildTermName(classEntity.getSemester(), classEntity.getYear());
+
+        if (termName != null) {
+            Optional<Term> term = termRepository.findByName(termName);
+            if (term.isPresent()) {
+                Optional<Course> course = courseRepository.findBySubjectAndCourseNumberAndTerm(subject, courseNumber, term.get());
+                if (course.isPresent()) {
+                    return course;
+                }
+            }
+        }
+
+        return courseRepository.findBySubjectAndCourseNumber(subject, courseNumber);
+    }
+
+    /**
+     * Build the term name used by scraped courses (e.g., "Fall 2025").
+     */
+    private String buildTermName(String semester, Integer year) {
+        if (semester == null || semester.isBlank() || year == null) {
+            return null;
+        }
+        return semester.trim() + " " + year;
+    }
+
+    private String normalizeRequisite(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if ("none".equalsIgnoreCase(trimmed) || "unknown".equalsIgnoreCase(trimmed)) {
+            return null;
+        }
+        return trimmed;
+    }
+
+    private static class CourseRequisiteInfo {
+        private final String prerequisites;
+        private final String corequisites;
+        private final String antirequisites;
+
+        CourseRequisiteInfo(String prerequisites, String corequisites, String antirequisites) {
+            this.prerequisites = prerequisites;
+            this.corequisites = corequisites;
+            this.antirequisites = antirequisites;
+        }
+
+        static CourseRequisiteInfo empty() {
+            return new CourseRequisiteInfo(null, null, null);
+        }
+
+        String getPrerequisites() {
+            return prerequisites;
+        }
+
+        String getCorequisites() {
+            return corequisites;
+        }
+
+        String getAntirequisites() {
+            return antirequisites;
+        }
     }
 }

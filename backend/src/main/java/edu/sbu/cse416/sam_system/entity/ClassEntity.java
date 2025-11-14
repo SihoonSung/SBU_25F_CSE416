@@ -81,21 +81,6 @@ public class ClassEntity {
     @Column(name = "lec_instructor")
     private String lecInstructor;
     
-    // Prerequisites (e.g., "CSE 114")
-    // Using TEXT type to support long prerequisite descriptions
-    @Column(name = "prerequisites", columnDefinition = "TEXT")
-    private String prerequisites;
-    
-    // Corequisites (courses that must be taken concurrently)
-    // Using TEXT type to support long corequisite descriptions
-    @Column(name = "corequisites", columnDefinition = "TEXT")
-    private String corequisites;
-    
-    // Antirequisites (courses that cannot be taken together)
-    // Using TEXT type to support long antirequisite descriptions
-    @Column(name = "antirequisites", columnDefinition = "TEXT")
-    private String antirequisites;
-    
     // SBC (Stony Brook Curriculum) codes (e.g., "ARTS", "GLO", "HUM")
     @Column(name = "sbc")
     private String sbc;
@@ -118,7 +103,7 @@ public class ClassEntity {
     
     public ClassEntity(String department, Integer courseNum, String section, String semester, 
                   Integer year, Integer minCredits, Integer maxCredits, String title,
-                  String instructor, String schedule, String location, String prerequisites) {
+                  String instructor, String schedule, String location) {
         this.department = department;
         this.courseNum = courseNum;
         this.section = section;
@@ -130,7 +115,6 @@ public class ClassEntity {
         this.instructor = instructor;
         this.schedule = schedule;
         this.location = location;
-        this.prerequisites = prerequisites;
     }
     
     /**
@@ -279,30 +263,6 @@ public class ClassEntity {
     
     public void setLecInstructor(String lecInstructor) {
         this.lecInstructor = lecInstructor;
-    }
-    
-    public String getPrerequisites() {
-        return prerequisites;
-    }
-    
-    public void setPrerequisites(String prerequisites) {
-        this.prerequisites = prerequisites;
-    }
-    
-    public String getCorequisites() {
-        return corequisites;
-    }
-    
-    public void setCorequisites(String corequisites) {
-        this.corequisites = corequisites;
-    }
-    
-    public String getAntirequisites() {
-        return antirequisites;
-    }
-    
-    public void setAntirequisites(String antirequisites) {
-        this.antirequisites = antirequisites;
     }
     
     public String getSbc() {

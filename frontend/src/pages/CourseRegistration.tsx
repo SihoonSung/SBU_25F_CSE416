@@ -3,6 +3,9 @@ import './CourseRegistration.css'
 import { checkTimeConflict } from '../utils/timeConflict'
 import { getCurrentUser } from '../utils/auth'
 
+// Allow references to Node's process object in browser build (Jest compatibility)
+declare const process: any
+
 /*
  * Course Registration Page Component
  * Allows students to search for classes and add them to their cart.
@@ -46,6 +49,7 @@ function CourseRegistration() {
   const [cart, setCart] = useState<any[]>([])
   const [registeredClasses, setRegisteredClasses] = useState<any[]>([])
   const [waitlistClasses, setWaitlistClasses] = useState<any[]>([])
+  const [courseCatalogMap, setCourseCatalogMap] = useState<Record<string, any>>({})
   const [userId, setUserId] = useState<number | null>(null)
   const [registrationEligibility, setRegistrationEligibility] = useState<any>(null)
   const [showRegistrationAlert, setShowRegistrationAlert] = useState(false)
@@ -143,31 +147,62 @@ function CourseRegistration() {
   /**
    * Transform backend class data to frontend format
    */
-  const transformClassData = (cls: any) => ({
-    id: cls.classId,
-    code: `${cls.department}${cls.courseNum}.${cls.section}`,
-    courseId: cls.classId.toString(),
-    department: cls.department,
-    courseNum: cls.courseNum,
-    section: cls.section,
-    sectionType: cls.sectionType, // LEC, LAB, REC
-    title: cls.title,
-    schedule: cls.schedule,
-    instructor: cls.instructor,
-    location: cls.location,
-    lecSchedule: cls.lecSchedule, // LEC schedule
-    lecLocation: cls.lecLocation, // LEC location
-    lecInstructor: cls.lecInstructor, // LEC instructor
-    prerequisites: cls.prerequisites,
-    corequisites: cls.corequisites,
-    antirequisites: cls.antirequisites,
-    sbc: cls.sbc, // SBC codes
-    minCredits: cls.minCredits,
-    maxCredits: cls.maxCredits,
-    credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
-    semester: cls.semester,
-    year: cls.year
-  })
+  const buildCourseKey = (department: string, courseNum: number | string) =>
+    `${department}-${String(courseNum)}`
+
+  const createCourseCatalogMap = (courses: any[]) => {
+    const map: Record<string, any> = {}
+    if (!Array.isArray(courses)) {
+      return map
+    }
+    courses.forEach((course: any) => {
+      if (!course || !course.subject || !course.courseNumber) return
+      const key = buildCourseKey(course.subject, course.courseNumber)
+      map[key] = course
+    })
+    return map
+  }
+
+  const formatTermName = (semester: string, year: number | string) => {
+    if (!semester || semester.trim() === '' || year === undefined || year === null || String(year).trim() === '') {
+      return ''
+    }
+    const normalizedSemester =
+      semester.charAt(0).toUpperCase() + semester.slice(1).toLowerCase()
+    return `${normalizedSemester} ${year}`
+  }
+
+  const transformClassData = (cls: any, catalogMap: Record<string, any>) => {
+    const courseKey = buildCourseKey(cls.department, cls.courseNum)
+    const catalogCourse = catalogMap[courseKey] || {}
+
+    return {
+      id: cls.classId,
+      code: `${cls.department}${cls.courseNum}.${cls.section}`,
+      courseId: cls.classId.toString(),
+      department: cls.department,
+      courseNum: cls.courseNum,
+      section: cls.section,
+      sectionType: cls.sectionType, // LEC, LAB, REC
+      title: cls.title,
+      schedule: cls.schedule,
+      instructor: cls.instructor,
+      location: cls.location,
+      lecSchedule: cls.lecSchedule, // LEC schedule
+      lecLocation: cls.lecLocation, // LEC location
+      lecInstructor: cls.lecInstructor, // LEC instructor
+      prerequisites: catalogCourse.prerequisites ?? null,
+      corequisites: catalogCourse.corequisites ?? null,
+      antirequisites: catalogCourse.antirequisites ?? null,
+      advisoryPrereqs: catalogCourse.advisoryPrerequisites ?? null,
+      sbc: cls.sbc, // SBC codes
+      minCredits: cls.minCredits,
+      maxCredits: cls.maxCredits,
+      credits: cls.minCredits === cls.maxCredits ? cls.minCredits : `${cls.minCredits}-${cls.maxCredits}`,
+      semester: cls.semester,
+      year: cls.year
+    }
+  }
 
   /**
    * Sort classes by Department → Course Number → Section
@@ -411,13 +446,39 @@ function CourseRegistration() {
         credentials: 'include'
       })
       const data = await response.json()
-      
-      // Transform and sort data
-      const transformedData = data.map(transformClassData)
+
+      const termName = formatTermName(semester, year)
+      let catalogMap: Record<string, any> = {}
+
+      if (termName) {
+        try {
+          const catalogResponse = await fetch(
+            `${backendBase}/api/scraping/courses/byTerm?term=${encodeURIComponent(termName)}`,
+            { credentials: 'include' }
+          )
+          if (catalogResponse.ok) {
+            const catalogData = await catalogResponse.json()
+            catalogMap = createCourseCatalogMap(catalogData)
+          } else {
+            catalogMap = {}
+          }
+        } catch (catalogError) {
+          console.error('Error fetching course catalog:', catalogError)
+          catalogMap = {}
+        }
+      }
+
+      setCourseCatalogMap(catalogMap)
+
+      // Transform and sort data using catalog requisites
+      const classArray = Array.isArray(data) ? data : []
+      const transformedData = classArray.map((cls: any) => transformClassData(cls, catalogMap))
       setSearchResults(sortClasses(transformedData))
 
     } catch (error) {
       console.error('Error fetching classes:', error)
+      setCourseCatalogMap({})
+      setSearchResults([])
     }
   }
   
@@ -442,8 +503,9 @@ function CourseRegistration() {
       const data = await response.json()
       
       // Transform, filter, and sort data
-      const transformedData = data
-        .map(transformClassData)
+      const dataArray = Array.isArray(data) ? data : []
+      const transformedData = dataArray
+        .map((cls: any) => transformClassData(cls, courseCatalogMap))
         .filter((cls: any) => cls.semester === selectedSemester && cls.year === selectedYear)
 
       setSearchResults(sortClasses(transformedData))

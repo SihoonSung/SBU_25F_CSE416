@@ -194,8 +194,11 @@ public class PdfParserService {
         Integer currentMinCredits = null;
         Integer currentMaxCredits = null;
         String currentSbc = null;
+        @SuppressWarnings("unused")
         String currentPrerequisites = "None";
+        @SuppressWarnings("unused")
         String currentCorequisites = "None";
+        @SuppressWarnings("unused")
         String currentAntirequisites = "None";
         
         // Store LEC information for courses with LAB sections
@@ -544,9 +547,6 @@ public class PdfParserService {
                     classEntity.setMinCredits(currentMinCredits);
                     classEntity.setMaxCredits(currentMaxCredits);
                     classEntity.setSbc(currentSbc); // Set SBC
-                    classEntity.setPrerequisites(currentPrerequisites);
-                    classEntity.setCorequisites(currentCorequisites);
-                    classEntity.setAntirequisites(currentAntirequisites);
                     classEntity.setMaxCapacity(100); // Default max capacity
                     classEntity.setCurrentCapacity(0); // Default current capacity
                     
