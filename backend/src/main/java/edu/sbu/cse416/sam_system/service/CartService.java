@@ -76,6 +76,9 @@ public class CartService {
     private TimeConflictWaiverService waiverService;
     
     @Autowired
+    private RequisiteWaiverService requisiteWaiverService;
+    
+    @Autowired
     private edu.sbu.cse416.sam_system.service.AuditLogService auditLogService;
     
     @Autowired
@@ -383,37 +386,58 @@ public class CartService {
                     String antirequisites = requisites.getAntirequisites();
                     String corequisites = requisites.getCorequisites();
 
-                    // Check prerequisites
+                    // Check prerequisites (with waiver check)
                     if (prerequisites != null && !prerequisites.trim().isEmpty() && !prerequisites.trim().equalsIgnoreCase("None")) {
-                        boolean prerequisitesMet = prerequisitesValidationService.validatePrerequisites(userId, prerequisites);
-                        if (!prerequisitesMet) {
-                            prerequisiteErrors.add(String.format("Prerequisites not met for %s %s: %s", 
-                                cartItem.getClassEntity().getDepartment(), 
-                                cartItem.getClassEntity().getCourseNum(),
-                                prerequisites));
+                        // Check if there's an approved waiver for prerequisites
+                        boolean hasPrerequisiteWaiver = requisiteWaiverService.hasApprovedWaiver(
+                            userId, cartItem.getClassEntity().getClassId(), 
+                            edu.sbu.cse416.sam_system.entity.RequisiteWaiver.RequisiteType.PREREQUISITE);
+                        
+                        if (!hasPrerequisiteWaiver) {
+                            boolean prerequisitesMet = prerequisitesValidationService.validatePrerequisites(userId, prerequisites);
+                            if (!prerequisitesMet) {
+                                prerequisiteErrors.add(String.format("Prerequisites not met for %s %s: %s", 
+                                    cartItem.getClassEntity().getDepartment(), 
+                                    cartItem.getClassEntity().getCourseNum(),
+                                    prerequisites));
+                            }
                         }
                     }
                     
-                    // Check antirequisites
+                    // Check antirequisites (with waiver check)
                     if (antirequisites != null && !antirequisites.trim().isEmpty()) {
-                        boolean antirequisitesOk = prerequisitesValidationService.validateAntirequisites(userId, antirequisites);
-                        if (!antirequisitesOk) {
-                            antirequisiteErrors.add(String.format("Antirequisites conflict for %s %s: %s", 
-                                cartItem.getClassEntity().getDepartment(), 
-                                cartItem.getClassEntity().getCourseNum(),
-                                antirequisites));
+                        // Check if there's an approved waiver for antirequisites
+                        boolean hasAntirequisiteWaiver = requisiteWaiverService.hasApprovedWaiver(
+                            userId, cartItem.getClassEntity().getClassId(), 
+                            edu.sbu.cse416.sam_system.entity.RequisiteWaiver.RequisiteType.ANTIREQUISITE);
+                        
+                        if (!hasAntirequisiteWaiver) {
+                            boolean antirequisitesOk = prerequisitesValidationService.validateAntirequisites(userId, antirequisites);
+                            if (!antirequisitesOk) {
+                                antirequisiteErrors.add(String.format("Antirequisites conflict for %s %s: %s", 
+                                    cartItem.getClassEntity().getDepartment(), 
+                                    cartItem.getClassEntity().getCourseNum(),
+                                    antirequisites));
+                            }
                         }
                     }
                     
-                    // Check corequisites
+                    // Check corequisites (with waiver check)
                     if (corequisites != null && !corequisites.trim().isEmpty() && !corequisites.trim().equalsIgnoreCase("None")) {
-                        String currentSemester = cartItem.getClassEntity().getSemester();
-                        Integer currentYear = cartItem.getClassEntity().getYear();
-                        boolean corequisitesOk = prerequisitesValidationService.validateCorequisites(userId, corequisites, prerequisites, currentSemester, currentYear);
-                        if (!corequisitesOk) {
-                            String corequisiteMessage = generateCorequisiteErrorMessage(cartItem.getClassEntity().getDepartment(), 
-                                cartItem.getClassEntity().getCourseNum(), corequisites);
-                            corequisiteErrors.add(corequisiteMessage);
+                        // Check if there's an approved waiver for corequisites
+                        boolean hasCorequisiteWaiver = requisiteWaiverService.hasApprovedWaiver(
+                            userId, cartItem.getClassEntity().getClassId(), 
+                            edu.sbu.cse416.sam_system.entity.RequisiteWaiver.RequisiteType.COREQUISITE);
+                        
+                        if (!hasCorequisiteWaiver) {
+                            String currentSemester = cartItem.getClassEntity().getSemester();
+                            Integer currentYear = cartItem.getClassEntity().getYear();
+                            boolean corequisitesOk = prerequisitesValidationService.validateCorequisites(userId, corequisites, prerequisites, currentSemester, currentYear);
+                            if (!corequisitesOk) {
+                                String corequisiteMessage = generateCorequisiteErrorMessage(cartItem.getClassEntity().getDepartment(), 
+                                    cartItem.getClassEntity().getCourseNum(), corequisites);
+                                corequisiteErrors.add(corequisiteMessage);
+                            }
                         }
                     }
                 }
