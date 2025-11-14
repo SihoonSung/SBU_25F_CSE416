@@ -39,62 +39,89 @@ public class DegreeRequirementStatusService {
      * @return Map containing status for each declared/planned major and minor
      */
     public Map<String, Object> getDegreeRequirementsStatus(Long userId) {
-        Map<String, Object> result = new HashMap<>();
-        
         User student = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Student not found: " + userId));
-        
-        // Get student's completed and in-progress classes
-        List<UserClasses> allUserClasses = userClassesRepository.findByUserId(userId);
+        return computeDegreeRequirementStatus(student, Collections.emptyList());
+    }
+
+    /**
+     * Get degree requirement status including planned courses (planner forecast).
+     */
+    public Map<String, Object> getDegreeRequirementsStatusWithPlannedCourses(Long userId, List<UserCoursePlan> plannedCourses) {
+        User student = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Student not found: " + userId));
+        List<UserClasses> syntheticClasses = createSyntheticClasses(student, plannedCourses);
+        return computeDegreeRequirementStatus(student, syntheticClasses);
+    }
+
+    private Map<String, Object> computeDegreeRequirementStatus(User student, List<UserClasses> additionalClasses) {
+        Map<String, Object> result = new HashMap<>();
+
+        List<UserClasses> baseUserClasses = userClassesRepository.findByUserId(student.getUserId());
+        List<UserClasses> allUserClasses = new ArrayList<>(baseUserClasses);
+        if (additionalClasses != null && !additionalClasses.isEmpty()) {
+            allUserClasses.addAll(additionalClasses);
+        }
+
         List<UserClasses> completedClasses = allUserClasses.stream()
                 .filter(uc -> uc.getGrade() != null && !uc.getGrade().trim().isEmpty() && !uc.getGrade().equals("I"))
                 .collect(Collectors.toList());
         List<UserClasses> inProgressClasses = allUserClasses.stream()
                 .filter(uc -> uc.getGrade() == null || uc.getGrade().trim().isEmpty() || uc.getGrade().equals("I"))
                 .collect(Collectors.toList());
-        
-        // Parse declared majors and minors
+
         List<Map<String, Object>> declaredMajors = parseMajorsOrMinors(student.getMajors(), student.getDegrees(), student.getMajorRequirementVersions());
         List<Map<String, Object>> declaredMinors = parseMajorsOrMinors(student.getMinors(), "MINOR", student.getMinorRequirementVersions());
         List<Map<String, Object>> plannedMajors = parseMajorsOrMinors(student.getPlannedMajors(), student.getPlannedDegrees(), student.getPlannedMajorRequirementVersions());
         List<Map<String, Object>> plannedMinors = parseMajorsOrMinors(student.getPlannedMinors(), "MINOR", student.getPlannedMinorRequirementVersions());
-        
-        // Check requirements for each declared major
-        List<Map<String, Object>> declaredMajorStatuses = new ArrayList<>();
-        for (Map<String, Object> major : declaredMajors) {
-            Map<String, Object> status = checkRequirementStatus(major, completedClasses, inProgressClasses, allUserClasses);
-            declaredMajorStatuses.add(status);
-        }
-        
-        // Check requirements for each declared minor
-        List<Map<String, Object>> declaredMinorStatuses = new ArrayList<>();
-        for (Map<String, Object> minor : declaredMinors) {
-            Map<String, Object> status = checkRequirementStatus(minor, completedClasses, inProgressClasses, allUserClasses);
-            declaredMinorStatuses.add(status);
-        }
-        
-        // Check requirements for each planned major
-        List<Map<String, Object>> plannedMajorStatuses = new ArrayList<>();
-        for (Map<String, Object> major : plannedMajors) {
-            Map<String, Object> status = checkRequirementStatus(major, completedClasses, inProgressClasses, allUserClasses);
-            plannedMajorStatuses.add(status);
-        }
-        
-        // Check requirements for each planned minor
-        List<Map<String, Object>> plannedMinorStatuses = new ArrayList<>();
-        for (Map<String, Object> minor : plannedMinors) {
-            Map<String, Object> status = checkRequirementStatus(minor, completedClasses, inProgressClasses, allUserClasses);
-            plannedMinorStatuses.add(status);
-        }
-        
+
+        List<Map<String, Object>> declaredMajorStatuses = evaluateRequirements(declaredMajors, completedClasses, inProgressClasses, allUserClasses);
+        List<Map<String, Object>> declaredMinorStatuses = evaluateRequirements(declaredMinors, completedClasses, inProgressClasses, allUserClasses);
+        List<Map<String, Object>> plannedMajorStatuses = evaluateRequirements(plannedMajors, completedClasses, inProgressClasses, allUserClasses);
+        List<Map<String, Object>> plannedMinorStatuses = evaluateRequirements(plannedMinors, completedClasses, inProgressClasses, allUserClasses);
+
         result.put("declaredMajors", declaredMajorStatuses);
         result.put("declaredMinors", declaredMinorStatuses);
         result.put("plannedMajors", plannedMajorStatuses);
         result.put("plannedMinors", plannedMinorStatuses);
-        result.put("studentId", userId);
+        result.put("studentId", student.getUserId());
         result.put("studentName", student.getFirstName() + " " + student.getLastName());
-        
+
         return result;
+    }
+
+    private List<Map<String, Object>> evaluateRequirements(List<Map<String, Object>> programs,
+                                                           List<UserClasses> completedClasses,
+                                                           List<UserClasses> inProgressClasses,
+                                                           List<UserClasses> allUserClasses) {
+        List<Map<String, Object>> statuses = new ArrayList<>();
+        for (Map<String, Object> program : programs) {
+            Map<String, Object> status = checkRequirementStatus(program, completedClasses, inProgressClasses, allUserClasses);
+            statuses.add(status);
+        }
+        return statuses;
+    }
+
+    private List<UserClasses> createSyntheticClasses(User student, List<UserCoursePlan> plannedCourses) {
+        if (plannedCourses == null || plannedCourses.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<UserClasses> synthetic = new ArrayList<>();
+        for (UserCoursePlan plan : plannedCourses) {
+            UserClasses uc = new UserClasses();
+            uc.setUser(student);
+            uc.setClassId(null);
+            uc.setDepartment(plan.getDepartment());
+            uc.setCourseNum(plan.getCourseNum());
+            uc.setSection(null);
+            uc.setSemester(plan.getSemester());
+            uc.setYear(plan.getYear());
+            uc.setCredits(plan.getCredits());
+            uc.setGpnc(null);
+            uc.setGrade(null); // treat as in-progress
+            synthetic.add(uc);
+        }
+        return synthetic;
     }
     
     /**
