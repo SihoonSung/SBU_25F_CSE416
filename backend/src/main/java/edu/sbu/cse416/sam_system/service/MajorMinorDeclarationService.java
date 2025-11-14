@@ -41,6 +41,9 @@ public class MajorMinorDeclarationService {
     @Autowired
     private SystemDateService systemDateService;
     
+    @Autowired
+    private edu.sbu.cse416.sam_system.service.AuditLogService auditLogService;
+    
     // Constants for limits
     private static final int MAX_MAJORS = 2;
     private static final int MAX_MINORS = 3;
@@ -137,7 +140,16 @@ public class MajorMinorDeclarationService {
             declaration.setAdvisor(departmentAdvisor);
         }
         
-        return declarationRepository.save(declaration);
+        declaration = declarationRepository.save(declaration);
+        
+        // Log audit entry for student-initiated declaration request
+        if (declarationType == DeclarationType.MAJOR) {
+            auditLogService.logMajorDeclarationRequested(student, subjectCode, effectiveTerm);
+        } else if (declarationType == DeclarationType.MINOR) {
+            auditLogService.logMinorDeclarationRequested(student, subjectCode, effectiveTerm);
+        }
+        
+        return declaration;
     }
 
     private boolean subjectExistsInJsonArray(String jsonArray, String subjectCode) {
@@ -186,6 +198,33 @@ public class MajorMinorDeclarationService {
         
         // Update student's majors/minors in User table
         updateStudentMajorsMinors(declaration);
+        
+        // Log audit entry
+        User student = declaration.getStudent();
+        String subjectCode = declaration.getSubjectCode();
+        if (declaration.getDeclarationType() == DeclarationType.MAJOR) {
+            // Check if this is a change request
+            String fromSubjectCode = null;
+            if (existingNotes != null && existingNotes.startsWith("CHANGE_FROM:")) {
+                fromSubjectCode = existingNotes.substring("CHANGE_FROM:".length()).split("\\|")[0].trim();
+            }
+            if (fromSubjectCode != null && !fromSubjectCode.isEmpty()) {
+                auditLogService.logMajorChanged(student, advisor, fromSubjectCode, subjectCode, notes);
+            } else {
+                auditLogService.logMajorDeclared(student, advisor, subjectCode, notes);
+            }
+        } else if (declaration.getDeclarationType() == DeclarationType.MINOR) {
+            // Check if this is a change request
+            String fromSubjectCode = null;
+            if (existingNotes != null && existingNotes.startsWith("CHANGE_FROM:")) {
+                fromSubjectCode = existingNotes.substring("CHANGE_FROM:".length()).split("\\|")[0].trim();
+            }
+            if (fromSubjectCode != null && !fromSubjectCode.isEmpty()) {
+                auditLogService.logMinorChanged(student, advisor, fromSubjectCode, subjectCode, notes);
+            } else {
+                auditLogService.logMinorDeclared(student, advisor, subjectCode, notes);
+            }
+        }
         
         return declaration;
     }
@@ -933,6 +972,71 @@ public class MajorMinorDeclarationService {
                 String primaryMajor = majors.isEmpty() ? null : majors.get(0);
                 student.setMajor(primaryMajor);
                 
+                // Update major requirement versions
+                // Get the requirement version from degree requirements for this major
+                List<DegreeRequirement> majorRequirements = degreeRequirementRepository
+                    .findBySubjectCodeAndActive(subjectCode);
+                if (!majorRequirements.isEmpty()) {
+                    // Prefer BS, then BA
+                    DegreeRequirement requirement = majorRequirements.stream()
+                        .filter(r -> r.getDegreeType() == edu.sbu.cse416.sam_system.entity.DegreeType.BS)
+                        .findFirst()
+                        .orElse(majorRequirements.stream()
+                            .filter(r -> r.getDegreeType() == edu.sbu.cse416.sam_system.entity.DegreeType.BA)
+                            .findFirst()
+                            .orElse(majorRequirements.get(0)));
+                    
+                    String requirementVersion = requirement.getRequirementsVersion();
+                    String effectiveTerm = requirement.getEffectiveTerm();
+                    
+                    // Create TermRef for requirement version
+                    java.util.Map<String, Object> versionTerm = new java.util.HashMap<>();
+                    versionTerm.put("semester", effectiveTerm != null && effectiveTerm.contains("Fall") ? "Fall" : 
+                                   (effectiveTerm != null && effectiveTerm.contains("Spring") ? "Spring" : null));
+                    // Extract year from effectiveTerm (e.g., "Fall 2025" -> 2025)
+                    if (effectiveTerm != null) {
+                        try {
+                            String[] parts = effectiveTerm.split("\\s+");
+                            if (parts.length >= 2) {
+                                Integer year = Integer.parseInt(parts[parts.length - 1]);
+                                versionTerm.put("year", year);
+                            }
+                        } catch (Exception e) {
+                            // Ignore parsing errors
+                        }
+                    }
+                    
+                    // Update major requirement versions JSON array
+                    String majorVersionsJson = student.getMajorRequirementVersions();
+                    List<java.util.Map<String, Object>> majorVersions = new java.util.ArrayList<>();
+                    
+                    if (majorVersionsJson != null && !majorVersionsJson.trim().isEmpty()) {
+                        try {
+                            @SuppressWarnings("unchecked")
+                            List<java.util.Map<String, Object>> parsedVersions = mapper.readValue(majorVersionsJson, List.class);
+                            majorVersions = parsedVersions;
+                        } catch (Exception e) {
+                            System.err.println("Error parsing major requirement versions JSON: " + e.getMessage());
+                        }
+                    }
+                    
+                    // Update or add requirement version for this major
+                    // Find existing version for this major index
+                    int majorIndex = majors.indexOf(subjectCode);
+                    while (majorVersions.size() <= majorIndex) {
+                        majorVersions.add(new java.util.HashMap<>());
+                    }
+                    majorVersions.set(majorIndex, versionTerm);
+                    
+                    String updatedMajorVersionsJson = mapper.writeValueAsString(majorVersions);
+                    student.setMajorRequirementVersions(updatedMajorVersionsJson);
+                    
+                    // Log requirement version change
+                    String versionStr = requirementVersion + " (" + effectiveTerm + ")";
+                    auditLogService.logMajorRequirementVersionChanged(student, declaration.getAdvisor() != null ? 
+                        declaration.getAdvisor() : declaration.getCeasAdvisor(), subjectCode, versionStr, null);
+                }
+                
                 // TP used cursor to: Also update degrees array with "BA" or "BS" based on degree requirements
                 
             } else if (declaration.getDeclarationType() == DeclarationType.MINOR) {
@@ -966,6 +1070,68 @@ public class MajorMinorDeclarationService {
                 com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
                 String updatedMinorsJson = mapper.writeValueAsString(minors);
                 student.setMinors(updatedMinorsJson);
+                
+                // Update minor requirement versions
+                // Get the requirement version from degree requirements for this minor
+                List<DegreeRequirement> minorRequirements = degreeRequirementRepository
+                    .findBySubjectCodeAndActive(subjectCode);
+                if (!minorRequirements.isEmpty()) {
+                    // Find MINOR degree type
+                    DegreeRequirement requirement = minorRequirements.stream()
+                        .filter(r -> r.getDegreeType() == edu.sbu.cse416.sam_system.entity.DegreeType.MINOR)
+                        .findFirst()
+                        .orElse(minorRequirements.get(0));
+                    
+                    String requirementVersion = requirement.getRequirementsVersion();
+                    String effectiveTerm = requirement.getEffectiveTerm();
+                    
+                    // Create TermRef for requirement version
+                    java.util.Map<String, Object> versionTerm = new java.util.HashMap<>();
+                    versionTerm.put("semester", effectiveTerm != null && effectiveTerm.contains("Fall") ? "Fall" : 
+                                   (effectiveTerm != null && effectiveTerm.contains("Spring") ? "Spring" : null));
+                    // Extract year from effectiveTerm
+                    if (effectiveTerm != null) {
+                        try {
+                            String[] parts = effectiveTerm.split("\\s+");
+                            if (parts.length >= 2) {
+                                Integer year = Integer.parseInt(parts[parts.length - 1]);
+                                versionTerm.put("year", year);
+                            }
+                        } catch (Exception e) {
+                            // Ignore parsing errors
+                        }
+                    }
+                    
+                    // Update minor requirement versions JSON array
+                    String minorVersionsJson = student.getMinorRequirementVersions();
+                    List<java.util.Map<String, Object>> minorVersions = new java.util.ArrayList<>();
+                    
+                    if (minorVersionsJson != null && !minorVersionsJson.trim().isEmpty()) {
+                        try {
+                            @SuppressWarnings("unchecked")
+                            List<java.util.Map<String, Object>> parsedVersions = mapper.readValue(minorVersionsJson, List.class);
+                            minorVersions = parsedVersions;
+                        } catch (Exception e) {
+                            System.err.println("Error parsing minor requirement versions JSON: " + e.getMessage());
+                        }
+                    }
+                    
+                    // Update or add requirement version for this minor
+                    // Find existing version for this minor index
+                    int minorIndex = minors.indexOf(subjectCode);
+                    while (minorVersions.size() <= minorIndex) {
+                        minorVersions.add(new java.util.HashMap<>());
+                    }
+                    minorVersions.set(minorIndex, versionTerm);
+                    
+                    String updatedMinorVersionsJson = mapper.writeValueAsString(minorVersions);
+                    student.setMinorRequirementVersions(updatedMinorVersionsJson);
+                    
+                    // Log requirement version change
+                    String versionStr = requirementVersion + " (" + effectiveTerm + ")";
+                    auditLogService.logMinorRequirementVersionChanged(student, declaration.getAdvisor() != null ? 
+                        declaration.getAdvisor() : declaration.getCeasAdvisor(), subjectCode, versionStr, null);
+                }
             }
             
             // Save updated student

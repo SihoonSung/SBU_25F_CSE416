@@ -15,6 +15,7 @@ import edu.sbu.cse416.sam_system.repository.UserCoursePlanRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRosterRepository;
 import edu.sbu.cse416.sam_system.service.UserService;
+import edu.sbu.cse416.sam_system.service.AuditLogService;
 import edu.sbu.cse416.sam_system.entity.WaitlistEntry;
 import edu.sbu.cse416.sam_system.repository.WaitlistRepository;
 
@@ -53,6 +54,7 @@ public class UserController {
     private final ClassRepository classRepository;
     private final ClassRosterRepository classRosterRepository;
     private final WaitlistRepository waitlistRepository;
+    private final AuditLogService auditLogService;
 
     public UserController(UserRepository userRepository, UserService userService,
                          UserClassesRepository userClassesRepository,
@@ -60,7 +62,8 @@ public class UserController {
                          UserCoursePlanRepository userCoursePlanRepository,
                          ClassRepository classRepository,
                          ClassRosterRepository classRosterRepository,
-                         WaitlistRepository waitlistRepository) {
+                         WaitlistRepository waitlistRepository,
+                         AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.userService = userService;
         this.userClassesRepository = userClassesRepository;
@@ -69,6 +72,7 @@ public class UserController {
         this.classRepository = classRepository;
         this.classRosterRepository = classRosterRepository;
         this.waitlistRepository = waitlistRepository;
+        this.auditLogService = auditLogService;
     }
 
     /** Test endpoint to verify controller is loaded */
@@ -454,6 +458,10 @@ public class UserController {
                     "message", "Can only drop classes from current semester"
                 ));
             }
+            
+            // Log audit entry before deletion
+            String className = classEntity.getDepartment() + " " + classEntity.getCourseNum();
+            auditLogService.logClassDropped(user, user, className, null);
             
             // Delete from UserClasses
             userClassesRepository.deleteByUserIdAndClassId(userId, classId);

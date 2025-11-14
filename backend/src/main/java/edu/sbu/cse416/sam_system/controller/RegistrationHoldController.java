@@ -40,6 +40,7 @@ public class RegistrationHoldController {
             String holdTypeStr = request.get("holdType").toString();
             Long placedById = Long.parseLong(request.get("placedById").toString());
             String reason = (String) request.get("reason");
+            String note = (String) request.get("note"); // Optional note for audit log
             
             RegistrationHold.HoldType holdType;
             try {
@@ -51,7 +52,7 @@ public class RegistrationHoldController {
                 ));
             }
             
-            RegistrationHold hold = holdService.placeHold(studentId, holdType, placedById, reason);
+            RegistrationHold hold = holdService.placeHold(studentId, holdType, placedById, reason, note);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -86,9 +87,10 @@ public class RegistrationHoldController {
     @DeleteMapping("/{holdId}")
     public ResponseEntity<Map<String, Object>> removeHold(
             @PathVariable Long holdId,
-            @RequestParam Long removedById) {
+            @RequestParam Long removedById,
+            @RequestParam(required = false) String note) {
         try {
-            holdService.removeHold(holdId, removedById);
+            holdService.removeHold(holdId, removedById, note);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);

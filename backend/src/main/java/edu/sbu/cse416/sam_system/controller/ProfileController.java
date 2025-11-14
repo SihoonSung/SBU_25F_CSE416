@@ -4,10 +4,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import edu.sbu.cse416.sam_system.entity.User;
+import edu.sbu.cse416.sam_system.entity.AuditLog;
 import edu.sbu.cse416.sam_system.entity.DegreeRequirement;
 import edu.sbu.cse416.sam_system.entity.DegreeType;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
@@ -16,6 +18,8 @@ import edu.sbu.cse416.sam_system.security.CurrentUser;
 import edu.sbu.cse416.sam_system.service.PersonProfileService; 
 import edu.sbu.cse416.sam_system.service.PersonProfileService.TermRef; // Import TermRef from PersonProfileService for use
 import edu.sbu.cse416.sam_system.service.SystemDateService;
+import edu.sbu.cse416.sam_system.service.AuditLogService;
+import edu.sbu.cse416.sam_system.entity.UserRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 
@@ -37,18 +41,20 @@ public class ProfileController {
     private final PersonProfileService personProfileService;
     private final SystemDateService systemDateService;
     private final DegreeRequirementRepository degreeRequirementRepository;
+    private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     public ProfileController(UserRepository userRepository, JdbcTemplate jdbc, CurrentUser currentUser, 
                            PersonProfileService personProfileService, SystemDateService systemDateService,
-                           DegreeRequirementRepository degreeRequirementRepository) {
+                           DegreeRequirementRepository degreeRequirementRepository, AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.jdbc = jdbc;
         this.currentUser = currentUser;
         this.personProfileService = personProfileService;
         this.systemDateService = systemDateService;
         this.degreeRequirementRepository = degreeRequirementRepository;
+        this.auditLogService = auditLogService;
     }
 
     /* ======================================================================
@@ -342,7 +348,63 @@ public class ProfileController {
     public List<Map<String, Object>> getAuditLogBySid(@PathVariable String sid) {
         User u = resolveUserByStudentId(sid);
         if (u.getStudentId() == null) return Collections.emptyList();
-        return queryAuditLog(u.getStudentId());
+        
+        // Get viewer role for privacy filtering
+        UserRole viewerRole = null;
+        try {
+            User viewer = resolveUserForMe();
+            viewerRole = viewer.getRole();
+        } catch (Exception e) {
+            // Not authenticated or user not found - use null (public)
+        }
+        
+        return auditLogService.getAuditLogForStudent(u.getStudentId(), viewerRole);
+    }
+    
+    /**
+     * Update note for an audit log entry
+     * Only registrar and advisor can update notes
+     * PUT /api/profile/audit-log/{logId}/note
+     */
+    @PutMapping("/audit-log/{logId}/note")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> updateAuditLogNote(
+            @PathVariable Long logId,
+            @RequestBody Map<String, Object> request) {
+        try {
+            // Get current user
+            User currentUser = resolveUserForMe();
+            
+            // Validate user role (only REGISTRAR and ADVISOR can update notes)
+            if (currentUser.getRole() != UserRole.REGISTRAR && currentUser.getRole() != UserRole.ADVISOR) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "error", "Only registrar and advisor can update audit log notes"));
+            }
+            
+            // Get note from request
+            String note = (String) request.get("note");
+            if (note == null) {
+                note = ""; // Allow empty note to clear existing note
+            }
+            
+            // Update note
+            AuditLog updatedLog = auditLogService.updateNote(logId, currentUser, note);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Audit log note updated successfully");
+            response.put("logId", updatedLog.getId());
+            response.put("note", updatedLog.getNote());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("success", false, "error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("success", false, "error", "Failed to update audit log note: " + e.getMessage()));
+        }
     }
 
     /* ======================================================================
@@ -881,6 +943,8 @@ public class ProfileController {
         );
     }
 
+    // Deprecated: Use AuditLogService instead
+    @Deprecated
     private List<Map<String, Object>> queryAuditLog(String studentId) {
         String sql =
             "SELECT id, ts AS timestamp, actor_role AS actorRole, actor_display AS actorDisplay, " +

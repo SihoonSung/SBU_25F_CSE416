@@ -39,9 +39,9 @@ academic_advisors:
 - SBU_ID: 114665641
   first_name: Minseo1
   last_name: advisor
-  level: department
-  email: minseohappy06@gmail.com
-  academic_unit: [POL]
+  level: CEAS
+  email: minseohappy07@gmail.com
+  academic_unit: [AMS, CSE, BIO]
 
 instructors:
 - SBU_ID: 100987654
@@ -61,7 +61,7 @@ students:
 - SBU_ID: 100123456
   first_name: Charles
   last_name: Brown
-  email: minseohappy07@gmail.com
+  email: minseohappy09@gmail.com
   university_entry: {semester: Fall, year: 2020} # term in which the student entered the university.  valid values for semester: Fall, Spring, SummerI, SummerII
   direct_admit: null # major to which the student was directly admitted when accepted to the university, if any, otherwise null
   AOI: CSE # major for which the student is AOI if any, otherwise null
@@ -92,7 +92,7 @@ students:
 - SBU_ID: 114665644
   first_name: Minseo2
   last_name: Student
-  email: minseohappy08@gmail.com
+  email: minseohappy06@gmail.com
   university_entry: {semester: Spring, year: 2025}
   direct_admit: null
   AOI: null

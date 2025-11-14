@@ -39,6 +39,9 @@ public class TimeConflictWaiverService {
     @Autowired
     private ClassRepository classRepository;
     
+    @Autowired
+    private edu.sbu.cse416.sam_system.service.AuditLogService auditLogService;
+    
     /**
      * Create a new waiver request
      * @param studentId Student requesting the waiver
@@ -78,7 +81,14 @@ public class TimeConflictWaiverService {
         waiver.setReason(reason);
         waiver.setStatus(TimeConflictWaiver.WaiverStatus.PENDING);
         
-        return waiverRepository.save(waiver);
+        waiver = waiverRepository.save(waiver);
+        
+        // Log audit entry for student-initiated waiver request
+        String classACode = enrolledClass.getDepartment() + " " + enrolledClass.getCourseNum();
+        String classBCode = conflictingClass.getDepartment() + " " + conflictingClass.getCourseNum();
+        auditLogService.logTimeConflictWaiverRequested(student, classACode, classBCode, reason);
+        
+        return waiver;
     }
     
     /**
@@ -295,7 +305,16 @@ public class TimeConflictWaiverService {
         waiver.setAdvisorApprovedAt(LocalDateTime.now());
         waiver.updateStatus();
         
-        return waiverRepository.save(waiver);
+        waiver = waiverRepository.save(waiver);
+        
+        // Log audit entry if waiver is fully approved
+        if (waiver.getStatus() == TimeConflictWaiver.WaiverStatus.APPROVED) {
+            String classA = waiver.getEnrolledClass().getDepartment() + " " + waiver.getEnrolledClass().getCourseNum();
+            String classB = waiver.getConflictingClass().getDepartment() + " " + waiver.getConflictingClass().getCourseNum();
+            auditLogService.logTimeConflictWaived(waiver.getStudent(), advisor, classA, classB, null);
+        }
+        
+        return waiver;
     }
     
     /**

@@ -32,16 +32,20 @@ public class RegistrationHoldService {
     @Autowired
     private UserRepository userRepository;
     
+    @Autowired
+    private edu.sbu.cse416.sam_system.service.AuditLogService auditLogService;
+    
     /**
      * Place a registration hold on a student
      * @param studentId Student ID
      * @param holdType Hold type (ACADEMIC_ADVISING or FINANCIAL)
      * @param placedById User ID who is placing the hold
      * @param reason Reason for the hold
+     * @param note Optional note for the audit log
      * @return Created RegistrationHold, or null if unauthorized
      */
     public RegistrationHold placeHold(Long studentId, RegistrationHold.HoldType holdType, 
-                                     Long placedById, String reason) {
+                                     Long placedById, String reason, String note) {
         User student = userRepository.findById(studentId)
             .orElseThrow(() -> new RuntimeException("Student not found"));
         
@@ -55,16 +59,22 @@ public class RegistrationHoldService {
         
         // Create new hold
         RegistrationHold hold = new RegistrationHold(student, holdType, placedBy, reason);
-        return holdRepository.save(hold);
+        hold = holdRepository.save(hold);
+        
+        // Log audit entry
+        auditLogService.logHoldPlaced(student, placedBy, holdType.name(), reason, note);
+        
+        return hold;
     }
     
     /**
      * Remove a registration hold
      * @param holdId Hold ID
      * @param removedById User ID who is removing the hold
+     * @param note Optional note for the audit log
      * @return Removed RegistrationHold, or null if not found or unauthorized
      */
-    public RegistrationHold removeHold(Long holdId, Long removedById) {
+    public RegistrationHold removeHold(Long holdId, Long removedById, String note) {
         RegistrationHold hold = holdRepository.findById(holdId)
             .orElseThrow(() -> new RuntimeException("Hold not found"));
         
@@ -75,6 +85,9 @@ public class RegistrationHoldService {
         if (!canRemoveHold(removedBy, hold, hold.getStudent())) {
             throw new RuntimeException("User does not have permission to remove this hold");
         }
+        
+        // Log audit entry before deletion
+        auditLogService.logHoldRemoved(hold.getStudent(), removedBy, hold.getHoldType().name(), note);
         
         // Physically delete the hold record instead of soft-deleting
         holdRepository.delete(hold);
@@ -138,7 +151,57 @@ public class RegistrationHoldService {
             }
             
             // College-level advisor can place holds on students in the same college
-            if ("college".equalsIgnoreCase(advisorLevel)) {
+            // Level can be "college" or a college acronym (e.g., "CEAS", "CAS")
+            if ("college".equalsIgnoreCase(advisorLevel) || 
+                (advisorLevel != null && !"university".equalsIgnoreCase(advisorLevel) && 
+                 !"department".equalsIgnoreCase(advisorLevel))) {
+                // If advisor level is a college acronym, check if student's college matches
+                if (advisorLevel != null && !"college".equalsIgnoreCase(advisorLevel)) {
+                    if (student.getCollege() != null && advisorLevel.equalsIgnoreCase(student.getCollege())) {
+                        return true;
+                    }
+                }
+                
+                // Check if advisor's academic_unit contains student's college
+                if (advisorAcademicUnit != null && student.getCollege() != null) {
+                    String[] academicUnits = advisorAcademicUnit.split(",");
+                    for (String unit : academicUnits) {
+                        if (unit.trim().equalsIgnoreCase(student.getCollege())) {
+                            return true;
+                        }
+                    }
+                }
+                
+                // If student's college is not set, check if student's major matches advisor's academic_unit
+                // (This handles cases where advisor's academic_unit contains major codes)
+                if (advisorAcademicUnit != null) {
+                    String[] academicUnits = advisorAcademicUnit.split(",");
+                    
+                    // Check student's majors (JSON array)
+                    String studentMajors = student.getMajors();
+                    if (studentMajors != null) {
+                        String normalizedMajors = studentMajors.replaceAll("[\\[\\]\"\\s]", "");
+                        String[] majors = normalizedMajors.split(",");
+                        for (String major : majors) {
+                            for (String advisorUnit : academicUnits) {
+                                if (advisorUnit.trim().equalsIgnoreCase(major.trim())) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Also check single major field
+                    if (student.getMajor() != null) {
+                        for (String advisorUnit : academicUnits) {
+                            if (advisorUnit.trim().equalsIgnoreCase(student.getMajor())) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                
+                // Also check direct match
                 return advisorAcademicUnit != null && 
                        advisorAcademicUnit.equalsIgnoreCase(student.getCollege());
             }
@@ -149,6 +212,9 @@ public class RegistrationHoldService {
                     return false;
                 }
                 
+                // Parse comma-separated academic units
+                String[] advisorUnits = advisorAcademicUnit.split(",");
+                
                 // Check if student has this department as a major
                 String studentMajors = student.getMajors(); // JSON array
                 if (studentMajors != null) {
@@ -156,14 +222,20 @@ public class RegistrationHoldService {
                     String normalizedMajors = studentMajors.replaceAll("[\\[\\]\"\\s]", "");
                     String[] majors = normalizedMajors.split(",");
                     for (String major : majors) {
-                        if (advisorAcademicUnit.equalsIgnoreCase(major.trim())) {
-                            return true;
+                        for (String advisorUnit : advisorUnits) {
+                            if (advisorUnit.trim().equalsIgnoreCase(major.trim())) {
+                                return true;
+                            }
                         }
                     }
                 }
                 
                 // Also check single major field
-                return advisorAcademicUnit.equalsIgnoreCase(student.getMajor());
+                for (String advisorUnit : advisorUnits) {
+                    if (advisorUnit.trim().equalsIgnoreCase(student.getMajor())) {
+                        return true;
+                    }
+                }
             }
             
             return false;

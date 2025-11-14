@@ -76,6 +76,9 @@ public class CartService {
     private TimeConflictWaiverService waiverService;
     
     @Autowired
+    private edu.sbu.cse416.sam_system.service.AuditLogService auditLogService;
+    
+    @Autowired
     private RegistrationScheduleService registrationScheduleService;
     
     /**
@@ -179,6 +182,10 @@ public class CartService {
                         User user = userRepository.findById(userId).orElse(null);
                         if (user != null) {
                             // Remove from roster
+                            // Log audit entry before deletion
+                            String className = classEntity.getDepartment() + " " + classEntity.getCourseNum();
+                            auditLogService.logClassDropped(user, user, className, null);
+                            
                             classRosterRepository.deleteByClassEntityAndUser(classEntity, user);
                             
                             // Update capacity
@@ -596,6 +603,10 @@ public class CartService {
                     classRosterRepository.save(roster);
                     classRepository.save(classEntity);
                     registeredClasses.add(saved);
+                    
+                    // Log audit entry for class enrollment
+                    String className = classEntity.getDepartment() + " " + classEntity.getCourseNum();
+                    auditLogService.logClassEnrolled(user, user, className, null);
                     
                     // Mark cart item for deletion (remove from cart completely)
                     cartItemsToDelete.add(cartItem.getId());

@@ -9,6 +9,7 @@ import edu.sbu.cse416.sam_system.repository.ClassRosterRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRepository;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
 import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
+import edu.sbu.cse416.sam_system.service.AuditLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,6 +41,9 @@ public class ClassRosterController {
 
     @Autowired
     private UserClassesRepository userClassesRepository;
+    
+    @Autowired
+    private AuditLogService auditLogService;
     
     /**
      * Get roster for a specific class
@@ -241,8 +245,17 @@ public class ClassRosterController {
                 ));
             }
             UserClasses uc = ucOpt.get();
+            String oldGrade = uc.getGrade();
             uc.setGrade(grade);
             userClassesRepository.save(uc);
+            
+            // Log audit entry
+            String className = classEntity.getDepartment() + " " + classEntity.getCourseNum();
+            if (oldGrade == null || oldGrade.trim().isEmpty()) {
+                auditLogService.logGradeAssigned(student, instructor, className, grade, null);
+            } else {
+                auditLogService.logGradeChanged(student, instructor, className, oldGrade, grade, null);
+            }
 
             return ResponseEntity.ok(Map.of(
                 "success", true,
