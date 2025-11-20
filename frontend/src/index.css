@@ -17,6 +17,7 @@ a {
   color: var(--color-secondary);
   text-decoration: inherit;
 }
+
 a:hover {
   color: var(--color-secondary);
   opacity: 0.9;
@@ -27,6 +28,30 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background-color: var(--bg-page);
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 1rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+}
+
+/* Global Responsive Table Utility */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+  border-radius: var(--radius-md);
+}
+
+.table-responsive table {
+  min-width: 600px;
+  /* Ensure table doesn't squash */
 }
 
 h1 {
@@ -45,9 +70,11 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
 button:hover {
   border-color: var(--color-secondary);
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
@@ -58,6 +85,7 @@ button:focus-visible {
     color: var(--text-primary);
     background-color: var(--bg-subtle);
   }
+
   button {
     background-color: var(--bg-elevated);
   }

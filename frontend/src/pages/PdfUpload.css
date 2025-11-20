@@ -6,17 +6,19 @@
 
 .registrar-page {
   min-height: 100vh;
-  padding: 2rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  max-width: 1400px;
+  padding: 3rem;
+  font-family: 'Inter', sans-serif;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
 .registrar-page h1 {
-  font-size: 2.5rem;
+  font-family: 'Outfit', sans-serif;
+  font-size: 3rem;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 2rem;
+  letter-spacing: -0.02em;
 }
 
 /* Section Styles */
@@ -24,11 +26,18 @@
 .capacity-section,
 .management-section {
   background: var(--bg-elevated);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-subtle);
   padding: 2rem;
   margin-bottom: 2rem;
+  transition: all 0.3s ease;
+}
+
+.upload-section:hover,
+.capacity-section:hover,
+.management-section:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .upload-section h2,
@@ -209,11 +218,14 @@
   display: grid;
   grid-template-columns: 100px 2fr 150px 180px 120px 100px 180px;
   padding: 1rem;
-  background-color: var(--bg-subtle);
+  background-color: transparent;
   border-radius: var(--radius-md);
   font-weight: 600;
-  color: var(--text-primary);
-  font-size: 14px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .registrar-page .table-row {
@@ -221,15 +233,17 @@
   grid-template-columns: 100px 2fr 150px 180px 120px 100px 180px;
   padding: 1rem;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   align-items: center;
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .registrar-page .table-row:hover {
-  background-color: var(--bg-page);
-  box-shadow: var(--shadow-sm);
+  background-color: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
+  transform: translateY(-2px);
 }
 
 .registrar-page .th,
@@ -284,12 +298,12 @@
 }
 
 .registrar-page .edit-btn {
-  background-color: var(--button-info-bg);
+  background-color: var(--color-primary);
   color: var(--button-primary-text);
 }
 
 .registrar-page .edit-btn:hover {
-  background-color: var(--button-info-hover-bg);
+  background-color: var(--color-primary-light);
 }
 
 .registrar-page .save-btn {
@@ -321,7 +335,7 @@
 }
 
 .registrar-page .pagination-btn {
-  background-color: var(--button-info-bg);
+  background-color: var(--color-primary);
   color: var(--button-primary-text);
   border: none;
   border-radius: var(--radius-md);
@@ -333,7 +347,7 @@
 }
 
 .registrar-page .pagination-btn:hover:not(:disabled) {
-  background-color: var(--button-info-hover-bg);
+  background-color: var(--color-primary-light);
 }
 
 .registrar-page .pagination-btn:disabled {
@@ -350,6 +364,7 @@
 
 /* Responsive Design */
 @media (max-width: 1200px) {
+
   .registrar-page .table-header,
   .registrar-page .table-row {
     grid-template-columns: 90px 1.5fr 130px 150px 100px 90px 150px;
@@ -378,7 +393,7 @@
 
 /* Load Capacity Button */
 .load-capacity-btn {
-  background: var(--button-info-bg);
+  background: var(--color-primary);
   color: var(--button-primary-text);
   border: none;
   padding: 1rem 2rem;
@@ -391,7 +406,7 @@
 }
 
 .load-capacity-btn:hover:not(:disabled) {
-  background: var(--button-info-hover-bg);
+  background: var(--color-primary-light);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
@@ -420,4 +435,3 @@
   color: var(--error-text);
   border: 1px solid var(--error-border);
 }
-

@@ -1,72 +1,94 @@
 :root {
   /* Brand */
-  --color-primary: #C50000; /* SBU Red */
-  --color-secondary: #3498db; /* Accent Blue */
+  --color-primary: #990000;
+  /* Deep SBU Red */
+  --color-primary-light: #cc0000;
+  --color-secondary: #3b82f6;
+  /* Modern Blue */
+  --color-accent: #8b5cf6;
+  /* Violet Accent for gradients */
 
   /* Text */
-  --text-primary: #2c3e50;
-  --text-secondary: #4a5568;
-  --text-muted: #6b7280;
+  --text-primary: #111827;
+  /* Cool Gray 900 */
+  --text-secondary: #4b5563;
+  /* Cool Gray 600 */
+  --text-muted: #9ca3af;
+  /* Cool Gray 400 */
+  --text-on-primary: #ffffff;
 
   /* Backgrounds */
-  --bg-page: #f8f9fa;
+  --bg-page: #f3f4f6;
+  /* Cool Gray 100 */
   --bg-elevated: #ffffff;
-  --bg-subtle: #f5f5f5;
+  --bg-subtle: #f9fafb;
+  /* Cool Gray 50 */
+  --bg-glass: rgba(255, 255, 255, 0.8);
 
   /* Border */
-  --border-default: #e1e8ed;
-  --border-subtle: #e5e7eb;
+  --border-default: #e5e7eb;
+  /* Cool Gray 200 */
+  --border-subtle: #f3f4f6;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, var(--color-primary) 0%, #7f1d1d 100%);
+  --gradient-text: linear-gradient(135deg, #111827 0%, #4b5563 100%);
+  --gradient-card: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
 
   /* States */
-  --success-bg: #d1fae5;
-  --success-text: #065f46;
+  --success-bg: #ecfdf5;
+  --success-text: #047857;
   --success-border: #a7f3d0;
 
-  --warning-bg: #fff3cd;
-  --warning-text: #856404;
-  --warning-border: #ffeaa7;
+  --warning-bg: #fffbeb;
+  --warning-text: #b45309;
+  --warning-border: #fcd34d;
 
-  --error-bg: #f8d7da;
-  --error-text: #721c24;
-  --error-border: #f5c6cb;
+  --error-bg: #fef2f2;
+  --error-text: #b91c1c;
+  --error-border: #fecaca;
 
-  --info-bg: #e3f2fd;
-  --info-text: #1e40af;
-  --info-border: #dbeafe;
+  --info-bg: #eff6ff;
+  --info-text: #1d4ed8;
+  --info-border: #bfdbfe;
 
   /* Buttons */
   --button-primary-bg: var(--color-primary);
   --button-primary-text: #ffffff;
-  --button-secondary-bg: var(--color-secondary);
-  --button-secondary-text: #ffffff;
-  --button-muted-bg: #9ca3af;
-  --button-danger-bg: #dc2626;
-  --button-danger-hover-bg: #b91c1c;
+  --button-secondary-bg: #ffffff;
+  --button-secondary-text: var(--text-primary);
+  --button-secondary-border: var(--border-default);
+  --button-muted-bg: #e5e7eb;
+  --button-danger-bg: #ef4444;
+  --button-danger-hover-bg: #dc2626;
 
   /* Shadows & Radius */
   --radius-md: 12px;
-  --radius-sm: 6px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-sm: 8px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
   --radius-pill: 9999px;
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.2);
-  --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.1);
-  
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
   /* Additional colors for buttons and states */
-  --button-success-bg: #48bb78;
-  --button-success-hover-bg: #38a169;
-  --button-info-bg: #4299e1;
-  --button-info-hover-bg: #3182ce;
-  --button-muted-bg-disabled: #cbd5e0;
-  
+  --button-success-bg: #10b981;
+  --button-success-hover-bg: #059669;
+  --button-info-bg: #3b82f6;
+  --button-info-hover-bg: #2563eb;
+  --button-muted-bg-disabled: #d1d5db;
+
   /* Border colors for focus states */
   --border-focus: var(--color-secondary);
-  --border-focus-shadow: rgba(66, 153, 225, 0.25);
+  --border-focus-shadow: rgba(59, 130, 246, 0.25);
 }
 
 /* Base typography scale */
 html {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   color: var(--text-primary);
   background: var(--bg-page);
 }
@@ -89,7 +111,10 @@ html {
   color: var(--button-secondary-text);
 }
 
-.text-muted { color: var(--text-muted); }
-.text-secondary { color: var(--text-secondary); }
+.text-muted {
+  color: var(--text-muted);
+}
 
-
+.text-secondary {
+  color: var(--text-secondary);
+}

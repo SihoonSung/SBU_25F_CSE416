@@ -5,10 +5,11 @@
  */
 
 .course-search {
-  padding: 28px;
-  max-width: min(92vw, 1600px);
+  padding: 3rem;
+  max-width: 1600px;
   margin: 0 auto;
   min-height: 100vh;
+  font-family: 'Inter', sans-serif;
 }
 
 /* Filter Info */
@@ -51,17 +52,34 @@
 /* Filters Sidebar - Left */
 .filters-sidebar {
   background: var(--bg-elevated);
-  padding: 20px;
-  border-radius: 20px;
-  border: 1px solid var(--border-default);
+  padding: 2rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+.filters-sidebar:hover {
+  box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 768px) {
+  .results-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .results-table {
+    min-width: 600px;
+  }
 }
 
 .filters-sidebar h2 {
-  font-size: 24px;
-  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 16px 0;
+  margin: 0 0 1.5rem 0;
 }
 
 .filter-group {
@@ -141,7 +159,9 @@
   font-size: 0.95rem;
 }
 
-.clear-filters-btn:hover { background-color: var(--bg-elevated); }
+.clear-filters-btn:hover {
+  background-color: var(--bg-elevated);
+}
 
 /* Results Main - Right */
 .results-main {
@@ -151,20 +171,27 @@
 }
 
 .results-main h1 {
-  font-size: 30px;
-  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 16px 0;
+  margin: 0 0 1.5rem 0;
+  letter-spacing: -0.02em;
 }
 
 /* Header bar and list container */
 .results-shell {
   background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  padding: 12px; /* TP: Used Cursor - Add internal padding to make header+rows appear as a module-like box */
+  padding: 1rem;
+  transition: all 0.3s ease;
+}
+
+.results-shell:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .results-header {
@@ -172,19 +199,23 @@
   grid-template-columns: 120px 1fr 90px 220px 140px 90px 110px 110px;
   gap: 12px;
   align-items: center;
-  padding: 14px 18px;
-  background: var(--bg-page);
+  padding: 1rem 1.5rem;
+  background: var(--bg-subtle);
   color: var(--text-secondary);
-  font-weight: 700;
-  border: 1px solid var(--border-default);
-  border-radius: 16px; /* 헤더도 모듈 내부의 소모듈처럼 */
+  font-weight: 600;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .results-body {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 16px 6px 6px 6px; /* TP: Used Cursor - Narrow spacing with header, outer padding handled by shell */
+  padding: 16px 6px 6px 6px;
+  /* 헤더와 간격 좁게, 외곽 padding은 shell에서 처리 */
 }
 
 .search-row {
@@ -193,21 +224,47 @@
   gap: 12px;
   align-items: center;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: 20px;
-  padding: 22px 22px; /* 세로 높이 키움 */
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
   box-shadow: var(--shadow-sm);
   cursor: pointer;
-  min-height: 108px; /* 행 자체 키우기 */
+  min-height: auto;
+  transition: all 0.2s ease;
 }
 
-.search-row:hover { border-color: var(--border-default); box-shadow: 0 10px 24px rgba(0,0,0,0.10); }
+.search-row:hover {
+  border-color: transparent;
+  box-shadow: var(--shadow-premium);
+  transform: translateY(-2px);
+}
 
-.cell-code { font-weight: 700; color: var(--text-primary); }
-.cell-title { color: var(--text-primary); font-weight: 500; }
-.cell-credits { color: var(--text-secondary); }
-.cell-prereq { color: var(--text-muted); font-size: 13px; line-height: 1.3; }
-.cell-instructor, .cell-time, .cell-seats { color: var(--text-secondary); font-size: 14px; }
+.cell-code {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.cell-title {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.cell-credits {
+  color: var(--text-secondary);
+}
+
+.cell-prereq {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.cell-instructor,
+.cell-time,
+.cell-seats {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
 
 .add-to-cart {
   display: flex;
@@ -218,17 +275,20 @@
   background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: 9999px;
-  padding: 12px 18px;
-  font-weight: 800;
+  border-radius: var(--radius-pill);
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
 }
 
-.add-to-cart-btn:hover { background: var(--button-danger-hover-bg); }
+.add-to-cart-btn:hover {
+  background: var(--button-danger-hover-bg);
+}
 
 /* Catalog Results Cards */
-.catalog-results-cards { 
+.catalog-results-cards {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -242,24 +302,24 @@
 
 /* Catalog Result Card - Collapsed (Enhanced) */
 .catalog-result-card {
-  background-color: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 20px 24px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  gap: 1.5rem;
+  box-shadow: var(--shadow-sm);
   transition: all 0.3s ease;
   position: relative;
   width: 100%;
 }
 
 .catalog-result-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-  border-color: #4299e1;
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-premium);
+  border-color: transparent;
 }
 
 .catalog-clickable {
@@ -310,7 +370,9 @@
 
 .catalog-course-instructor {
   font-size: 0.875rem;
-  color: #3b82f6;
+  font-size: 0.875rem;
+  color: var(--color-primary);
+  font-weight: 600;
   font-weight: 600;
   min-width: 140px;
   text-align: right;
@@ -342,7 +404,7 @@
 }
 
 .sbc-item .meta-text {
-  color: #3b82f6;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -381,6 +443,7 @@
     opacity: 0;
     transform: scaleY(0.95);
   }
+
   to {
     opacity: 1;
     transform: scaleY(1);
@@ -476,7 +539,9 @@
   transition: color 0.2s ease;
 }
 
-.catalog-detail-link:hover { text-decoration: underline; }
+.catalog-detail-link:hover {
+  text-decoration: underline;
+}
 
 /* Unsupported Subject Indicators */
 .catalog-unsupported-badge {
@@ -571,7 +636,9 @@
   transition: background 0.2s ease;
 }
 
-.catalog-pagination-btn:hover:not(:disabled) { background: var(--bg-page); }
+.catalog-pagination-btn:hover:not(:disabled) {
+  background: var(--bg-page);
+}
 
 .catalog-pagination-btn:disabled {
   background-color: #cbd5e0;
@@ -590,7 +657,7 @@
   .course-search-content {
     flex-direction: column;
   }
-  
+
   .filters-sidebar {
     width: 100%;
     max-width: 100%;

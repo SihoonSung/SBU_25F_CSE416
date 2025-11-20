@@ -1,10 +1,10 @@
 /* Degree Requirements Page Styles */
 
 .degree-requirements {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 2rem;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 3rem;
+  font-family: 'Inter', sans-serif;
 }
 
 .page-header {
@@ -13,10 +13,12 @@
 }
 
 .page-header h1 {
-  color: #2c3e50;
+  font-family: 'Outfit', sans-serif;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
-  font-size: 2.5rem;
-  font-weight: 600;
+  font-size: 3rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .page-header p {
@@ -50,12 +52,17 @@
 
 /* Filters Section */
 .filters-section {
-  background: #ffffff;
-  border-radius: 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-xl);
   padding: 2rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
   margin-bottom: 2rem;
-  border: 1px solid #e1e8ed;
+  border: 1px solid var(--border-subtle);
+  transition: all 0.3s ease;
+}
+
+.filters-section:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .filters-section h2 {
@@ -85,11 +92,11 @@
 
 .filter-group select {
   padding: 0.75rem;
-  border: 2px solid #e1e8ed;
-  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   font-size: 1rem;
-  background-color: #ffffff;
-  transition: border-color 0.3s ease;
+  background-color: var(--bg-page);
+  transition: border-color 0.2s ease;
 }
 
 .filter-group select:focus {
@@ -127,11 +134,16 @@
 
 /* Requirements Section */
 .requirements-section {
-  background: #ffffff;
-  border-radius: 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-xl);
   padding: 2rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e1e8ed;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.3s ease;
+}
+
+.requirements-section:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .section-header {
@@ -191,13 +203,13 @@
 }
 
 .requirement-card {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 1rem 1.25rem;
-  border: 1px solid #e1e8ed;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  border: 1px solid var(--border-subtle);
   transition: all 0.3s ease;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .requirement-card.collapsed {
@@ -206,14 +218,14 @@
 
 .requirement-card.expanded {
   padding: 1.5rem;
-  border: 2px solid #3498db;
-  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+  border: 2px solid var(--color-primary);
+  box-shadow: 0 4px 12px rgba(153, 0, 0, 0.15);
 }
 
 .requirement-card:hover {
-  border-color: #3498db;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  border-color: transparent;
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
 }
 
 .requirement-content-wrapper {
@@ -226,6 +238,7 @@
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -261,7 +274,7 @@
 
 .badge {
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   font-size: 0.8rem;
   font-weight: 600;
 }
@@ -320,7 +333,7 @@
   padding: 0;
   background: #ffffff;
   border-radius: 8px;
-  border-left: 4px solid #3498db;
+  border-left: 4px solid var(--color-primary);
   border: 1px solid #e1e8ed;
 }
 
@@ -362,6 +375,7 @@
     opacity: 0;
     max-height: 0;
   }
+
   to {
     opacity: 1;
     max-height: 2000px;
@@ -393,9 +407,9 @@
 }
 
 .sequence-module:hover {
-  background: linear-gradient(135deg, #f1f3f5 0%, #dee2e6 100%);
-  border-color: #adb5bd;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background: var(--bg-subtle);
+  border-color: transparent;
+  box-shadow: var(--shadow-md);
 }
 
 .sequence-path {
@@ -414,7 +428,7 @@
 .sequence-arrow {
   font-size: 1.2rem;
   font-weight: 700;
-  color: #1976d2;
+  color: var(--color-primary);
   margin: 0 0.25rem;
   display: inline-flex;
   align-items: center;
@@ -444,10 +458,10 @@
   background-color: #e3f2fd;
   color: #1565c0;
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   font-size: 0.85rem;
   font-weight: 500;
-  border: 1px solid #bbdefb;
+  border: 1px solid var(--border-subtle);
 }
 
 /* SBC Grid */
@@ -526,6 +540,7 @@
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

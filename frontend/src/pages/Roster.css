@@ -4,12 +4,12 @@
  */
 
 .roster-page {
-  max-width: min(92vw, 1400px);
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 2rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  padding: 3rem;
+  font-family: 'Inter', sans-serif;
   min-height: calc(100vh - 80px);
-  background-color: var(--bg-page, #f8f9fa);
+  background-color: var(--bg-page);
 }
 
 .roster-header {
@@ -17,10 +17,12 @@
 }
 
 .roster-header h1 {
-  font-size: 2rem;
+  font-family: 'Outfit', sans-serif;
+  font-size: 3rem;
   font-weight: 700;
-  color: var(--text-primary, #2c3e50);
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
 }
 
 .roster-header p {
@@ -50,12 +52,17 @@
 }
 
 .classes-section {
-  background: var(--bg-elevated, #ffffff);
-  border-radius: 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-xl);
   padding: 1.5rem;
-  border: 1px solid var(--border-default, #e1e8ed);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
   height: fit-content;
+  transition: all 0.3s ease;
+}
+
+.classes-section:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .classes-section h2 {
@@ -73,16 +80,17 @@
 
 .class-card {
   padding: 1rem;
-  border: 1px solid var(--border-default, #e1e8ed);
-  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all 0.2s;
-  background: var(--bg-elevated, #ffffff);
+  transition: all 0.2s ease;
+  background: var(--bg-elevated);
 }
 
 .class-card:hover {
-  border-color: var(--color-primary, #C50000);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: transparent;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .class-card.selected {
@@ -118,11 +126,27 @@
 }
 
 .roster-section {
-  background: var(--bg-elevated, #ffffff);
-  border-radius: 12px;
-  padding: 1.5rem;
-  border: 1px solid var(--border-default, #e1e8ed);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+.roster-section:hover {
+  box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 768px) {
+  .roster-section {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .roster-table {
+    min-width: 600px;
+  }
 }
 
 .roster-header-info h2 {
@@ -178,18 +202,20 @@
 }
 
 .roster-table th {
-  padding: 0.75rem 1rem;
+  padding: 1rem;
   text-align: left;
   font-weight: 600;
-  color: var(--text-primary, #2c3e50);
-  border-bottom: 2px solid var(--border-default, #e1e8ed);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-subtle);
   font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .roster-table td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border-subtle, #e9ecef);
-  color: var(--text-primary, #2c3e50);
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
   font-size: 0.9rem;
 }
 
@@ -200,9 +226,9 @@
 .status-badge {
   display: inline-block;
   padding: 0.25rem 0.75rem;
-  border-radius: 12px;
+  border-radius: var(--radius-pill);
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .status-badge.enrolled {
@@ -239,13 +265,12 @@
   .roster-content {
     grid-template-columns: 1fr;
   }
-  
+
   .classes-section {
     order: 2;
   }
-  
+
   .roster-section {
     order: 1;
   }
 }
-

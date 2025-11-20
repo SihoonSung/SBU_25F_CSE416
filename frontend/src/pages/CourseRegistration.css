@@ -6,12 +6,12 @@
 
 .course-registration-page {
   min-height: 100vh;
-  padding: 2rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  padding: 3rem;
+  font-family: 'Inter', sans-serif;
   display: grid;
   grid-template-columns: 7fr 3fr;
   gap: 2rem;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
@@ -22,10 +22,12 @@
 }
 
 .search-section h2 {
+  font-family: 'Outfit', sans-serif;
   font-size: 2rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 1rem 0;
+  margin: 0 0 1.5rem 0;
+  letter-spacing: -0.02em;
 }
 
 /* Term Selection */
@@ -34,11 +36,16 @@
   align-items: center;
   gap: 1rem;
   margin-bottom: 1.5rem;
-  padding: 1rem;
+  padding: 1.5rem;
   background: var(--bg-elevated);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.3s ease;
+}
+
+.term-selection:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .term-selection label {
@@ -68,13 +75,18 @@
 
 .search-container {
   background-color: var(--bg-elevated);
-  border-radius: var(--radius-md);
-  padding: 1.5rem;
+  border-radius: var(--radius-xl);
+  padding: 2rem;
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-subtle);
   flex: 1;
   display: flex;
   flex-direction: column;
+  transition: all 0.3s ease;
+}
+
+.search-container:hover {
+  box-shadow: var(--shadow-md);
 }
 
 /* Search Bar */
@@ -179,7 +191,7 @@
 }
 
 .pagination-btn {
-  background-color: var(--button-info-bg);
+  background-color: var(--color-primary);
   color: var(--button-primary-text);
   border: none;
   border-radius: var(--radius-md);
@@ -191,7 +203,7 @@
 }
 
 .pagination-btn:hover:not(:disabled) {
-  background-color: var(--button-info-hover-bg);
+  background-color: var(--color-primary-light);
 }
 
 .pagination-btn:disabled {
@@ -208,9 +220,9 @@
 
 .search-result-card {
   background-color: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -219,13 +231,19 @@
   transition: all 0.3s ease;
 }
 
+.search-result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-premium);
+  border-color: transparent;
+}
+
 .course-info.clickable {
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .course-info.clickable:hover {
-  color: var(--button-info-bg);
+  color: var(--color-primary);
 }
 
 .course-detail-card.clickable {
@@ -300,10 +318,10 @@
 /* Course Detail Card */
 .course-detail-card {
   background-color: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  box-shadow: var(--shadow-premium);
   animation: expandIn 0.3s ease-out;
   transform-origin: top;
 }
@@ -362,7 +380,7 @@
 
 .detail-value.sbc-badges {
   font-weight: 600;
-  color: var(--button-info-bg);
+  color: var(--color-primary);
   font-size: 13px;
 }
 
@@ -370,9 +388,9 @@
 .detail-section {
   margin: 1rem 0;
   padding: 1rem;
-  background-color: var(--info-bg);
+  background-color: var(--bg-subtle);
   border-radius: var(--radius-md);
-  border-left: 3px solid var(--button-info-bg);
+  border-left: 3px solid var(--color-primary);
 }
 
 .detail-section.lec-section {
@@ -406,7 +424,7 @@
 /* External link styling for Classie-Evals */
 .detail-link {
   font-size: 14px;
-  color: var(--button-info-bg);
+  color: var(--color-primary);
   cursor: pointer;
   text-decoration: none;
   font-weight: 500;
@@ -417,7 +435,7 @@
 }
 
 .detail-link:hover {
-  color: var(--button-info-hover-bg);
+  color: var(--color-primary-light);
   text-decoration: underline;
 }
 
@@ -427,6 +445,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -447,21 +466,28 @@
 }
 
 .cart-section h2 {
+  font-family: 'Outfit', sans-serif;
   font-size: 2rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 1.5rem 0;
+  letter-spacing: -0.02em;
 }
 
 .cart-container {
   background-color: var(--bg-elevated);
-  border-radius: var(--radius-md);
-  padding: 1.5rem;
+  border-radius: var(--radius-xl);
+  padding: 2rem;
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-subtle);
   flex: 1;
   display: flex;
   flex-direction: column;
+  transition: all 0.3s ease;
+}
+
+.cart-container:hover {
+  box-shadow: var(--shadow-md);
 }
 
 
@@ -487,15 +513,21 @@
 
 .registered-course-card {
   background-color: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   box-shadow: var(--shadow-sm);
   position: relative;
   min-height: 100px;
+  transition: all 0.3s ease;
+}
+
+.registered-course-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .registered-course-card .course-info {
@@ -542,21 +574,29 @@
   flex-direction: column;
   gap: 1rem;
   margin-bottom: 1.5rem;
-  padding: 0.25rem; /* Add padding to prevent shadow clipping */
-  margin: -0.25rem -0.25rem 1.5rem -0.25rem; /* Negative margin to maintain layout */
+  padding: 0.25rem;
+  /* Add padding to prevent shadow clipping */
+  margin: -0.25rem -0.25rem 1.5rem -0.25rem;
+  /* Negative margin to maintain layout */
 }
 
 .cart-course-card {
   background-color: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   box-shadow: var(--shadow-sm);
   position: relative;
   min-height: 100px;
+  transition: all 0.3s ease;
+}
+
+.cart-course-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .cart-course-card .course-info {
@@ -635,8 +675,8 @@
 }
 
 .status-tag.enrolled {
-  background-color: var(--info-bg);
-  color: var(--info-text);
+  background-color: var(--bg-subtle);
+  color: var(--color-primary);
 }
 
 .status-tag.waitlisted {
@@ -695,7 +735,7 @@
     gap: 1.5rem;
     padding: 1.5rem;
   }
-  
+
   .search-bar input {
     width: 100%;
   }
@@ -705,25 +745,25 @@
   .course-registration-page {
     padding: 1rem;
   }
-  
+
   .search-container,
   .cart-container {
     padding: 1rem;
   }
-  
+
   .search-result-card,
   .cart-course-card {
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .course-actions {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
     width: 100%;
   }
-  
+
   .add-to-cart-btn {
     flex-direction: row;
     height: auto;
@@ -731,12 +771,12 @@
     padding: 0.5rem 1rem;
     margin-left: 0;
   }
-  
+
   .status-tag,
   .drop-btn {
     position: static;
   }
-  
+
   .btn-text {
     font-size: 11px;
   }
@@ -746,12 +786,12 @@
   .course-registration-page {
     padding: 0.5rem;
   }
-  
+
   .search-section h2,
   .cart-section h2 {
     font-size: 1.75rem;
   }
-  
+
   .search-result-card,
   .cart-course-card {
     padding: 0.75rem;
@@ -826,8 +866,13 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .status-tag.antirequisites {
@@ -839,4 +884,3 @@
   background-color: var(--warning-bg);
   color: var(--warning-text);
 }
-
