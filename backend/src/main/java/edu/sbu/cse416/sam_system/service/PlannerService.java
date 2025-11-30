@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 /**
  * Service layer for course planner functionality.
  * Handles requisite validation, persistence and summary calculation.
+ * TP: Used Cursor to implement auto-planner service for generating course plans
  */
 @Service
 @Transactional
@@ -157,6 +158,63 @@ public class PlannerService {
         }
 
         userCoursePlanRepository.delete(plan);
+    }
+
+    /**
+     * Save auto-generated plan to the student's course plan.
+     * This replaces all existing planned courses with the new plan.
+     * Accepts PlannerCourseDto (from AutoPlannerResponse)
+     */
+    @Transactional
+    public void saveAutoPlan(Long userId, List<PlannerCourseDto> planCourses) {
+        // Get student
+        User student = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Student not found: " + userId));
+
+        // Delete all existing planned courses
+        userCoursePlanRepository.deleteByUserId(userId);
+
+        // Save new planned courses
+        for (PlannerCourseDto dto : planCourses) {
+            String department = dto.department();
+            Integer courseNum = dto.courseNum();
+            String semester = normalizeSemester(dto.semester());
+            Integer year = dto.year();
+
+            if (department == null || department.isBlank()) {
+                throw new IllegalArgumentException("Department is required for course: " + courseNum);
+            }
+            if (courseNum == null) {
+                throw new IllegalArgumentException("Course number is required for department: " + department);
+            }
+            if (semester == null || semester.isBlank()) {
+                throw new IllegalArgumentException("Semester is required for course: " + department + " " + courseNum);
+            }
+            if (year == null) {
+                throw new IllegalArgumentException("Year is required for course: " + department + " " + courseNum);
+            }
+
+            // Find course to get credits (use credits from DTO if available, otherwise from course)
+            Optional<Course> courseOpt = resolveCourse(department, courseNum, semester, year);
+            Integer credits = dto.credits();
+            if (credits == null && courseOpt.isPresent()) {
+                credits = courseOpt.get().getCredits();
+            }
+            if (credits == null) {
+                throw new IllegalArgumentException("Course not found or credits unavailable: " + department + " " + courseNum);
+            }
+
+            // Create and save new plan entry
+            UserCoursePlan newPlan = new UserCoursePlan();
+            newPlan.setUser(student);
+            newPlan.setDepartment(department);
+            newPlan.setCourseNum(courseNum);
+            newPlan.setSemester(semester);
+            newPlan.setYear(year);
+            newPlan.setCredits(credits);
+
+            userCoursePlanRepository.save(newPlan);
+        }
     }
 
     // ---------- Helpers ----------
@@ -434,8 +492,8 @@ public class PlannerService {
                 .filter(uc -> uc.getGrade() == null || uc.getGrade().trim().isEmpty() || uc.getGrade().equals("I"))
                 .collect(Collectors.toList());
 
-        // 핵심: 하나의 리스트에 모든 과목들을 모음
-        // 이 리스트는 계속 업데이트됨 (plan에 과목을 추가할 때마다)
+        // Core: Collect all courses in a single list
+        // This list is continuously updated (whenever a course is added to the plan)
         List<UserClasses> allAvailableClasses = new ArrayList<>();
         allAvailableClasses.addAll(completedClasses);
         allAvailableClasses.addAll(inProgressClasses);
@@ -474,29 +532,26 @@ public class PlannerService {
         // Calculate current major credits (completed + inProgress)
         double currentMajorCredits = calculateMajorCredits(completedClasses, inProgressClasses, majorSubjectCodes);
 
-        // Iterative planning: 반복적으로 required → electives → SBCs를 시도
-        // 이렇게 하면 electives나 SBCs가 추가되면서 prerequisites가 만족되어
-        // 다음 iteration에서 더 많은 required courses를 추가할 수 있음
-        int maxGlobalIterations = 10; // 전체 반복 횟수 제한
-        warnings.add("[AUTO-PLANNER] Starting iterative planning (max " + maxGlobalIterations + " iterations)");
-        
+        // Iterative planning: repeatedly try required → electives → SBCs
+        // This allows electives or SBCs to be added, satisfying prerequisites,
+        // enabling more required courses to be added in the next iteration
+        int maxGlobalIterations = 10; // Maximum number of iterations
         for (int globalIteration = 0; globalIteration < maxGlobalIterations; globalIteration++) {
             int coursesBefore = proposedPlan.size();
-            warnings.add("[AUTO-PLANNER] ===== Global Iteration " + (globalIteration + 1) + " =====");
             
-            // 1. Required courses 추가 (degree requirements에서)
+            // 1. Add required courses (from degree requirements)
             addRequiredCourses(student, allCourses, availableTerms, proposedPlan, creditsByTerm,
                               majorCoursesByTerm, allAvailableClasses, completedClasses, inProgressClasses,
                               warnings, request.workloadLimits(), request.avoidCourses(), processedCourses,
                               requiredCourseCodes, request.graduationSemester(), request.graduationYear());
 
-            // 2. Electives 추가 (degree requirements에서)
+            // 2. Add electives (from degree requirements)
             addElectives(student, allCourses, availableTerms, proposedPlan, creditsByTerm,
                         majorCoursesByTerm, allAvailableClasses, completedClasses, inProgressClasses,
                         warnings, request.workloadLimits(), request.avoidCourses(), processedCourses,
                         requiredCourseCodes, request.graduationSemester(), request.graduationYear());
 
-            // 3. SBC 충족을 위한 과목 추가
+            // 3. Add courses to satisfy SBC requirements
             addSBCsAndCredits(student, allCourses, availableTerms, proposedPlan, creditsByTerm,
                              majorCoursesByTerm, allAvailableClasses, completedClasses, inProgressClasses,
                              warnings, request.workloadLimits(), request.avoidCourses(), totalCreditsRequired,
@@ -505,23 +560,19 @@ public class PlannerService {
             
             int coursesAfter = proposedPlan.size();
             int addedThisIteration = coursesAfter - coursesBefore;
-            warnings.add("[AUTO-PLANNER] Iteration " + (globalIteration + 1) + " added " + addedThisIteration + " courses");
             
-            // 만약 이번 iteration에서 아무것도 추가되지 않았으면 종료
+            // Stop if no courses were added in this iteration
             if (addedThisIteration == 0) {
-                warnings.add("[AUTO-PLANNER] No courses added in iteration " + (globalIteration + 1) + ", stopping");
                 break;
             }
             
-            // Credits나 degree requirements가 만족되었으면 종료
+            // Stop if credits or degree requirements are satisfied
             double currentTotal = currentTotalCredits + creditsByTerm.values().stream().mapToDouble(Double::doubleValue).sum();
             if (currentTotal >= totalCreditsRequired) {
-                warnings.add("[AUTO-PLANNER] Total credits requirement met (" + currentTotal + " >= " + totalCreditsRequired + "), stopping");
                 break;
             }
             
             if (areDegreeRequirementsSatisfied(student, proposedPlan, completedClasses, inProgressClasses)) {
-                warnings.add("[AUTO-PLANNER] All degree requirements satisfied, stopping");
                 break;
             }
         }
@@ -650,12 +701,12 @@ public class PlannerService {
                             }
                         }
                     } catch (IllegalArgumentException e) {
-                        System.err.println("Invalid DegreeType for major " + subjectCode + ": " + degreeTypeStr);
+                        // Invalid DegreeType, skip
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error getting total credits required: " + e.getMessage());
+            // Error getting total credits required, skip
         }
         
         return maxCredits;
@@ -723,7 +774,6 @@ public class PlannerService {
                         }
                     } catch (Exception e) {
                         // If YAML parsing fails, use estimate
-                        System.err.println("Error parsing YAML for degree_credits_required: " + e.getMessage());
                         if ("CSE".equals(subjectCode) && "BS".equals(degreeTypeStr)) {
                             maxCredits = Math.max(maxCredits, 80);
                         } else {
@@ -734,11 +784,11 @@ public class PlannerService {
                 } catch (IllegalArgumentException e) {
                     // Invalid degree type, skip
                 } catch (Exception e) {
-                    System.err.println("Error getting degree credits required for " + subjectCode + ": " + e.getMessage());
+                    // Error getting degree credits required, skip
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error getting degree credits required: " + e.getMessage());
+            // Error getting degree credits required, skip
         }
         
         return maxCredits > 0 ? maxCredits : 60; // Default to 60 if not found
@@ -763,7 +813,7 @@ public class PlannerService {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error getting major subject codes: " + e.getMessage());
+            // Error getting major subject codes, skip
         }
         
         return subjectCodes;
@@ -829,7 +879,7 @@ public class PlannerService {
                 result.add(item);
             }
         } catch (Exception e) {
-            System.err.println("Error parsing majors/minors JSON: " + e.getMessage());
+            // Error parsing majors/minors JSON, skip
         }
         return result;
     }
@@ -916,11 +966,11 @@ public class PlannerService {
                 } catch (IllegalArgumentException e) {
                     // Invalid degree type, skip
                 } catch (Exception e) {
-                    System.err.println("Error extracting required courses for " + subjectCode + ": " + e.getMessage());
+                    // Error extracting required courses, skip
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error getting required course codes: " + e.getMessage());
+            // Error getting required course codes, skip
         }
         
         return requiredCodes;
@@ -941,9 +991,6 @@ public class PlannerService {
             if (courseNumber >= 400 && courseNumber < 500) {
                 // Must be in required course codes
                 boolean isRequired = requiredCourseCodes.contains(courseCode);
-                if (!isRequired) {
-                    warnings.add("[400-LEVEL RESTRICTION] Course " + courseCode + " is 400-level but not in degree requirements");
-                }
                 return isRequired;
             }
             
@@ -959,8 +1006,98 @@ public class PlannerService {
      * Identify courses that don't contribute to degree requirements
      */
     private List<String> identifyNonRequiredCourses(List<PlannerCourseDto> proposedPlan, User student) {
-        // TODO: Implement logic to identify non-required courses
-        return new ArrayList<>();
+        List<String> nonRequired = new ArrayList<>();
+        
+        if (proposedPlan == null || proposedPlan.isEmpty()) {
+            return nonRequired;
+        }
+        
+        // Get all courses that are needed for prerequisites
+        Set<String> coursesNeededForPrerequisites = getCoursesNeededForPrerequisites(proposedPlan);
+        
+        // Get all courses that satisfy degree requirements
+        Set<String> coursesNeededForDegreeRequirements = getCoursesNeededForDegreeRequirements(student, proposedPlan);
+        
+        // Check each planned course
+        for (PlannerCourseDto course : proposedPlan) {
+            String courseCode = course.department() + " " + course.courseNum();
+            
+            // Check if this course is needed for prerequisites or degree requirements
+            boolean neededForPrerequisites = coursesNeededForPrerequisites.contains(courseCode);
+            boolean neededForDegreeRequirements = coursesNeededForDegreeRequirements.contains(courseCode);
+            
+            // If not needed for either, it's a non-required class
+            if (!neededForPrerequisites && !neededForDegreeRequirements) {
+                nonRequired.add(courseCode);
+            }
+        }
+        
+        return nonRequired;
+    }
+    
+    /**
+     * Get all courses that are needed as prerequisites for courses in the proposed plan
+     */
+    private Set<String> getCoursesNeededForPrerequisites(List<PlannerCourseDto> proposedPlan) {
+        Set<String> neededCourses = new HashSet<>();
+        
+        // Get all courses from catalog
+        List<Course> allCourses = courseRepository.findAll();
+        Map<String, Course> courseMap = new HashMap<>();
+        for (Course c : allCourses) {
+            courseMap.put(c.getSubject() + " " + c.getCourseNumber(), c);
+        }
+        
+        // For each planned course, check what prerequisites it needs
+        for (PlannerCourseDto plan : proposedPlan) {
+            String courseCode = plan.department() + " " + plan.courseNum();
+            Course course = courseMap.get(courseCode);
+            
+            if (course == null) {
+                continue;
+            }
+            
+            String prerequisites = course.getPrerequisites();
+            String corequisites = course.getCorequisites();
+            
+            if (prerequisites != null && !prerequisites.trim().isEmpty()) {
+                // Extract course codes from prerequisites
+                Matcher matcher = COURSE_CODE_PATTERN.matcher(prerequisites);
+                while (matcher.find()) {
+                    String dept = matcher.group(1);
+                    String courseNum = matcher.group(2);
+                    neededCourses.add(dept + " " + courseNum);
+                }
+            }
+            
+            if (corequisites != null && !corequisites.trim().isEmpty()) {
+                // Extract course codes from corequisites
+                Matcher matcher = COURSE_CODE_PATTERN.matcher(corequisites);
+                while (matcher.find()) {
+                    String dept = matcher.group(1);
+                    String courseNum = matcher.group(2);
+                    neededCourses.add(dept + " " + courseNum);
+                }
+            }
+        }
+        
+        return neededCourses;
+    }
+    
+    /**
+     * Get all courses that satisfy degree requirements
+     */
+    private Set<String> getCoursesNeededForDegreeRequirements(User student, List<PlannerCourseDto> proposedPlan) {
+        Set<String> neededCourses = new HashSet<>();
+        
+        // Get all required courses from degree requirements
+        Set<String> requiredCourseCodes = getAllRequiredCourseCodes(student);
+        neededCourses.addAll(requiredCourseCodes);
+        
+        // Also check if courses are needed for electives or sequences in degree requirements
+        // This is already covered by getAllRequiredCourseCodes, but we can add more logic if needed
+        
+        return neededCourses;
     }
 
     /**
@@ -1011,38 +1148,30 @@ public class PlannerService {
                         Set<String> requiredCourses = extractRequiredCoursesFromGroup(group, type,
                                 completedClasses, inProgressClasses, allAvailableClasses);
                         
-                        // Add each required course to plan (한 번만 시도, global iteration에서 반복됨)
-                        warnings.add("[AUTO-PLANNER] Processing required courses for " + subjectCode + " (group type: " + type + ")");
+                        // Add each required course to plan (try once, repeated in global iteration)
                         for (String courseCode : requiredCourses) {
                             if (isAvoided(courseCode, avoidCourses)) {
-                                warnings.add("[AUTO-PLANNER] Skipping " + courseCode + " (in avoid list)");
                                 continue;
                             }
                             if (isAlreadyPlannedOrCompleted(courseCode, proposedPlan, completedClasses, inProgressClasses)) {
-                                warnings.add("[AUTO-PLANNER] Skipping " + courseCode + " (already planned or completed)");
                                 continue; // Already added
                             }
                             
                             // Try to add course (will check prerequisites and find suitable term)
-                            warnings.add("[AUTO-PLANNER] Attempting to add " + courseCode);
-                            if (tryAddCourseWithPrerequisites(courseCode, allCourses, availableTerms, proposedPlan,
+                            tryAddCourseWithPrerequisites(courseCode, allCourses, availableTerms, proposedPlan,
                                     creditsByTerm, majorCoursesByTerm, allAvailableClasses, completedClasses,
                                     inProgressClasses, warnings, student, workloadLimits, processedCourses,
-                                    avoidCourses, requiredCourseCodes, graduationSemester, graduationYear)) {
-                                warnings.add("[AUTO-PLANNER] ✓ Successfully added " + courseCode);
-                            } else {
-                                warnings.add("[AUTO-PLANNER] ✗ Failed to add " + courseCode + " (will retry in next global iteration if prerequisites are added)");
-                            }
+                                    avoidCourses, requiredCourseCodes, graduationSemester, graduationYear);
                         }
                     }
                 } catch (IllegalArgumentException e) {
                     // Invalid degree type, skip
                 } catch (Exception e) {
-                    System.err.println("Error processing required courses for " + subjectCode + ": " + e.getMessage());
+                    // Error processing required courses, skip
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error adding required courses: " + e.getMessage());
+            // Error adding required courses, skip
         }
     }
 
@@ -1120,11 +1249,11 @@ public class PlannerService {
                 } catch (IllegalArgumentException e) {
                     // Invalid degree type, skip
                 } catch (Exception e) {
-                    System.err.println("Error processing electives for " + subjectCode + ": " + e.getMessage());
+                    // Error processing electives, skip
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error adding electives: " + e.getMessage());
+            // Error adding electives, skip
         }
     }
 
@@ -1193,6 +1322,11 @@ public class PlannerService {
                 .collect(Collectors.toList());
         
         for (Course course : candidateCourses) {
+            // Skip 0-credit courses
+            if (course.getCredits() == null || course.getCredits() <= 0) {
+                continue;
+            }
+            
             // Check if we've reached total credits required
             if (totalCredits >= totalCreditsRequired) {
                 // Check if all requirements are satisfied
@@ -1203,11 +1337,7 @@ public class PlannerService {
                         break; // All requirements satisfied, stop adding courses
                     }
                 }
-            }
-            
-            // If we've exceeded total credits, only add if needed for requirements
-            if (totalCredits >= totalCreditsRequired) {
-                // Only add if needed for SBCs or major credits
+                // If total credits are met and SBCs/major credits are met, don't add more courses
                 if (areSBCsSatisfied(sbcRequirements, currentSBCCounts) && 
                     totalMajorCredits >= degreeCreditsRequired) {
                     break; // Requirements satisfied, stop
@@ -1227,6 +1357,27 @@ public class PlannerService {
             if (isMajorCourse && totalMajorCredits >= degreeCreditsRequired) {
                 // Major credits satisfied, skip major courses unless needed for other requirements
                 continue;
+            }
+            
+            // If total credits are already met, only add if needed for SBCs
+            if (totalCredits >= totalCreditsRequired) {
+                // Check if this course satisfies unmet SBCs
+                List<String> sbcs = extractSbcs(course.getSbcsSatisfied());
+                boolean satisfiesUnmetSBC = false;
+                for (String sbc : sbcs) {
+                    String cleanSBC = sbc.replace("Partially fulfills:", "").trim();
+                    if (!cleanSBC.isEmpty() && !cleanSBC.equals("unknown")) {
+                        int required = sbcRequirements.getOrDefault(cleanSBC, 0);
+                        int current = currentSBCCounts.getOrDefault(cleanSBC, 0);
+                        if (current < required) {
+                            satisfiesUnmetSBC = true;
+                            break;
+                        }
+                    }
+                }
+                if (!satisfiesUnmetSBC) {
+                    continue; // Skip courses that don't satisfy unmet SBCs
+                }
             }
             
             // Try to add course
@@ -1252,6 +1403,16 @@ public class PlannerService {
                     if (isMajorCourse) {
                         totalMajorCredits += courseCredits;
                         majorCreditsNeeded -= courseCredits;
+                    }
+                }
+                
+                // Check if all requirements are satisfied after adding this course
+                if (totalCredits >= totalCreditsRequired) {
+                    if (areSBCsSatisfied(sbcRequirements, currentSBCCounts) && 
+                        totalMajorCredits >= degreeCreditsRequired) {
+                        if (areDegreeRequirementsSatisfied(student, proposedPlan, completedClasses, inProgressClasses)) {
+                            break; // All requirements satisfied, stop adding courses
+                        }
                     }
                 }
             }
@@ -1388,46 +1549,40 @@ public class PlannerService {
                                                  List<String> avoidCourses,
                                                  Set<String> requiredCourseCodes,
                                                  String graduationSemester, Integer graduationYear) {
-        warnings.add("[TRY-ADD] Starting to process " + courseCode);
-        
         if (processedCourses.contains(courseCode)) {
             boolean alreadyDone = isAlreadyPlannedOrCompleted(courseCode, proposedPlan, completedClasses, inProgressClasses);
-            warnings.add("[TRY-ADD] " + courseCode + " already processed, already planned/completed: " + alreadyDone);
             return alreadyDone;
         }
         
         processedCourses.add(courseCode);
-        warnings.add("[TRY-ADD] " + courseCode + " marked as processed");
         
         Course course = findCourseByCode(allCourses, courseCode);
         if (course == null) {
-            warnings.add("[TRY-ADD] ✗ " + courseCode + " not found in course catalog");
-            warnings.add("Required course not found: " + courseCode);
+            return false;
+        }
+        
+        // Skip 0-credit courses
+        if (course.getCredits() == null || course.getCredits() <= 0) {
             return false;
         }
         
         // Check prerequisites using allAvailableClasses
         // Special case: WRT 101 can be added without prerequisites
         String prerequisites = course.getPrerequisites();
-        warnings.add("[TRY-ADD] " + courseCode + " prerequisites: " + (prerequisites != null ? prerequisites : "none"));
         
         if (prerequisites != null && !prerequisites.trim().isEmpty() && !prerequisites.equalsIgnoreCase("none")) {
             // Skip prerequisite check for WRT 101
             if (!"WRT 101".equals(courseCode)) {
                 boolean prereqsSatisfied = checkPrerequisitesWithAllAvailableClasses(prerequisites, allAvailableClasses, student);
-                warnings.add("[TRY-ADD] " + courseCode + " prerequisites satisfied: " + prereqsSatisfied);
                 
                 // First, try to add missing prerequisites recursively
                 if (!prereqsSatisfied) {
                     List<String> missingPrereqs = extractMissingPrerequisites(prerequisites, allAvailableClasses, requiredCourseCodes);
-                    warnings.add("[TRY-ADD] " + courseCode + " missing prerequisites: " + missingPrereqs);
                     for (String prereqCode : missingPrereqs) {
                         if (isAvoided(prereqCode, avoidCourses)) {
-                            warnings.add("[TRY-ADD] Skipping prerequisite " + prereqCode + " (in avoid list)");
                             continue;
                         }
                         // Recursively try to add prerequisite
-                        warnings.add("[TRY-ADD] Recursively trying to add prerequisite " + prereqCode + " for " + courseCode);
                         tryAddCourseWithPrerequisites(prereqCode, allCourses, availableTerms, proposedPlan,
                                 creditsByTerm, majorCoursesByTerm, allAvailableClasses, completedClasses,
                                 inProgressClasses, warnings, student, workloadLimits, processedCourses, avoidCourses,
@@ -1436,17 +1591,13 @@ public class PlannerService {
                     
                     // Check again after adding prerequisites
                     prereqsSatisfied = checkPrerequisitesWithAllAvailableClasses(prerequisites, allAvailableClasses, student);
-                    warnings.add("[TRY-ADD] " + courseCode + " prerequisites satisfied after adding missing ones: " + prereqsSatisfied);
                 }
-            } else {
-                warnings.add("[TRY-ADD] " + courseCode + " is WRT 101, skipping prerequisite check");
             }
         }
         
         // Find best term for this course
         // Note: findBestTermForCourse checks prerequisites for each term separately,
         // so if prerequisites are satisfied in a later term, it will find that term
-        warnings.add("[TRY-ADD] Finding best term for " + courseCode);
         TermInfo bestTerm = findBestTermForCourse(course, availableTerms, proposedPlan, creditsByTerm,
                 majorCoursesByTerm, allAvailableClasses, completedClasses, inProgressClasses,
                 student, workloadLimits, warnings, graduationSemester, graduationYear, allCourses);
@@ -1455,24 +1606,13 @@ public class PlannerService {
             // Could not find a suitable term (prerequisites not met in any term, or workload limits)
             // This course will be skipped for now, but if prerequisites are added later,
             // it might be added in a subsequent iteration or in a different phase
-            warnings.add("[TRY-ADD] ✗ Could not find suitable term for " + courseCode + " (prerequisites may not be met in any available term)");
-            warnings.add("Could not schedule required course: " + courseCode + 
-                    " (prerequisites may not be met in any available term)");
             return false;
         }
-        
-        warnings.add("[TRY-ADD] Found best term for " + courseCode + ": " + bestTerm.semester + " " + bestTerm.year);
         
         // Add course to plan
         boolean added = addCourseToTerm(courseCode, bestTerm, allCourses, proposedPlan, creditsByTerm,
                 majorCoursesByTerm, allAvailableClasses, completedClasses, inProgressClasses,
                 warnings, student, workloadLimits, requiredCourseCodes);
-        
-        if (added) {
-            warnings.add("[TRY-ADD] ✓ Successfully added " + courseCode + " to " + bestTerm.semester + " " + bestTerm.year);
-        } else {
-            warnings.add("[TRY-ADD] ✗ Failed to add " + courseCode + " to " + bestTerm.semester + " " + bestTerm.year);
-        }
         
         return added;
     }
@@ -1492,6 +1632,11 @@ public class PlannerService {
                                    Set<String> requiredCourseCodes) {
         Course course = findCourseByCode(allCourses, courseCode);
         if (course == null) return false;
+        
+        // Skip 0-credit courses
+        if (course.getCredits() == null || course.getCredits() <= 0) {
+            return false;
+        }
         
         String termKey = buildTermKey(term.semester, term.year);
         
@@ -1540,7 +1685,7 @@ public class PlannerService {
             majorCoursesByTerm.put(termKey, majorCoursesByTerm.getOrDefault(termKey, 0) + 1);
         }
         
-        // 핵심: plan에 추가한 과목을 allAvailableClasses에도 추가
+        // Core: Add courses added to plan to allAvailableClasses as well
         UserClasses synthetic = new UserClasses();
         synthetic.setUser(student);
         synthetic.setDepartment(course.getSubject());
@@ -1586,7 +1731,6 @@ public class PlannerService {
         });
         
         String courseCode = course.getSubject() + " " + course.getCourseNumber();
-        warnings.add("[FIND-TERM] Finding best term for " + courseCode + " (isMajorCourse: " + isMajorCourse + ")");
         
         // For each term, check if prerequisites are satisfied and workload allows
         for (TermInfo term : sortedTerms) {
@@ -1595,16 +1739,12 @@ public class PlannerService {
             double courseCredits = course.getCredits() != null ? course.getCredits().doubleValue() : 0.0;
             Double limit = workloadLimits.get(termKey);
             
-            warnings.add("[FIND-TERM] Checking " + termKey + " for " + courseCode + " (workload: " + currentWorkload + "/" + (limit != null ? limit : "no limit") + ")");
-            
             if (limit != null && currentWorkload + courseCredits > limit) {
-                warnings.add("[FIND-TERM] ✗ " + termKey + " rejected: workload limit exceeded (" + (currentWorkload + courseCredits) + " > " + limit + ")");
                 continue;
             }
             
             int majorCount = majorCoursesByTerm.getOrDefault(termKey, 0);
             if (isMajorCourse && majorCount >= 3) {
-                warnings.add("[FIND-TERM] ✗ " + termKey + " rejected: major course limit reached (" + majorCount + " >= 3)");
                 continue;
             }
             
@@ -1618,13 +1758,10 @@ public class PlannerService {
                     boolean standingMet = checkStandingRequirementForTerm(prerequisites, completedClasses, inProgressClasses, 
                                                          proposedPlan, term.semester, term.year, warnings,
                                                          graduationSemester, graduationYear);
-                    warnings.add("[FIND-TERM] " + termKey + " standing requirement (" + prerequisites + ") met: " + standingMet);
                     if (!standingMet) {
-                        warnings.add("[FIND-TERM] ✗ " + termKey + " rejected: standing requirement not met");
                         continue; // Standing requirement not met for this term
                     }
                 }
-                warnings.add("[FIND-TERM] ✓ " + termKey + " selected for " + courseCode + " (no prerequisites or WRT 101)");
                 return term; // No prerequisites or WRT 101
             }
             
@@ -1673,7 +1810,6 @@ public class PlannerService {
                         synthetic.setGrade("C");
                         synthetic.setCredits(planned.credits());
                         plannedBeforeOrAtTerm.add(synthetic);
-                        warnings.add("[FIND-TERM] " + termKey + " - including same-term corequisite: " + plannedCourseCode);
                     } else {
                         // Also check if planned course has current course as corequisite (bidirectional check)
                         Course plannedCourseObj = findCourseByCode(allCourses, plannedCourseCode);
@@ -1687,14 +1823,11 @@ public class PlannerService {
                                 synthetic.setGrade("C");
                                 synthetic.setCredits(planned.credits());
                                 plannedBeforeOrAtTerm.add(synthetic);
-                                warnings.add("[FIND-TERM] " + termKey + " - including same-term course with bidirectional corequisite: " + plannedCourseCode);
                             }
                         }
                     }
                 }
             }
-            
-            warnings.add("[FIND-TERM] " + termKey + " - planned courses before/at this term: " + plannedBeforeOrAtTerm.size());
             
             // Combine with completed and in-progress classes
             List<UserClasses> allClassesForPrereqCheck = new ArrayList<>();
@@ -1702,18 +1835,12 @@ public class PlannerService {
             allClassesForPrereqCheck.addAll(inProgressClasses);
             allClassesForPrereqCheck.addAll(plannedBeforeOrAtTerm);
             
-            warnings.add("[FIND-TERM] " + termKey + " - total classes for prereq check: " + allClassesForPrereqCheck.size() + 
-                             " (completed: " + completedClasses.size() + ", inProgress: " + inProgressClasses.size() + 
-                             ", plannedBefore/At: " + plannedBeforeOrAtTerm.size() + ")");
-            
             // Check standing requirements for this term
             if (prerequisites.toLowerCase().contains("standing")) {
                 boolean standingMet = checkStandingRequirementForTerm(prerequisites, completedClasses, inProgressClasses,
                                                      proposedPlan, term.semester, term.year, warnings,
                                                      graduationSemester, graduationYear);
-                warnings.add("[FIND-TERM] " + termKey + " standing requirement (" + prerequisites + ") met: " + standingMet);
                 if (!standingMet) {
-                    warnings.add("[FIND-TERM] ✗ " + termKey + " rejected: standing requirement not met");
                     continue; // Standing requirement not met for this term
                 }
             }
@@ -1721,17 +1848,12 @@ public class PlannerService {
             // Pass term and graduation information so standing requirement can be bypassed if needed
             boolean prereqsSatisfied = checkPrerequisitesWithAllAvailableClasses(prerequisites, allClassesForPrereqCheck, student, 
                                                                                 term.semester, term.year, graduationSemester, graduationYear);
-            warnings.add("[FIND-TERM] " + termKey + " prerequisites (" + prerequisites + ") satisfied: " + prereqsSatisfied);
             
             if (prereqsSatisfied) {
-                warnings.add("[FIND-TERM] ✓ " + termKey + " selected for " + courseCode);
                 return term;
-            } else {
-                warnings.add("[FIND-TERM] ✗ " + termKey + " rejected: prerequisites not satisfied");
             }
         }
         
-        warnings.add("[FIND-TERM] ✗ No suitable term found for " + courseCode);
         return null; // No suitable term found
     }
 
@@ -2015,14 +2137,10 @@ public class PlannerService {
         String lowerPrereq = prerequisites.toLowerCase();
         if (lowerPrereq.contains("u3") || lowerPrereq.contains("junior")) {
             if (isBeforeGraduationTerm || isGraduationTerm) {
-                warnings.add("[STANDING-CHECK] " + termSemester + " " + termYear + 
-                           " - U3 requirement bypassed (graduation term or before: " + isBeforeGraduationTerm + "/" + isGraduationTerm + ")");
                 return true; // Allow U3 courses in graduation term or before
             }
         } else if (lowerPrereq.contains("u4") || lowerPrereq.contains("senior")) {
             if (isGraduationTerm) {
-                warnings.add("[STANDING-CHECK] " + termSemester + " " + termYear + 
-                           " - U4 requirement bypassed (graduation term)");
                 return true; // Allow U4 courses in graduation term
             }
         }
@@ -2085,12 +2203,6 @@ public class PlannerService {
             requiredStanding = "any";
             result = true; // Default: if just says "standing" without specific level, assume satisfied
         }
-        
-        warnings.add("[STANDING-CHECK] " + termSemester + " " + termYear + 
-                    " - Credits: " + totalCredits + " (completed: " + completedCredits + 
-                    ", inProgress: " + inProgressCredits + ", planned: " + plannedCredits + 
-                    " from " + plannedCount + " courses) = " + standing + 
-                    " | Required: " + requiredStanding + " | Result: " + result);
         
         return result;
     }
@@ -2391,7 +2503,6 @@ public class PlannerService {
                 if (isAlreadyPlannedOrCompleted(code, proposedPlan, completedClasses, inProgressClasses)) continue;
                 if (isAvoided(code, avoidCourses)) continue;
                 
-                warnings.add("[ELECTIVES-SEQUENCE] Attempting to add " + code + " from sequence");
                 if (tryAddCourseWithPrerequisites(code, allCourses, availableTerms, proposedPlan,
                         creditsByTerm, majorCoursesByTerm, allAvailableClasses, completedClasses,
                         inProgressClasses, warnings, student, workloadLimits, processedCourses, avoidCourses,
@@ -2400,18 +2511,12 @@ public class PlannerService {
                     if (course != null && course.getCredits() != null) {
                         needed -= course.getCredits();
                         sequenceAdded = true;
-                        warnings.add("[ELECTIVES-SEQUENCE] ✓ Added " + code + " from sequence");
                     }
-                } else {
-                    warnings.add("[ELECTIVES-SEQUENCE] ✗ Failed to add " + code + " from sequence");
                 }
             }
             
             // If we successfully added at least one course from this sequence, continue
             // Otherwise, try next sequence
-            if (sequenceAdded) {
-                warnings.add("[ELECTIVES-SEQUENCE] Sequence partially/completely added");
-            }
         }
         
         // Then process sequences without completed courses
@@ -2442,7 +2547,6 @@ public class PlannerService {
                     break;
                 }
                 
-                warnings.add("[ELECTIVES-SEQUENCE] Attempting to add " + code + " from new sequence");
                 if (tryAddCourseWithPrerequisites(code, allCourses, availableTerms, proposedPlan,
                         creditsByTerm, majorCoursesByTerm, allAvailableClasses, completedClasses,
                         inProgressClasses, warnings, student, workloadLimits, processedCourses, avoidCourses,
@@ -2450,18 +2554,15 @@ public class PlannerService {
                     Course course = findCourseByCode(allCourses, code);
                     if (course != null && course.getCredits() != null) {
                         sequenceCredits += course.getCredits();
-                        warnings.add("[ELECTIVES-SEQUENCE] ✓ Added " + code + " from new sequence");
                     }
                 } else {
                     allAdded = false;
-                    warnings.add("[ELECTIVES-SEQUENCE] ✗ Failed to add " + code + " from new sequence, skipping entire sequence");
                     break; // Can't complete this sequence, try next one
                 }
             }
             
             if (allAdded && sequenceCredits > 0) {
                 needed -= sequenceCredits;
-                warnings.add("[ELECTIVES-SEQUENCE] ✓ Complete sequence added (" + sequenceCredits + " credits)");
             }
         }
     }
@@ -2738,7 +2839,6 @@ public class PlannerService {
             
             return true;
         } catch (Exception e) {
-            System.err.println("Error checking degree requirements satisfaction: " + e.getMessage());
             return false; // If error, assume not satisfied
         }
     }

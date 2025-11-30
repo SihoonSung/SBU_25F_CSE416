@@ -1,6 +1,7 @@
 package edu.sbu.cse416.sam_system.controller;
 
 import edu.sbu.cse416.sam_system.service.PlanValidationService;
+import edu.sbu.cse416.sam_system.dto.PlannerDtos;
 import edu.sbu.cse416.sam_system.dto.PlannerDtos.AutoPlannerRequest;
 import edu.sbu.cse416.sam_system.dto.PlannerDtos.AutoPlannerResponse;
 import edu.sbu.cse416.sam_system.dto.PlannerDtos.PlannerCourseRequest;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -123,6 +125,41 @@ public class PlannerController {
             System.err.println("AutoPlanner Exception: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.internalServerError().body(Map.of("error", "Internal server error: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Confirm and save the auto-generated plan to the student's course plan.
+     * POST /api/planner/{userId}/confirm
+     * Body: List<PlannerCourseDto> (the proposedPlan from AutoPlannerResponse)
+     */
+    @PostMapping("/{userId}/confirm")
+    public ResponseEntity<?> confirmAutoPlan(@PathVariable Long userId,
+                                             @RequestBody List<PlannerDtos.PlannerCourseDto> planCourses) {
+        try {
+            if (planCourses == null || planCourses.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Plan courses are required"));
+            }
+            
+            plannerService.saveAutoPlan(userId, planCourses);
+            PlannerSummaryDto summary = plannerService.getPlannerSummary(userId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Plan confirmed and saved successfully",
+                    "summary", summary
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        } catch (Exception e) {
+            System.err.println("Confirm AutoPlan Exception: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "success", false,
+                    "error", "Internal server error: " + e.getMessage()
+            ));
         }
     }
 }
