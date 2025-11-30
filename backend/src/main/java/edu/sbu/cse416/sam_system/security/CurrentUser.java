@@ -1,5 +1,6 @@
 package edu.sbu.cse416.sam_system.security;
 
+import edu.sbu.cse416.sam_system.entity.User;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,24 +21,44 @@ public class CurrentUser {
         this.request = request;
     }
 
-    // TP: Used cursor to get current user's email from OAuth2 or headers
+    // TP: Used cursor to get current user's email from OAuth2, bypass mode (UserPrincipal), or headers
     public String getEmail() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof OAuth2User o2User) {
-            String email = o2User.getAttribute("email");
-            if (email != null && !email.isBlank()) return email;
+        if (auth != null) {
+            // Handle bypass mode authentication (UserPrincipal)
+            if (auth.getPrincipal() instanceof UserPrincipal userPrincipal) {
+                User user = userPrincipal.getUser();
+                if (user != null && user.getEmail() != null && !user.getEmail().isBlank()) {
+                    return user.getEmail();
+                }
+            }
+            // Handle OAuth2 authentication (OAuth2User)
+            else if (auth.getPrincipal() instanceof OAuth2User o2User) {
+                String email = o2User.getAttribute("email");
+                if (email != null && !email.isBlank()) return email;
+            }
         }
         String emailHeader = request.getHeader("X-User-Email");
         return (emailHeader != null && !emailHeader.isBlank()) ? emailHeader.trim() : null;
     }
 
-    // TP: Used cursor to derive current user's NetID from OAuth2 or headers
+    // TP: Used cursor to derive current user's NetID from OAuth2, bypass mode (UserPrincipal), or headers
     public String getNetId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof OAuth2User o2User) {
-            String email = o2User.getAttribute("email");
-            if (email != null && email.contains("@")) {
-                return email.substring(0, email.indexOf('@'));
+        if (auth != null) {
+            // Handle bypass mode authentication (UserPrincipal)
+            if (auth.getPrincipal() instanceof UserPrincipal userPrincipal) {
+                User user = userPrincipal.getUser();
+                if (user != null && user.getEmail() != null && user.getEmail().contains("@")) {
+                    return user.getEmail().substring(0, user.getEmail().indexOf('@'));
+                }
+            }
+            // Handle OAuth2 authentication (OAuth2User)
+            else if (auth.getPrincipal() instanceof OAuth2User o2User) {
+                String email = o2User.getAttribute("email");
+                if (email != null && email.contains("@")) {
+                    return email.substring(0, email.indexOf('@'));
+                }
             }
         }
         String emailHeader = request.getHeader("X-User-Email");

@@ -19,6 +19,11 @@ function Login() {
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const googleUrl = `${backendBase}/oauth2/authorization/google`
   
+  // Bypass mode state
+  const BYPASS_MODE_ENABLED = import.meta.env.VITE_BYPASS_MODE_ENABLED === 'true'
+  const [email, setEmail] = useState('')
+  const [isBypassLoading, setIsBypassLoading] = useState(false)
+  
   // OAuth callback handling
   useEffect(() => {
     const success = searchParams.get('success')
@@ -43,6 +48,42 @@ function Login() {
       setIsLoading(false)
     }
   }, [searchParams, navigate])
+
+  // Bypass login function
+  const handleBypassLogin = async () => {
+    if (!email.trim()) {
+      setErrorMessage('Please enter email address')
+      return
+    }
+    
+    setIsBypassLoading(true)
+    setErrorMessage('')
+    
+    try {
+      const response = await fetch(`${backendBase}/api/auth/bypass-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email: email.trim() }),
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Login successful - redirect to home
+        navigate('/home', { replace: true })
+      } else {
+        setErrorMessage(data.error || 'Login failed. User may not be imported via YAML.')
+      }
+    } catch (error) {
+      console.error('Bypass login error:', error)
+      setErrorMessage('Login failed. Please try again.')
+    } finally {
+      setIsBypassLoading(false)
+    }
+  }
 
   return (
     <div className="login-page">
@@ -96,6 +137,73 @@ function Login() {
               <img src={sbuLogo} alt="Stony Brook University Logo" className="sbu-logo-img" />
             </div>
           </div>
+          
+          {/* Bypass Mode Login Section */}
+          {BYPASS_MODE_ENABLED && (
+            <div className="bypass-login-section" style={{
+              marginTop: '2rem',
+              marginLeft: '-40px',
+              marginRight: '-40px',
+              padding: '1.5rem',
+              border: '2px dashed #ff9800',
+              borderRadius: '8px',
+              backgroundColor: '#fff3e0',
+              boxSizing: 'border-box'
+            }}>
+              <h3 style={{ marginTop: 0, color: '#e65100', fontSize: '1.1rem' }}>
+                Bypass Mode Login (Demo/Test Only)
+              </h3>
+              
+              <input
+                type="email"
+                placeholder="Enter email address (from YAML import)"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '0.75rem',
+                  marginBottom: '1rem',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  fontSize: '1rem'
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleBypassLogin()
+                  }
+                }}
+              />
+              
+              <button
+                onClick={handleBypassLogin}
+                disabled={isBypassLoading}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: '#ff9800',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: isBypassLoading ? 'not-allowed' : 'pointer',
+                  opacity: isBypassLoading ? 0.6 : 1
+                }}
+              >
+                {isBypassLoading ? 'Logging in...' : 'Login (Bypass Mode)'}
+              </button>
+              
+              <p className="bypass-notice" style={{
+                marginTop: '1rem',
+                fontSize: '0.85rem',
+                color: '#666',
+                fontStyle: 'italic'
+              }}>
+                Note: User must be imported via YAML before logging in with bypass mode.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

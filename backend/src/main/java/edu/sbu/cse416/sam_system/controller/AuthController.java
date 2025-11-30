@@ -1,14 +1,21 @@
 package edu.sbu.cse416.sam_system.controller;
 
 import edu.sbu.cse416.sam_system.entity.User;
+import edu.sbu.cse416.sam_system.security.UserPrincipal;
 import edu.sbu.cse416.sam_system.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -31,6 +38,9 @@ public class AuthController {
 
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private Environment environment;
 
     /**
      * OAuth2 login success endpoint
@@ -78,35 +88,51 @@ public class AuthController {
 
     /**
      * Get current user information
+     * Supports both OAuth2 (OidcUser) and bypass mode (UserPrincipal) authentication
      */
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/me")
     // TP: Used cursor to return current authenticated user's info
     public ResponseEntity<Map<String, Object>> getCurrentUser(
-            @AuthenticationPrincipal OidcUser principal) {
+            @AuthenticationPrincipal Object principal) {
 
-        if (principal == null) {
+        User user = null;
+
+        // Handle bypass mode authentication (UserPrincipal)
+        if (principal instanceof UserPrincipal userPrincipal) {
+            user = userPrincipal.getUser();
+        }
+        // Handle OAuth2 authentication (OidcUser)
+        else if (principal instanceof OidcUser oidcUser) {
+            String googleId = oidcUser.getSubject();
+            Optional<User> userOpt = userService.getUserByGoogleId(googleId);
+
+            if (userOpt.isEmpty()) {
+                // Try to find user by email as fallback
+                String email = oidcUser.getAttribute("email");
+                
+                if (email != null) {
+                    userOpt = userService.getUserByEmail(email);
+                }
+                
+                if (userOpt.isEmpty()) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
+                }
+            }
+
+            user = userOpt.get();
+        }
+        // Fallback: Try to get user from SecurityContext
+        else {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof UserPrincipal userPrincipal) {
+                user = userPrincipal.getUser();
+            }
+        }
+
+        if (user == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
         }
-
-        String googleId = principal.getSubject();
-        
-        Optional<User> userOpt = userService.getUserByGoogleId(googleId);
-
-        if (userOpt.isEmpty()) {
-            // Try to find user by email as fallback
-            String email = principal.getAttribute("email");
-            
-            if (email != null) {
-                userOpt = userService.getUserByEmail(email);
-            }
-            
-            if (userOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
-            }
-        }
-
-        User user = userOpt.get();
         
         Map<String, Object> userData = new HashMap<>();
         userData.put("userId", user.getUserId());
@@ -179,6 +205,90 @@ public class AuthController {
             response.put("authenticated", false);
         }
 
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Bypass mode login endpoint (demo/test only)
+     * Allows login with email address only, no authentication
+     * Works with users imported from YAML files
+     */
+    @PostMapping("/bypass-login")
+    public ResponseEntity<Map<String, Object>> bypassLogin(
+            @RequestBody Map<String, String> request,
+            HttpServletRequest httpRequest) {
+        
+        // 1. 환경 변수 체크 - 우회 모드가 활성화되어 있는지 확인
+        String bypassEnabled = environment.getProperty("auth.bypass.enabled", "false");
+        if (!"true".equalsIgnoreCase(bypassEnabled)) {
+            return ResponseEntity.status(403).body(Map.of(
+                "error", "Bypass mode is disabled"
+            ));
+        }
+        
+        // 2. 이메일 주소 추출
+        String email = request.get("email");
+        
+        if (email == null || email.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Email address is required"
+            ));
+        }
+        
+        // 3. 데이터베이스에서 사용자 조회
+        // YAML import 시 저장된 사용자를 이메일로 찾음
+        Optional<User> userOpt = userService.getUserByEmail(email.toLowerCase().trim());
+        
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "User not found. Please ensure the user has been imported via YAML."
+            ));
+        }
+        
+        User user = userOpt.get();
+        
+        // 4. 사용자 활성 상태 확인
+        if (!user.getIsActive()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "User account is inactive"
+            ));
+        }
+        
+        // 5. 인증 객체 생성 및 SecurityContext에 저장
+        UserPrincipal userPrincipal = new UserPrincipal(user);
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+            userPrincipal, 
+            null, 
+            userPrincipal.getAuthorities()
+        );
+        
+        SecurityContext securityContext = SecurityContextHolder.getContext();
+        securityContext.setAuthentication(authentication);
+        
+        // 세션에 SecurityContext 저장
+        httpRequest.getSession().setAttribute(
+            HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+            securityContext
+        );
+        
+        // 6. lastLogin 업데이트
+        user.updateLastLogin();
+        userService.updateUser(user);
+        
+        // 7. 응답 반환 (일반 로그인과 동일한 형식)
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("user", Map.of(
+            "userId", user.getUserId(),
+            "email", user.getEmail(),
+            "firstName", user.getFirstName(),
+            "lastName", user.getLastName(),
+            "fullName", user.getFullName(),
+            "role", user.getRole().toString(),
+            "profilePictureUrl", user.getProfilePictureUrl() != null ? user.getProfilePictureUrl() : "",
+            "isActive", user.getIsActive()
+        ));
+        
         return ResponseEntity.ok(response);
     }
 }
