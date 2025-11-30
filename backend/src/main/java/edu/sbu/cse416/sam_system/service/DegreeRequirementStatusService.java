@@ -14,9 +14,7 @@ import java.util.stream.Collectors;
 
 /**
  * Service for checking student's degree requirement status.
- * Evaluates which requirements are satisfied for declared/planned majors and minors.
- * 
- * TP: Used Cursor to implement degree requirement status checking system
+ * Merged Version: Maintains Version 1's detailed logic/variable names while adding Version 2's Planner features.
  */
 @Service
 @Transactional
@@ -35,8 +33,6 @@ public class DegreeRequirementStatusService {
     
     /**
      * Get degree requirement status for a student
-     * @param userId Student user ID
-     * @return Map containing status for each declared/planned major and minor
      */
     public Map<String, Object> getDegreeRequirementsStatus(Long userId) {
         User student = userRepository.findById(userId)
@@ -45,7 +41,7 @@ public class DegreeRequirementStatusService {
     }
 
     /**
-     * Get degree requirement status including planned courses (planner forecast).
+     * [Added from Version 2] Get degree requirement status including planned courses (planner forecast).
      */
     public Map<String, Object> getDegreeRequirementsStatusWithPlannedCourses(Long userId, List<UserCoursePlan> plannedCourses) {
         User student = userRepository.findById(userId)
@@ -64,8 +60,6 @@ public class DegreeRequirementStatusService {
         }
 
         // Separate classes by grade status:
-        // - completedClasses: all classes with grades (regardless of grade value) - for checking if grade meets min_grade
-        // - inProgressClasses: classes with null/empty grade (pending) - grade가 null인 경우
         List<UserClasses> completedClasses = allUserClasses.stream()
                 .filter(uc -> {
                     String grade = uc.getGrade();
@@ -111,6 +105,9 @@ public class DegreeRequirementStatusService {
         return statuses;
     }
 
+    /**
+     * [Added from Version 2] Creates synthetic UserClasses from UserCoursePlan
+     */
     private List<UserClasses> createSyntheticClasses(User student, List<UserCoursePlan> plannedCourses) {
         if (plannedCourses == null || plannedCourses.isEmpty()) {
             return Collections.emptyList();
@@ -119,7 +116,7 @@ public class DegreeRequirementStatusService {
         for (UserCoursePlan plan : plannedCourses) {
             UserClasses uc = new UserClasses();
             uc.setUser(student);
-            uc.setClassId(null);
+            uc.setClassId(null); // Planned courses have no ID
             uc.setDepartment(plan.getDepartment());
             uc.setCourseNum(plan.getCourseNum());
             uc.setSection(null);
@@ -127,18 +124,13 @@ public class DegreeRequirementStatusService {
             uc.setYear(plan.getYear());
             uc.setCredits(plan.getCredits());
             uc.setGpnc(null);
-            uc.setGrade(null); // treat as in-progress
+            // Assume all planned courses are completed with C grade for forecasting
+            uc.setGrade("C"); 
             synthetic.add(uc);
         }
         return synthetic;
     }
     
-    /**
-     * Parse majors or minors JSON arrays
-     * @param subjectsJson JSON array of subject codes
-     * @param degreesJson JSON array of degree types, or string "MINOR" for all minors, or null
-     * @param versionsJson JSON array of requirement versions
-     */
     private List<Map<String, Object>> parseMajorsOrMinors(String subjectsJson, String degreesJson, String versionsJson) {
         List<Map<String, Object>> result = new ArrayList<>();
         
@@ -150,9 +142,7 @@ public class DegreeRequirementStatusService {
             List<?> subjects = objectMapper.readValue(subjectsJson, List.class);
             List<?> degrees = null;
             
-            // Handle case where degreesJson is "MINOR" string (for minors)
             if ("MINOR".equals(degreesJson)) {
-                // All items are minors
                 for (int i = 0; i < subjects.size(); i++) {
                     Map<String, Object> item = new HashMap<>();
                     item.put("subjectCode", subjects.get(i).toString());
@@ -173,7 +163,6 @@ public class DegreeRequirementStatusService {
                 return result;
             }
             
-            // Regular parsing for majors
             degrees = (degreesJson != null && !degreesJson.trim().isEmpty()) 
                     ? objectMapper.readValue(degreesJson, List.class) : null;
             List<?> versions = (versionsJson != null && !versionsJson.trim().isEmpty())
@@ -202,9 +191,6 @@ public class DegreeRequirementStatusService {
         return result;
     }
     
-    /**
-     * Check requirement status for a specific major or minor
-     */
     private Map<String, Object> checkRequirementStatus(Map<String, Object> majorOrMinor, 
                                                        List<UserClasses> completedClasses,
                                                        List<UserClasses> inProgressClasses,
@@ -217,7 +203,6 @@ public class DegreeRequirementStatusService {
         String degreeTypeStr = (String) majorOrMinor.get("degreeType");
         
         if (degreeTypeStr == null) {
-            // Try to determine degree type from DegreeRequirement
             List<DegreeRequirement> reqs = degreeRequirementRepository.findBySubjectCodeAndActive(subjectCode);
             if (!reqs.isEmpty()) {
                 degreeTypeStr = reqs.get(0).getDegreeType().toString();
@@ -225,7 +210,6 @@ public class DegreeRequirementStatusService {
             }
         }
         
-        // Find the degree requirement
         DegreeRequirement requirement = null;
         if (degreeTypeStr != null) {
             try {
@@ -247,7 +231,6 @@ public class DegreeRequirementStatusService {
         status.put("requirementId", requirement.getRequirementId());
         status.put("requirementTitle", requirement.getSubjectCode() + " " + degreeTypeStr);
         
-        // Parse course requirements JSON
         String courseReqsJson = requirement.getCourseRequirements();
         if (courseReqsJson == null || courseReqsJson.trim().isEmpty()) {
             status.put("status", "NO_REQUIREMENTS");
@@ -268,17 +251,15 @@ public class DegreeRequirementStatusService {
                 return status;
             }
             
-            // First pass: Check non-electives groups to track used courses
             Set<String> usedClassIds = new HashSet<>();
             List<Map<String, Object>> groupStatuses = new ArrayList<>();
             
-            // Check non-electives groups first
             for (Map<String, Object> group : groups) {
                 String type = (String) group.get("type");
                 if (!"electives".equals(type)) {
                     Map<String, Object> groupStatus = checkGroupStatus(group, completedClasses, inProgressClasses, allUserClasses, usedClassIds);
                     groupStatuses.add(groupStatus);
-                    // Track used classes from this group
+                    
                     @SuppressWarnings("unchecked")
                     List<Map<String, Object>> satisfiedCourses = (List<Map<String, Object>>) groupStatus.get("satisfiedCourses");
                     if (satisfiedCourses != null) {
@@ -286,13 +267,15 @@ public class DegreeRequirementStatusService {
                             Object classId = courseInfo.get("classId");
                             if (classId != null) {
                                 usedClassIds.add(classId.toString());
+                            } else {
+                                // [Merge Fix] Handle planned courses (null ID)
+                                usedClassIds.add(courseInfo.get("department") + "_" + courseInfo.get("courseNum") + "_planned");
                             }
                         }
                     }
                 }
             }
             
-            // Second pass: Check electives groups with used classes excluded
             for (Map<String, Object> group : groups) {
                 String type = (String) group.get("type");
                 if ("electives".equals(type)) {
@@ -303,7 +286,6 @@ public class DegreeRequirementStatusService {
             
             status.put("groups", groupStatuses);
             
-            // Calculate overall status
             long satisfiedGroups = groupStatuses.stream()
                     .filter(gs -> "SATISFIED".equals(gs.get("status")))
                     .count();
@@ -314,7 +296,7 @@ public class DegreeRequirementStatusService {
             status.put("overallStatus", satisfiedGroups == totalGroups ? "SATISFIED" : "IN_PROGRESS");
             status.put("progressPercentage", totalGroups > 0 ? (int) (satisfiedGroups * 100 / totalGroups) : 0);
             
-            // Check SBC requirements
+            // Check SBC requirements (Kept from Version 1)
             String sbcReqsJson = requirement.getSbcRequirements();
             if (sbcReqsJson != null && !sbcReqsJson.trim().isEmpty()) {
                 Map<String, Object> sbcStatus = checkSbcRequirements(sbcReqsJson, completedClasses, inProgressClasses, allUserClasses);
@@ -329,14 +311,7 @@ public class DegreeRequirementStatusService {
         return status;
     }
     
-    /**
-     * Check SBC requirements.
-     * SBC logic:
-     * - required_major_courses: one of these courses satisfies the SBC
-     * - required_major_courses_partial: ALL of these courses must be taken to satisfy the SBC
-     * - optional_major_courses_partial: can replace one required_major_courses (for partial requirements)
-     * - If no required_major_courses specified, SBC is satisfied by any course with that SBC designation (from catalog)
-     */
+    // [Kept from Version 1] SBC logic is preserved
     private Map<String, Object> checkSbcRequirements(String sbcRequirementsJson,
                                                        List<UserClasses> completedClasses,
                                                        List<UserClasses> inProgressClasses,
@@ -354,14 +329,6 @@ public class DegreeRequirementStatusService {
             
             List<Map<String, Object>> sbcStatus = new ArrayList<>();
             
-            // Build set of all course codes (completed + in progress)
-            Set<String> allCourseCodes = new HashSet<>();
-            for (UserClasses uc : allUserClasses) {
-                if (uc.getDepartment() != null && uc.getCourseNum() != null) {
-                    allCourseCodes.add(uc.getDepartment() + " " + uc.getCourseNum());
-                }
-            }
-            
             for (Map<String, Object> sbcReq : sbcReqs) {
                 String category = (String) sbcReq.get("sbc");
                 if (category == null) {
@@ -371,7 +338,6 @@ public class DegreeRequirementStatusService {
                 Map<String, Object> status = new HashMap<>();
                 status.put("category", category);
                 
-                // Check required_major_courses (one of these satisfies the SBC)
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> requiredMajorCourses = (List<Map<String, Object>>) sbcReq.get("required_major_courses");
                 boolean requiredSatisfied = false;
@@ -382,13 +348,11 @@ public class DegreeRequirementStatusService {
                         String code = (String) courseReq.get("code");
                         if (code == null) continue;
                         
-                        // Get min_grade from course requirement, default to "C" if not specified
                         String minGrade = (String) courseReq.get("min_grade");
                         if (minGrade == null || minGrade.trim().isEmpty()) {
                             minGrade = "C";
                         }
                         
-                        // Check if course is completed with sufficient grade
                         String[] parts = parseCourseCode(code);
                         String dept = parts[0];
                         String courseNumStr = parts[1];
@@ -397,13 +361,11 @@ public class DegreeRequirementStatusService {
                         if (matchingClass != null) {
                             requiredSatisfied = true;
                             satisfiedRequiredCourses.add(code);
-                            break; // Only need one
+                            break;
                         }
                     }
                 }
                 
-                // Check required_major_courses_partial
-                // Logic: If 2 courses, need both. If 3+ courses, need 2 of them.
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> requiredMajorCoursesPartial = (List<Map<String, Object>>) sbcReq.get("required_major_courses_partial");
                 boolean partialRequiredSatisfied = false;
@@ -417,13 +379,11 @@ public class DegreeRequirementStatusService {
                         String code = (String) courseReq.get("code");
                         if (code == null) continue;
                         
-                        // Get min_grade from course requirement, default to "C" if not specified
                         String minGrade = (String) courseReq.get("min_grade");
                         if (minGrade == null || minGrade.trim().isEmpty()) {
                             minGrade = "C";
                         }
                         
-                        // Check if course is completed with sufficient grade
                         String[] parts = parseCourseCode(code);
                         String dept = parts[0];
                         String courseNumStr = parts[1];
@@ -436,20 +396,15 @@ public class DegreeRequirementStatusService {
                         }
                     }
                     
-                    // Check if requirement is met
                     if (totalPartialRequired == 2) {
-                        // Need both courses
                         partialRequiredSatisfied = satisfiedPartialRequired.size() == 2;
                     } else {
-                        // Need 2 out of 3+ courses
                         partialRequiredSatisfied = satisfiedPartialRequired.size() >= 2;
                     }
                 } else {
-                    // No partial requirements, so this check passes
                     partialRequiredSatisfied = true;
                 }
                 
-                // Check optional_major_courses_partial (can replace one required_major_courses)
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> optionalMajorCoursesPartial = (List<Map<String, Object>>) sbcReq.get("optional_major_courses_partial");
                 List<String> satisfiedOptionalPartial = new ArrayList<>();
@@ -459,13 +414,11 @@ public class DegreeRequirementStatusService {
                         String code = (String) courseReq.get("code");
                         if (code == null) continue;
                         
-                        // Get min_grade from course requirement, default to "C" if not specified
                         String minGrade = (String) courseReq.get("min_grade");
                         if (minGrade == null || minGrade.trim().isEmpty()) {
                             minGrade = "C";
                         }
                         
-                        // Check if course is completed with sufficient grade
                         String[] parts = parseCourseCode(code);
                         String dept = parts[0];
                         String courseNumStr = parts[1];
@@ -477,42 +430,26 @@ public class DegreeRequirementStatusService {
                     }
                 }
                 
-                // Determine if SBC is met
-                // Logic:
-                // 1. If no course requirements exist, SBC cannot be satisfied by major courses (met = false)
-                // 2. required_major_courses: one of these satisfies (or optional_major_courses_partial can replace one)
-                // 3. required_major_courses_partial: 
-                //    - If 2 courses: need both
-                //    - If 3+ courses: need 2 of them
-                // 4. If both exist, both conditions must be met
-                
                 boolean sbcMet = false;
                 
-                // Check if SBC has any course requirements
                 boolean hasRequiredCourses = (requiredMajorCourses != null && !requiredMajorCourses.isEmpty());
                 boolean hasPartialCourses = (requiredMajorCoursesPartial != null && !requiredMajorCoursesPartial.isEmpty());
                 boolean hasOptionalPartial = (optionalMajorCoursesPartial != null && !optionalMajorCoursesPartial.isEmpty());
                 boolean hasAnyCourseRequirements = hasRequiredCourses || hasPartialCourses || hasOptionalPartial;
                 
-                // If no course requirements, SBC cannot be satisfied by major courses
                 if (!hasAnyCourseRequirements) {
                     sbcMet = false;
                 } else {
-                    // Check required_major_courses condition
                     boolean requiredConditionMet = true;
                     if (hasRequiredCourses) {
-                        // Need at least one required_major_courses OR one optional_major_courses_partial
                         requiredConditionMet = requiredSatisfied || !satisfiedOptionalPartial.isEmpty();
                     }
                     
-                    // Check required_major_courses_partial condition
                     boolean partialConditionMet = true;
                     if (hasPartialCourses) {
-                        // If 2 courses, need both. If 3+, need 2.
                         partialConditionMet = partialRequiredSatisfied;
                     }
                     
-                    // Both conditions must be met (if they exist)
                     sbcMet = requiredConditionMet && partialConditionMet;
                 }
                 
@@ -535,9 +472,6 @@ public class DegreeRequirementStatusService {
         return result;
     }
     
-    /**
-     * Check status of a single requirement group
-     */
     private Map<String, Object> checkGroupStatus(Map<String, Object> group,
                                                  List<UserClasses> completedClasses,
                                                  List<UserClasses> inProgressClasses,
@@ -575,14 +509,20 @@ public class DegreeRequirementStatusService {
                     return groupStatus;
             }
             
-            // Determine status: satisfied, pending, or unsatisfied
-            // Check for pending courses (grade is null) and unsatisfied courses (grade exists but below min_grade)
+            // Check for pending courses (Version 1 Logic)
             String status = determineGroupStatus(group, type, satisfied, completedClasses, inProgressClasses, satisfiedCourses, usedClassIds);
             
             groupStatus.put("status", status);
             groupStatus.put("satisfiedCourses", satisfiedCourses);
             
-            // Add additional info based on type
+            // [Added from Version 2] Add required courses info if not satisfied
+            if (!satisfied && !status.equals("SATISFIED")) {
+                List<String> requiredCourses = extractRequiredCourses(group, type, satisfiedCourses);
+                if (!requiredCourses.isEmpty()) {
+                    groupStatus.put("requiredCourses", requiredCourses);
+                }
+            }
+            
             if ("electives".equals(type) && group.containsKey("credits_required")) {
                 int creditsRequired = (Integer) group.get("credits_required");
                 int creditsSatisfied = satisfiedCourses.stream()
@@ -603,12 +543,106 @@ public class DegreeRequirementStatusService {
         return groupStatus;
     }
     
-    /**
-     * Determine group status: SATISFIED, PENDING, or NOT_SATISFIED
-     * - SATISFIED: all required courses have grade >= min_grade
-     * - PENDING: at least one course has null grade (in-progress)
-     * - NOT_SATISFIED: courses missing or grades below min_grade
-     */
+    // [Added from Version 2] Extract required courses for NOT_SATISFIED groups
+    @SuppressWarnings("unchecked")
+    private List<String> extractRequiredCourses(Map<String, Object> group, String type, 
+                                                List<Map<String, Object>> satisfiedCourses) {
+        List<String> requiredCourses = new ArrayList<>();
+        
+        Set<String> satisfiedCodes = satisfiedCourses.stream()
+                .map(sc -> (String) sc.get("requirementCode"))
+                .filter(code -> code != null)
+                .collect(Collectors.toSet());
+        
+        switch (type) {
+            case "all_of": {
+                List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
+                if (courses != null) {
+                    for (Map<String, Object> courseReq : courses) {
+                        String code = (String) courseReq.get("code");
+                        if (code != null && !satisfiedCodes.contains(code)) {
+                            requiredCourses.add(code);
+                        }
+                    }
+                }
+                break;
+            }
+            case "one_of": {
+                List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
+                if (courses != null) {
+                    for (Map<String, Object> courseReq : courses) {
+                        String code = (String) courseReq.get("code");
+                        if (code != null) {
+                            requiredCourses.add(code);
+                        }
+                    }
+                }
+                break;
+            }
+            case "two_of": {
+                List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
+                if (courses != null) {
+                    for (Map<String, Object> courseReq : courses) {
+                        String code = (String) courseReq.get("code");
+                        if (code != null && !satisfiedCodes.contains(code)) {
+                            requiredCourses.add(code);
+                        }
+                    }
+                }
+                break;
+            }
+            case "one_of_sequences": {
+                List<List<Map<String, Object>>> sequences = (List<List<Map<String, Object>>>) group.get("sequences");
+                if (sequences != null) {
+                    for (List<Map<String, Object>> sequence : sequences) {
+                        List<String> sequenceCodes = new ArrayList<>();
+                        for (Map<String, Object> courseReq : sequence) {
+                            String code = (String) courseReq.get("code");
+                            if (code != null) {
+                                sequenceCodes.add(code);
+                            }
+                        }
+                        if (!sequenceCodes.isEmpty()) {
+                            requiredCourses.add(String.join(", ", sequenceCodes));
+                        }
+                    }
+                }
+                break;
+            }
+            case "electives": {
+                List<List<Map<String, Object>>> sequences = (List<List<Map<String, Object>>>) group.get("sequences");
+                List<Map<String, Object>> additionalCourses = (List<Map<String, Object>>) group.get("additional_courses");
+                 
+                if (sequences != null && !sequences.isEmpty()) {
+                    for (List<Map<String, Object>> sequence : sequences) {
+                        List<String> sequenceCodes = new ArrayList<>();
+                        for (Map<String, Object> courseReq : sequence) {
+                            String code = (String) courseReq.get("code");
+                            if (code != null) {
+                                sequenceCodes.add(code);
+                            }
+                        }
+                        if (!sequenceCodes.isEmpty()) {
+                            requiredCourses.add("Sequence: " + String.join(", ", sequenceCodes));
+                        }
+                    }
+                }
+                
+                if (additionalCourses != null && !additionalCourses.isEmpty()) {
+                    for (Map<String, Object> courseReq : additionalCourses) {
+                        String code = (String) courseReq.get("code");
+                        if (code != null) {
+                            requiredCourses.add(code);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        
+        return requiredCourses;
+    }
+    
     private String determineGroupStatus(Map<String, Object> group, String type,
                                          boolean satisfied,
                                          List<UserClasses> completedClasses,
@@ -619,23 +653,15 @@ public class DegreeRequirementStatusService {
             return "SATISFIED";
         }
         
-        // First check if there are courses with low grades (unsatisfied, not pending)
         boolean hasLowGrade = checkIfHasLowGrade(group, type, completedClasses);
         if (hasLowGrade) {
-            return "NOT_SATISFIED"; // Course exists but grade is too low - this is NOT_SATISFIED, not PENDING
+            return "NOT_SATISFIED";
         }
         
-        // Check if there are pending courses (grade is null)
         boolean hasPending = checkIfPending(group, type, completedClasses, inProgressClasses, usedClassIds);
         return hasPending ? "PENDING" : "NOT_SATISFIED";
     }
     
-    /**
-     * Check if group has courses that are completed but with grades below minimum requirement.
-     * This distinguishes between:
-     * - Course not taken (could be pending)
-     * - Course taken but grade too low (NOT_SATISFIED, not pending)
-     */
     private boolean checkIfHasLowGrade(Map<String, Object> group, String type,
                                        List<UserClasses> completedClasses) {
         try {
@@ -649,7 +675,6 @@ public class DegreeRequirementStatusService {
                 case "two_of":
                     return checkTwoOfHasLowGrade(group, completedClasses);
                 case "electives":
-                    // For electives, low grade courses are already filtered out in checkElectivesGroup
                     return false;
                 default:
                     return false;
@@ -659,9 +684,6 @@ public class DegreeRequirementStatusService {
         }
     }
     
-    /**
-     * Check if all_of group has any course with low grade.
-     */
     private boolean checkAllOfHasLowGrade(Map<String, Object> group, List<UserClasses> completedClasses) {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
@@ -683,16 +705,13 @@ public class DegreeRequirementStatusService {
             String courseNumStr = parts[1];
             
             if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
-                return true; // Found at least one course with low grade
+                return true;
             }
         }
         
         return false;
     }
     
-    /**
-     * Check if one_of group has any course with low grade.
-     */
     private boolean checkOneOfHasLowGrade(Map<String, Object> group, List<UserClasses> completedClasses) {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
@@ -714,16 +733,13 @@ public class DegreeRequirementStatusService {
             String courseNumStr = parts[1];
             
             if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
-                return true; // Found at least one course with low grade
+                return true;
             }
         }
         
         return false;
     }
     
-    /**
-     * Check if one_of_sequences group has any course with low grade.
-     */
     private boolean checkOneOfSequencesHasLowGrade(Map<String, Object> group, List<UserClasses> completedClasses) {
         @SuppressWarnings("unchecked")
         List<List<Map<String, Object>>> sequences = (List<List<Map<String, Object>>>) group.get("sequences");
@@ -746,7 +762,7 @@ public class DegreeRequirementStatusService {
                 String courseNumStr = parts[1];
                 
                 if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
-                    return true; // Found at least one course with low grade
+                    return true;
                 }
             }
         }
@@ -754,9 +770,6 @@ public class DegreeRequirementStatusService {
         return false;
     }
     
-    /**
-     * Check if two_of group has any course with low grade.
-     */
     private boolean checkTwoOfHasLowGrade(Map<String, Object> group, List<UserClasses> completedClasses) {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
@@ -778,16 +791,13 @@ public class DegreeRequirementStatusService {
             String courseNumStr = parts[1];
             
             if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
-                return true; // Found at least one course with low grade
+                return true;
             }
         }
         
         return false;
     }
     
-    /**
-     * Check all_of group: all courses must be completed
-     */
     private boolean checkAllOfGroup(Map<String, Object> group, List<UserClasses> completedClasses, 
                                     List<Map<String, Object>> satisfiedCourses) {
         @SuppressWarnings("unchecked")
@@ -801,27 +811,22 @@ public class DegreeRequirementStatusService {
             String code = (String) courseReq.get("code");
             if (code == null) continue;
             
-            // Get min_grade from course requirement, default to "C" if not specified
             String minGrade = (String) courseReq.get("min_grade");
             if (minGrade == null || minGrade.trim().isEmpty()) {
-                minGrade = "C"; // Default minimum grade
+                minGrade = "C";
             }
             
             String[] parts = parseCourseCode(code);
             String dept = parts[0];
             String courseNumStr = parts[1];
             
-            // Check if course is completed with sufficient grade
             UserClasses matchingClass = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
             if (matchingClass != null) {
                 satisfiedCourses.add(buildCourseInfo(matchingClass, code));
             } else {
-                // Check if course exists but with low grade - don't add to satisfiedCourses
                 if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
-                    // Course exists but grade is too low - don't add to satisfiedCourses
                     allFound = false;
                 } else {
-                    // Course not found at all
                     allFound = false;
                 }
             }
@@ -830,9 +835,6 @@ public class DegreeRequirementStatusService {
         return allFound && satisfiedCourses.size() == courses.size();
     }
     
-    /**
-     * Check one_of group: at least one course must be completed
-     */
     private boolean checkOneOfGroup(Map<String, Object> group, List<UserClasses> completedClasses,
                                     List<Map<String, Object>> satisfiedCourses) {
         @SuppressWarnings("unchecked")
@@ -845,10 +847,9 @@ public class DegreeRequirementStatusService {
             String code = (String) courseReq.get("code");
             if (code == null) continue;
             
-            // Get min_grade from course requirement, default to "C" if not specified
             String minGrade = (String) courseReq.get("min_grade");
             if (minGrade == null || minGrade.trim().isEmpty()) {
-                minGrade = "C"; // Default minimum grade
+                minGrade = "C";
             }
             
             String[] parts = parseCourseCode(code);
@@ -858,17 +859,13 @@ public class DegreeRequirementStatusService {
             UserClasses matchingClass = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
             if (matchingClass != null) {
                 satisfiedCourses.add(buildCourseInfo(matchingClass, code));
-                return true; // Found one, that's enough
+                return true;
             }
         }
         
         return false;
     }
     
-    /**
-     * Check one_of_sequences group: at least one complete sequence must be completed
-     * Also adds partially completed courses to satisfiedCourses
-     */
     private boolean checkOneOfSequencesGroup(Map<String, Object> group, List<UserClasses> completedClasses,
                                              List<Map<String, Object>> satisfiedCourses,
                                              Set<String> usedClassIds) {
@@ -880,7 +877,6 @@ public class DegreeRequirementStatusService {
         
         boolean foundCompleteSequence = false;
         
-        // First, check for complete sequences
         for (List<Map<String, Object>> sequence : sequences) {
             boolean sequenceComplete = true;
             List<Map<String, Object>> sequenceCourses = new ArrayList<>();
@@ -889,10 +885,9 @@ public class DegreeRequirementStatusService {
                 String code = (String) courseReq.get("code");
                 if (code == null) continue;
                 
-                // Get min_grade from course requirement, default to "C" if not specified
                 String minGrade = (String) courseReq.get("min_grade");
                 if (minGrade == null || minGrade.trim().isEmpty()) {
-                    minGrade = "C"; // Default minimum grade
+                    minGrade = "C";
                 }
                 
                 String[] parts = parseCourseCode(code);
@@ -900,32 +895,36 @@ public class DegreeRequirementStatusService {
                 String courseNumStr = parts[1];
                 
                 UserClasses matchingClass = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
-                if (matchingClass != null) {
+                
+                // [Merge Fix] Handle potential null classId (for planned courses)
+                String classIdStr = matchingClass != null && matchingClass.getClassId() != null ? matchingClass.getClassId().toString() : null;
+                // Create unique ID for planned courses
+                String uniqueId = classIdStr != null ? classIdStr : (matchingClass != null ? matchingClass.getDepartment() + "_" + matchingClass.getCourseNum() + "_planned" : null);
+
+                if (matchingClass != null && uniqueId != null && !usedClassIds.contains(uniqueId)) {
                     sequenceCourses.add(buildCourseInfo(matchingClass, code));
                 } else {
                     sequenceComplete = false;
-                    break; // This sequence is not complete
+                    break;
                 }
             }
             
             if (sequenceComplete && sequenceCourses.size() == sequence.size()) {
                 satisfiedCourses.addAll(sequenceCourses);
                 foundCompleteSequence = true;
-                break; // Found one complete sequence, that's enough
+                break;
             }
         }
         
-        // If no complete sequence found, still add partially completed courses
         if (!foundCompleteSequence) {
             for (List<Map<String, Object>> sequence : sequences) {
                 for (Map<String, Object> courseReq : sequence) {
                     String code = (String) courseReq.get("code");
                     if (code == null) continue;
                     
-                    // Get min_grade from course requirement, default to "C" if not specified
                     String minGrade = (String) courseReq.get("min_grade");
                     if (minGrade == null || minGrade.trim().isEmpty()) {
-                        minGrade = "C"; // Default minimum grade
+                        minGrade = "C";
                     }
                     
                     String[] parts = parseCourseCode(code);
@@ -934,10 +933,16 @@ public class DegreeRequirementStatusService {
                     
                     UserClasses matchingClass = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
                     if (matchingClass != null) {
-                        // Check if already added (avoid duplicates)
+                        // [Merge Fix] Check duplicates using safe ID logic
+                        String matchClassId = matchingClass.getClassId() != null ? matchingClass.getClassId().toString() : null;
+                        String matchUniqueId = matchClassId != null ? matchClassId : (matchingClass.getDepartment() + "_" + matchingClass.getCourseNum() + "_planned");
+                        
                         boolean alreadyAdded = satisfiedCourses.stream()
-                                .anyMatch(sc -> matchingClass.getClassId() != null && 
-                                             matchingClass.getClassId().equals(sc.get("classId")));
+                                .anyMatch(sc -> {
+                                    Object scClassId = sc.get("classId");
+                                    String scUniqueId = scClassId != null ? scClassId.toString() : (sc.get("department") + "_" + sc.get("courseNum") + "_planned");
+                                    return matchUniqueId.equals(scUniqueId);
+                                });
                         if (!alreadyAdded) {
                             satisfiedCourses.add(buildCourseInfo(matchingClass, code));
                         }
@@ -949,11 +954,6 @@ public class DegreeRequirementStatusService {
         return foundCompleteSequence;
     }
     
-    /**
-     * Check electives group: must satisfy credits_required from courses/sequences/additional_courses
-     * Excludes classes already used in other requirement groups
-     * If no group-level min_grade is specified, all courses must be C or above
-     */
     private boolean checkElectivesGroup(Map<String, Object> group, List<UserClasses> completedClasses,
                                        List<UserClasses> inProgressClasses, List<UserClasses> allUserClasses,
                                        List<Map<String, Object>> satisfiedCourses,
@@ -963,17 +963,13 @@ public class DegreeRequirementStatusService {
             return false;
         }
         
-        // Get group-level min_grade if specified
         String groupMinGrade = (String) group.get("min_grade");
-        // If no group-level min_grade, default to "C" for all courses
         if (groupMinGrade == null || groupMinGrade.trim().isEmpty()) {
             groupMinGrade = "C";
         }
         
         int totalCredits = 0;
         
-        // Check sequences first (if any sequence is complete, all courses in that sequence count)
-        // For natural science requirement type: "Must include at least one lab sequence"
         @SuppressWarnings("unchecked")
         List<List<Map<String, Object>>> sequences = (List<List<Map<String, Object>>>) group.get("sequences");
         if (sequences != null && !sequences.isEmpty()) {
@@ -985,20 +981,22 @@ public class DegreeRequirementStatusService {
                     String code = (String) courseReq.get("code");
                     if (code == null) continue;
                     
-                    // Get min_grade from course requirement, use group-level min_grade if not specified
                     String minGrade = (String) courseReq.get("min_grade");
                     if (minGrade == null || minGrade.trim().isEmpty()) {
-                        minGrade = groupMinGrade; // Use group-level min_grade
+                        minGrade = groupMinGrade;
                     }
                     
                     String[] parts = parseCourseCode(code);
                     String dept = parts[0];
                     String courseNumStr = parts[1];
                     
-                    // For electives, check completed classes with min grade requirement
                     UserClasses matchingClass = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
+                    
+                    // [Merge Fix] Safe ID handling
                     String classIdStr = matchingClass != null && matchingClass.getClassId() != null ? matchingClass.getClassId().toString() : null;
-                    if (matchingClass != null && classIdStr != null && !usedClassIds.contains(classIdStr)) {
+                    String uniqueId = classIdStr != null ? classIdStr : (matchingClass != null ? matchingClass.getDepartment() + "_" + matchingClass.getCourseNum() + "_planned" : null);
+
+                    if (matchingClass != null && uniqueId != null && !usedClassIds.contains(uniqueId)) {
                         sequenceMatches.add(matchingClass);
                     } else {
                         sequenceComplete = false;
@@ -1007,31 +1005,28 @@ public class DegreeRequirementStatusService {
                 }
                 
                 if (sequenceComplete && !sequenceMatches.isEmpty()) {
-                    // Check excluded courses
                     @SuppressWarnings("unchecked")
                     List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
                     
                     for (UserClasses uc : sequenceMatches) {
+                        // [Merge Fix] Safe ID handling
                         String classIdStr = uc.getClassId() != null ? uc.getClassId().toString() : null;
-                        if (uc.getCredits() != null && classIdStr != null && !usedClassIds.contains(classIdStr)) {
-                            // Check if course is excluded
+                        String uniqueId = classIdStr != null ? classIdStr : (uc.getDepartment() + "_" + uc.getCourseNum() + "_planned");
+
+                        if (uc.getCredits() != null && uniqueId != null && !usedClassIds.contains(uniqueId)) {
                             if (excludedCourses == null || !isExcluded(uc, excludedCourses)) {
-                                // Verify grade meets group-level min_grade requirement
                                 if (uc.getGrade() != null && isGradeSufficientForRequirement(uc.getGrade(), groupMinGrade)) {
                                     totalCredits += uc.getCredits();
                                     satisfiedCourses.add(buildCourseInfo(uc, uc.getDepartment() + " " + uc.getCourseNum()));
-                                    usedClassIds.add(classIdStr);
+                                    usedClassIds.add(uniqueId);
                                 }
                             }
                         }
                     }
-                    // Only count the first complete sequence (natural science requirement needs at least one)
-                    // But we continue to add more sequences if needed for credits
                 }
             }
         }
         
-        // Check additional_courses
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> additionalCourses = (List<Map<String, Object>>) group.get("additional_courses");
         if (additionalCourses != null && !additionalCourses.isEmpty()) {
@@ -1041,56 +1036,53 @@ public class DegreeRequirementStatusService {
                 String code = (String) courseReq.get("code");
                 if (code == null) continue;
                 
-                // Get min_grade from course requirement, use group-level min_grade if not specified
                 String minGrade = (String) courseReq.get("min_grade");
                 if (minGrade == null || minGrade.trim().isEmpty()) {
-                    minGrade = groupMinGrade; // Use group-level min_grade
+                    minGrade = groupMinGrade;
                 }
                 
                 String[] parts = parseCourseCode(code);
                 String dept = parts[0];
                 String courseNumStr = parts[1];
                 
-                // For electives, check completed classes with min grade requirement
                 UserClasses matchingClass = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
+                
+                // [Merge Fix] Safe ID handling
                 String classIdStr = matchingClass != null && matchingClass.getClassId() != null ? matchingClass.getClassId().toString() : null;
-                if (matchingClass != null && classIdStr != null && !usedClassIds.contains(classIdStr)) {
-                    // Check excluded courses
+                String uniqueId = classIdStr != null ? classIdStr : (matchingClass != null ? matchingClass.getDepartment() + "_" + matchingClass.getCourseNum() + "_planned" : null);
+
+                if (matchingClass != null && uniqueId != null && !usedClassIds.contains(uniqueId)) {
                     @SuppressWarnings("unchecked")
                     List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
                     if (excludedCourses == null || !isExcluded(matchingClass, excludedCourses)) {
                         if (matchingClass.getCredits() != null) {
                             totalCredits += matchingClass.getCredits();
                             satisfiedCourses.add(buildCourseInfo(matchingClass, code));
-                            usedClassIds.add(classIdStr);
+                            usedClassIds.add(uniqueId);
                         }
                     }
                 }
             }
         }
         
-        // Check regular courses list
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
         if (courses != null && !courses.isEmpty()) {
-            // Handle special patterns like "CSE 3xx+" (upper division)
             for (Map<String, Object> courseReq : courses) {
                 if (totalCredits >= creditsRequired) break;
                 
                 String code = (String) courseReq.get("code");
                 if (code == null) continue;
                 
-                // Get min_grade from course requirement, use group-level min_grade if not specified
                 String minGrade = (String) courseReq.get("min_grade");
                 if (minGrade == null || minGrade.trim().isEmpty()) {
-                    minGrade = groupMinGrade; // Use group-level min_grade
+                    minGrade = groupMinGrade;
                 }
                 
-                // Check for pattern like "CSE 3xx+"
                 if (code.contains("xx+") || code.contains("xx")) {
                     String[] parts = parseCourseCode(code);
                     String dept = parts[0];
-                    int minLevel = 300; // Default for 3xx+
+                    int minLevel = 300;
                     
                     if (code.contains("2xx+")) {
                         minLevel = 200;
@@ -1098,48 +1090,49 @@ public class DegreeRequirementStatusService {
                         minLevel = 400;
                     }
                     
-                    // Find matching upper-division courses with min grade requirement
-                    // For pattern matching, use group-level min_grade since there's no specific course requirement
                     for (UserClasses uc : completedClasses) {
                         if (totalCredits >= creditsRequired) break;
+                        
+                        // [Merge Fix] Safe ID handling
                         String classIdStr = uc.getClassId() != null ? uc.getClassId().toString() : null;
+                        String uniqueId = classIdStr != null ? classIdStr : (uc.getDepartment() + "_" + uc.getCourseNum() + "_planned");
+
                         if (uc.getDepartment() != null && uc.getDepartment().equalsIgnoreCase(dept) &&
                             uc.getCourseNum() != null && uc.getCourseNum() >= minLevel &&
-                            classIdStr != null && !usedClassIds.contains(classIdStr) &&
+                            uniqueId != null && !usedClassIds.contains(uniqueId) &&
                             uc.getGrade() != null && isGradeSufficientForRequirement(uc.getGrade(), groupMinGrade)) {
                             
-                            // Check excluded courses
                             @SuppressWarnings("unchecked")
                             List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
                             if (excludedCourses == null || !isExcluded(uc, excludedCourses)) {
                                 if (uc.getCredits() != null) {
                                     totalCredits += uc.getCredits();
                                     satisfiedCourses.add(buildCourseInfo(uc, uc.getDepartment() + " " + uc.getCourseNum()));
-                                    usedClassIds.add(classIdStr);
+                                    usedClassIds.add(uniqueId);
                                 }
                             }
                         }
                     }
                 } else {
-                    // Regular course code
                     String[] parts = parseCourseCode(code);
                     String dept = parts[0];
                     String courseNumStr = parts[1];
                     
-                    // For electives, check completed classes with min grade requirement
                     UserClasses matchingClass = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
+                    
+                    // [Merge Fix] Safe ID handling
                     String classIdStr = matchingClass != null && matchingClass.getClassId() != null ? matchingClass.getClassId().toString() : null;
-                    if (matchingClass != null && classIdStr != null && !usedClassIds.contains(classIdStr)) {
-                        // Check excluded courses
+                    String uniqueId = classIdStr != null ? classIdStr : (matchingClass != null ? matchingClass.getDepartment() + "_" + matchingClass.getCourseNum() + "_planned" : null);
+
+                    if (matchingClass != null && uniqueId != null && !usedClassIds.contains(uniqueId)) {
                         @SuppressWarnings("unchecked")
                         List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
                         if (excludedCourses == null || !isExcluded(matchingClass, excludedCourses)) {
-                            // Verify grade meets group-level min_grade requirement
                             if (matchingClass.getGrade() != null && isGradeSufficientForRequirement(matchingClass.getGrade(), groupMinGrade)) {
                                 if (matchingClass.getCredits() != null) {
                                     totalCredits += matchingClass.getCredits();
                                     satisfiedCourses.add(buildCourseInfo(matchingClass, code));
-                                    usedClassIds.add(classIdStr);
+                                    usedClassIds.add(uniqueId);
                                 }
                             }
                         }
@@ -1148,13 +1141,9 @@ public class DegreeRequirementStatusService {
             }
         }
         
-        // Must have at least the required credits AND at least one satisfied course
         return totalCredits >= creditsRequired && !satisfiedCourses.isEmpty();
     }
     
-    /**
-     * Check two_of group: exactly two courses must be completed
-     */
     private boolean checkTwoOfGroup(Map<String, Object> group, List<UserClasses> completedClasses,
                                    List<Map<String, Object>> satisfiedCourses) {
         @SuppressWarnings("unchecked")
@@ -1168,10 +1157,9 @@ public class DegreeRequirementStatusService {
             String code = (String) courseReq.get("code");
             if (code == null) continue;
             
-            // Get min_grade from course requirement, default to "C" if not specified
             String minGrade = (String) courseReq.get("min_grade");
             if (minGrade == null || minGrade.trim().isEmpty()) {
-                minGrade = "C"; // Default minimum grade
+                minGrade = "C";
             }
             
             String[] parts = parseCourseCode(code);
@@ -1188,9 +1176,6 @@ public class DegreeRequirementStatusService {
         return count >= 2;
     }
     
-    /**
-     * Parse course code like "CSE 114" or "CSE 3xx+" into department and course number
-     */
     private String[] parseCourseCode(String code) {
         if (code == null) {
             return new String[]{"", ""};
@@ -1206,9 +1191,6 @@ public class DegreeRequirementStatusService {
         return new String[]{parts[0], parts[1]};
     }
     
-    /**
-     * Find matching UserClasses for a department and course number
-     */
     private UserClasses findMatchingClass(List<UserClasses> classes, String department, String courseNumStr) {
         if (department == null || courseNumStr == null || courseNumStr.isEmpty()) {
             return null;
@@ -1218,7 +1200,7 @@ public class DegreeRequirementStatusService {
         try {
             courseNum = Integer.parseInt(courseNumStr);
         } catch (NumberFormatException e) {
-            return null; // Can't parse course number
+            return null;
         }
         
         return classes.stream()
@@ -1228,13 +1210,6 @@ public class DegreeRequirementStatusService {
                 .orElse(null);
     }
     
-    /**
-     * Check if course exists in completedClasses but with grade below minimum requirement.
-     * This is used to distinguish between:
-     * - Course not taken (missing)
-     * - Course taken but grade too low (unsatisfied)
-     * - Course in progress, grade is null (pending)
-     */
     private boolean hasCompletedCourseWithLowGrade(List<UserClasses> completedClasses, 
                                                    String department, String courseNumStr, String minGrade) {
         if (department == null || courseNumStr == null || courseNumStr.isEmpty()) {
@@ -1248,7 +1223,6 @@ public class DegreeRequirementStatusService {
             return false;
         }
         
-        // Default to "C" if minGrade is not specified
         String requiredGrade = (minGrade == null || minGrade.trim().isEmpty()) ? "C" : minGrade.trim();
         
         return completedClasses.stream()
@@ -1258,11 +1232,6 @@ public class DegreeRequirementStatusService {
                                !isGradeSufficientForRequirement(uc.getGrade(), requiredGrade));
     }
     
-    /**
-     * Find matching UserClasses with minimum grade requirement.
-     * If minGrade is specified, only returns classes with grade >= minGrade.
-     * If minGrade is null or empty, defaults to "C".
-     */
     private UserClasses findMatchingClassWithMinGrade(List<UserClasses> classes, String department, 
                                                        String courseNumStr, String minGrade) {
         if (department == null || courseNumStr == null || courseNumStr.isEmpty()) {
@@ -1273,10 +1242,9 @@ public class DegreeRequirementStatusService {
         try {
             courseNum = Integer.parseInt(courseNumStr);
         } catch (NumberFormatException e) {
-            return null; // Can't parse course number
+            return null;
         }
         
-        // Default to "C" if minGrade is not specified
         String requiredGrade = (minGrade == null || minGrade.trim().isEmpty()) ? "C" : minGrade.trim();
         
         return classes.stream()
@@ -1287,9 +1255,6 @@ public class DegreeRequirementStatusService {
                 .orElse(null);
     }
     
-    /**
-     * Check if a UserClasses matches an excluded course
-     */
     private boolean isExcluded(UserClasses uc, List<Map<String, Object>> excludedCourses) {
         for (Map<String, Object> excluded : excludedCourses) {
             String code = (String) excluded.get("code");
@@ -1313,9 +1278,6 @@ public class DegreeRequirementStatusService {
         return false;
     }
     
-    /**
-     * Build course info map for response
-     */
     private Map<String, Object> buildCourseInfo(UserClasses uc, String requirementCode) {
         Map<String, Object> info = new HashMap<>();
         info.put("requirementCode", requirementCode);
@@ -1330,10 +1292,6 @@ public class DegreeRequirementStatusService {
         return info;
     }
     
-    /**
-     * Check if requirement is pending (can be satisfied by in-progress classes).
-     * A requirement is pending if it's not satisfied but has in-progress classes that could satisfy it.
-     */
     private boolean checkIfPending(Map<String, Object> group, String type,
                                     List<UserClasses> completedClasses,
                                     List<UserClasses> inProgressClasses,
@@ -1362,9 +1320,6 @@ public class DegreeRequirementStatusService {
         }
     }
     
-    /**
-     * Check if all_of group is pending (all courses are completed or in-progress).
-     */
     private boolean checkAllOfPending(Map<String, Object> group, 
                                        List<UserClasses> completedClasses,
                                        List<UserClasses> inProgressClasses) {
@@ -1387,30 +1342,24 @@ public class DegreeRequirementStatusService {
             String dept = parts[0];
             String courseNumStr = parts[1];
             
-            // Check if completed with sufficient grade
             UserClasses completed = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
             if (completed != null) {
-                continue; // This course is satisfied
+                continue;
             }
             
-            // Check if course exists in completedClasses but with low grade (unsatisfied, not pending)
             if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
-                return false; // Course is completed but grade is too low - this is NOT_SATISFIED, not PENDING
+                return false;
             }
             
-            // Check if in-progress (grade is null)
             UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
             if (inProgress == null) {
-                return false; // One course is neither completed nor in-progress
+                return false;
             }
         }
         
-        return true; // All courses are either completed or in-progress
+        return true;
     }
     
-    /**
-     * Check if one_of group is pending (at least one course is in-progress).
-     */
     private boolean checkOneOfPending(Map<String, Object> group,
                                       List<UserClasses> completedClasses,
                                       List<UserClasses> inProgressClasses) {
@@ -1433,30 +1382,24 @@ public class DegreeRequirementStatusService {
             String dept = parts[0];
             String courseNumStr = parts[1];
             
-            // Check if completed with sufficient grade
             UserClasses completed = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
             if (completed != null) {
-                return false; // Already satisfied
+                return false;
             }
             
-            // Check if course exists in completedClasses but with low grade (unsatisfied, not pending)
             if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
-                return false; // Course is completed but grade is too low - this is NOT_SATISFIED, not PENDING
+                return false;
             }
             
-            // Check if in-progress (grade is null)
             UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
             if (inProgress != null) {
-                return true; // At least one is in-progress
+                return true;
             }
         }
         
-        return false; // No courses are in-progress
+        return false;
     }
     
-    /**
-     * Check if one_of_sequences group is pending.
-     */
     private boolean checkOneOfSequencesPending(Map<String, Object> group,
                                                 List<UserClasses> completedClasses,
                                                 List<UserClasses> inProgressClasses) {
@@ -1481,19 +1424,16 @@ public class DegreeRequirementStatusService {
                 String dept = parts[0];
                 String courseNumStr = parts[1];
                 
-                // Check if completed with sufficient grade
                 UserClasses completed = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
                 if (completed != null) {
-                    continue; // This course is satisfied
+                    continue;
                 }
                 
-                // Check if course exists in completedClasses but with low grade (unsatisfied, not pending)
                 if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
                     sequenceCanBeCompleted = false;
-                    break; // Course is completed but grade is too low - this is NOT_SATISFIED, not PENDING
+                    break;
                 }
                 
-                // Check if in-progress (grade is null)
                 UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
                 if (inProgress == null) {
                     sequenceCanBeCompleted = false;
@@ -1502,16 +1442,13 @@ public class DegreeRequirementStatusService {
             }
             
             if (sequenceCanBeCompleted) {
-                return true; // At least one sequence can be completed
+                return true;
             }
         }
         
         return false;
     }
     
-    /**
-     * Check if two_of group is pending (at least two courses are completed or in-progress).
-     */
     private boolean checkTwoOfPending(Map<String, Object> group,
                                       List<UserClasses> completedClasses,
                                       List<UserClasses> inProgressClasses) {
@@ -1535,32 +1472,25 @@ public class DegreeRequirementStatusService {
             String dept = parts[0];
             String courseNumStr = parts[1];
             
-            // Check if completed with sufficient grade
             UserClasses completed = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
             if (completed != null) {
                 count++;
                 continue;
             }
             
-            // Check if course exists in completedClasses but with low grade (unsatisfied, not pending)
             if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
-                // Don't count this - it's unsatisfied, not pending
                 continue;
             }
             
-            // Check if in-progress (grade is null)
             UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
             if (inProgress != null) {
                 count++;
             }
         }
         
-        return count >= 2; // At least two are completed or in-progress
+        return count >= 2;
     }
     
-    /**
-     * Check if electives group is pending (can reach required credits with in-progress classes).
-     */
     private boolean checkElectivesPending(Map<String, Object> group,
                                           List<UserClasses> completedClasses,
                                           List<UserClasses> inProgressClasses,
@@ -1570,65 +1500,46 @@ public class DegreeRequirementStatusService {
             return false;
         }
         
-        // Calculate credits from completed classes (already done in checkElectivesGroup)
-        // Here we just check if adding in-progress classes could reach the requirement
         int totalCredits = 0;
         
-        // Count completed credits (simplified - would need to match the logic from checkElectivesGroup)
-        // For simplicity, just check if there are enough in-progress classes that could satisfy
         if (inProgressClasses != null && !inProgressClasses.isEmpty()) {
             for (UserClasses uc : inProgressClasses) {
-                if (uc.getCredits() != null && uc.getClassId() != null) {
-                    String classIdStr = uc.getClassId().toString();
-                    if (!usedClassIds.contains(classIdStr)) {
-                        totalCredits += uc.getCredits();
-                    }
+                // [Merge Fix] Safe ID handling for pending classes
+                String classIdStr = uc.getClassId() != null ? uc.getClassId().toString() : null;
+                String uniqueId = classIdStr != null ? classIdStr : (uc.getDepartment() + "_" + uc.getCourseNum() + "_planned");
+
+                if (uc.getCredits() != null && uniqueId != null && !usedClassIds.contains(uniqueId)) {
+                    totalCredits += uc.getCredits();
                 }
             }
         }
         
-        // If we have some completed credits (from previous check) plus in-progress credits,
-        // we might be able to reach the requirement
-        // This is a simplified check - in reality, we'd need to match the exact elective logic
-        return totalCredits > 0; // If there are in-progress classes, it could be pending
+        return totalCredits > 0;
     }
     
-    /**
-     * Check if grade is sufficient (C or higher) for degree requirements.
-     * C- is not sufficient (below C).
-     */
     private boolean isGradeSufficient(String grade) {
         if (grade == null) return false;
         
         grade = grade.trim().toUpperCase();
         
-        // Letter grades - C or higher
         if (grade.equals("A") || grade.equals("A+") || grade.equals("A-") ||
             grade.equals("B") || grade.equals("B+") || grade.equals("B-") ||
             grade.equals("C") || grade.equals("C+")) {
             return true;
         }
         
-        // C- is not sufficient (below C)
         if (grade.equals("C-")) {
             return false;
         }
         
-        // Handle numeric grades (assuming 4.0 scale)
         try {
             double numericGrade = Double.parseDouble(grade);
-            return numericGrade >= 2.0; // C or higher (2.0 = C)
+            return numericGrade >= 2.0;
         } catch (NumberFormatException e) {
             return false;
         }
     }
     
-    /**
-     * Check if a grade meets the minimum required grade.
-     * @param actualGrade The grade the student received
-     * @param requiredGrade The minimum required grade (e.g., "C", "B-", "B")
-     * @return true if actualGrade >= requiredGrade
-     */
     private boolean isGradeSufficientForRequirement(String actualGrade, String requiredGrade) {
         if (actualGrade == null || requiredGrade == null) {
             return false;
@@ -1637,7 +1548,6 @@ public class DegreeRequirementStatusService {
         actualGrade = actualGrade.trim().toUpperCase();
         requiredGrade = requiredGrade.trim().toUpperCase();
         
-        // Grade point values for comparison
         Map<String, Double> gradePoints = new HashMap<>();
         gradePoints.put("A", 4.0);
         gradePoints.put("A-", 3.7);
@@ -1655,20 +1565,16 @@ public class DegreeRequirementStatusService {
         Double actualPoints = gradePoints.get(actualGrade);
         Double requiredPoints = gradePoints.get(requiredGrade);
         
-        // If both are in the map, compare points
         if (actualPoints != null && requiredPoints != null) {
             return actualPoints >= requiredPoints;
         }
         
-        // If not in map, try numeric comparison
         try {
             double actualNumeric = Double.parseDouble(actualGrade);
             double requiredNumeric = Double.parseDouble(requiredGrade);
             return actualNumeric >= requiredNumeric;
         } catch (NumberFormatException e) {
-            // If can't parse, return false
             return false;
         }
     }
 }
-

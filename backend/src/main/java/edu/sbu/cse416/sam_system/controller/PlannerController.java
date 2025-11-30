@@ -1,6 +1,11 @@
 package edu.sbu.cse416.sam_system.controller;
 
 import edu.sbu.cse416.sam_system.service.PlanValidationService;
+import edu.sbu.cse416.sam_system.dto.PlannerDtos.AutoPlannerRequest;
+import edu.sbu.cse416.sam_system.dto.PlannerDtos.AutoPlannerResponse;
+import edu.sbu.cse416.sam_system.dto.PlannerDtos.PlannerCourseRequest;
+import edu.sbu.cse416.sam_system.dto.PlannerDtos.PlannerSummaryDto;
+import edu.sbu.cse416.sam_system.service.PlannerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +23,9 @@ public class PlannerController {
 
     @Autowired
     private PlanValidationService planValidationService;
+
+    @Autowired
+    private PlannerService plannerService;
 
     /**
      * Get plan validation report - shows unsatisfied prerequisites and degree requirement final status.
@@ -39,6 +47,82 @@ public class PlannerController {
                     "success", false,
                     "error", "Failed to validate plan: " + e.getMessage()
             ));
+        }
+    }
+
+    /**
+     * Get planner summary for a user.
+     */
+    @GetMapping("/{userId}")
+    public ResponseEntity<PlannerSummaryDto> getPlanner(@PathVariable Long userId) {
+        return ResponseEntity.ok(plannerService.getPlannerSummary(userId));
+    }
+
+    /**
+     * Add a course to the planner.
+     */
+    @PostMapping("/{userId}")
+    public ResponseEntity<?> addCourse(@PathVariable Long userId,
+                                       @RequestBody PlannerCourseRequest request) {
+        try {
+            plannerService.addCourse(userId, request);
+            PlannerSummaryDto summary = plannerService.getPlannerSummary(userId);
+            return ResponseEntity.ok(summary);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Remove a planned course.
+     */
+    @DeleteMapping("/{userId}/{planId}")
+    public ResponseEntity<?> removeCourse(@PathVariable Long userId,
+                                          @PathVariable Long planId) {
+        try {
+            plannerService.removeCourse(userId, planId);
+            PlannerSummaryDto summary = plannerService.getPlannerSummary(userId);
+            return ResponseEntity.ok(summary);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Generate an auto-planned course schedule for a student.
+     * POST /api/planner/{userId}/auto-generate
+     */
+    @PostMapping("/{userId}/auto-generate")
+    public ResponseEntity<?> generateAutoPlan(@PathVariable Long userId,
+                                             @RequestBody AutoPlannerRequest request) {
+        try {
+            // Validate request
+            if (request == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Request body is required"));
+            }
+            if (request.workloadLimits() == null || request.workloadLimits().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "workloadLimits is required"));
+            }
+            if (request.graduationSemester() == null || request.graduationYear() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "graduationSemester and graduationYear are required"));
+            }
+            
+            AutoPlannerResponse response = plannerService.generateAutoPlan(userId, request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            System.err.println("AutoPlanner IllegalArgumentException: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("AutoPlanner Exception: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of("error", "Internal server error: " + e.getMessage()));
         }
     }
 }

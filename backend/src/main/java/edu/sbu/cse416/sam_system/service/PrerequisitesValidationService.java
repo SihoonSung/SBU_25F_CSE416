@@ -5,6 +5,7 @@ import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -163,8 +164,16 @@ public class PrerequisitesValidationService {
             return checkStandingRequirement(allUserClasses, group);
         }
         
-        // Handle grade requirements like "C or higher in BIO 205 or BIO 207"
-        if (group.toLowerCase().contains("or higher in") || group.toLowerCase().contains("c or higher")) {
+        // Handle grade requirements like "C or higher in BIO 205 or BIO 207" or "MAT 125 or higher"
+        // Check for patterns: "or higher in", "c or higher", or "X or higher" (where X is a course code)
+        String lowerGroup = group.toLowerCase();
+        if (lowerGroup.contains("or higher in") || lowerGroup.contains("c or higher")) {
+            return checkGradeRequirement(userClasses, group);
+        }
+        
+        // Check for "X or higher" pattern where X is a course code (e.g., "MAT 125 or higher")
+        // This pattern means the course must be taken with a passing grade (C or higher)
+        if (lowerGroup.matches(".*\\b([a-z]{2,4})\\s+\\d{3,4}\\s+or\\s+higher\\b.*")) {
             return checkGradeRequirement(userClasses, group);
         }
         
@@ -263,39 +272,76 @@ public class PrerequisitesValidationService {
     }
 
     /**
-     * Check simple course requirements like "BIO 351"
-     * If no course code is found in the group, ignore it (return true)
+     * Check simple course requirements like "BIO 351" or "BIO 205 or BIO 207"
+     * 
+     * IMPORTANT: "or" in prerequisite strings means "OR" (one of them is enough)
+     * However, if the group contains multiple courses without explicit "or", 
+     * we check if ALL are required (AND) or ANY is enough (OR).
+     * 
+     * Current logic: If "or" keyword is present, treat as OR (any one is enough).
+     * Otherwise, if multiple courses are listed, check if ALL are required.
      */
     private boolean checkSimpleCourseRequirement(List<UserClasses> userClasses, String group) {
         System.out.println("    [PREREQ VALIDATION] Checking simple course requirement: " + group);
         
-        // Extract course code from group
+        // Extract all course codes from group
         Matcher matcher = COURSE_PATTERN.matcher(group);
+        List<String> courseCodes = new ArrayList<>();
+        while (matcher.find()) {
+            String department = matcher.group(1);
+            String courseNum = matcher.group(2);
+            courseCodes.add(department + " " + courseNum);
+        }
         
         // If no course code found, ignore this requirement
-        if (!matcher.find()) {
+        if (courseCodes.isEmpty()) {
             System.out.println("    [PREREQ VALIDATION] No course code found, ignoring requirement: " + group);
             return true; // Ignore non-course requirements
         }
         
-        // Reset matcher to check all course codes in the group
-        matcher = COURSE_PATTERN.matcher(group);
+        // Check if "or" keyword is present (case-insensitive)
+        // If "or" is present, treat as OR (any one is enough)
+        // If "or" is NOT present but multiple courses exist, treat as AND (all required)
+        boolean hasOrKeyword = group.toLowerCase().matches(".*\\bor\\b.*");
         
-        // Check if user has taken any of the courses mentioned in this group
-        while (matcher.find()) {
-            String department = matcher.group(1);
-            String courseNum = matcher.group(2);
-            
-            System.out.println("    [PREREQ VALIDATION] Looking for course: " + department + " " + courseNum);
-            
-            if (hasTakenCourse(userClasses, department, courseNum)) {
-                System.out.println("    [PREREQ VALIDATION] Found course: " + department + " " + courseNum);
-                return true;
+        if (hasOrKeyword) {
+            // OR logic: any one course is enough
+            System.out.println("    [PREREQ VALIDATION] Detected OR logic (any one is enough)");
+            for (String courseCode : courseCodes) {
+                String[] parts = courseCode.split("\\s+");
+                if (parts.length >= 2) {
+                    String department = parts[0];
+                    String courseNum = parts[1];
+                    System.out.println("    [PREREQ VALIDATION] Looking for course: " + department + " " + courseNum);
+                    
+                    if (hasTakenCourse(userClasses, department, courseNum)) {
+                        System.out.println("    [PREREQ VALIDATION] Found course: " + department + " " + courseNum);
+                        return true;
+                    }
+                }
             }
+            System.out.println("    [PREREQ VALIDATION] OR requirement not met: none of " + courseCodes + " found");
+            return false;
+        } else {
+            // AND logic: all courses must be present
+            // (This handles cases where multiple courses are listed without "or")
+            System.out.println("    [PREREQ VALIDATION] Detected AND logic (all required)");
+            for (String courseCode : courseCodes) {
+                String[] parts = courseCode.split("\\s+");
+                if (parts.length >= 2) {
+                    String department = parts[0];
+                    String courseNum = parts[1];
+                    System.out.println("    [PREREQ VALIDATION] Looking for course: " + department + " " + courseNum);
+                    
+                    if (!hasTakenCourse(userClasses, department, courseNum)) {
+                        System.out.println("    [PREREQ VALIDATION] Missing required course: " + department + " " + courseNum);
+                        return false;
+                    }
+                }
+            }
+            System.out.println("    [PREREQ VALIDATION] All required courses found: " + courseCodes);
+            return true;
         }
-        
-        System.out.println("    [PREREQ VALIDATION] Course requirement not met: " + group);
-        return false;
     }
     
     /**

@@ -27,7 +27,8 @@ public class PlannerDtos {
             String semester,
             Integer year,
             Integer credits,
-            List<String> sbcs
+            List<String> sbcs,
+            List<String> unsatisfiedPrerequisites
     ) { }
 
     public record PlannerSummaryDto(
@@ -37,5 +38,29 @@ public class PlannerDtos {
             Map<String, Integer> sbcCounts,
             Map<String, Object> degreeRequirementForecast
     ) { }
+
+    /**
+     * Request DTO for auto-planner
+     */
+    public record AutoPlannerRequest(
+            String graduationSemester,
+            Integer graduationYear,
+            Map<String, Double> workloadLimits, // e.g., {"Fall 2025": 17.0, "Spring 2026": 17.0}
+            List<String> avoidCourses // e.g., ["CSE 101", "MAT 123"]
+    ) {}
+
+    /**
+     * Response DTO for auto-planner
+     */
+    public record AutoPlannerResponse(
+            List<PlannerCourseDto> proposedPlan,
+            Map<String, List<PlannerCourseDto>> proposedPlanByTerm,
+            Map<String, Double> creditsByTerm,
+            Double totalCredits,
+            Map<String, Integer> sbcCounts,
+            Map<String, Object> degreeRequirementForecast,
+            List<String> warnings,
+            List<String> nonRequiredCourses
+    ) {}
 }
 
