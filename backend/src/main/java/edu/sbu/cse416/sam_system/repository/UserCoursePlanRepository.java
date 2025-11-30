@@ -2,9 +2,11 @@ package edu.sbu.cse416.sam_system.repository;
 
 import edu.sbu.cse416.sam_system.entity.UserCoursePlan;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -47,6 +49,8 @@ public interface UserCoursePlanRepository extends JpaRepository<UserCoursePlan, 
     /**
      * Delete all course plans for a specific user
      */
+    @Modifying
+    @Transactional
     @Query("DELETE FROM UserCoursePlan ucp WHERE ucp.user.userId = :userId")
     void deleteByUserId(@Param("userId") Long userId);
     

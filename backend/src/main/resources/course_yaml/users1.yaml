@@ -66,37 +66,44 @@ instructors:
   email: sktjdqls1223@gmail.com
 
 students:
+# ======================================================================
+# Test Case 1: Unsatisfied Prerequisites - Low Grade (C-)
+# ======================================================================
 - SBU_ID: 100123456
   first_name: Charles
   last_name: Brown
   email: minseohappy09@gmail.com
-  university_entry: {semester: Fall, year: 2020} # term in which the student entered the university.  valid values for semester: Fall, Spring, SummerI, SummerII
-  direct_admit: null # major to which the student was directly admitted when accepted to the university, if any, otherwise null
-  AOI: CSE # major for which the student is AOI if any, otherwise null
-  college: # college or school that the student is in, identified by acronym, e.g., CEAS
-  majors: [CSE] # list of majors, identified by 3-letter codes, e.g., CSE
-  degrees: [BS] # list of degree types, identified by 2-letter codes. entry i in this list corresponds to entry i in the majors list.
-  major_requirement_versions: [{semester: Fall, year: 2020}, {semester: Fall, year: 2021}] # the degree requirements version the student is following for each major.  entry i in this list corresponds to entry i in the majors list.
-  minors: [] # list of minors, identified by 3-letter codes
+  university_entry: {semester: Fall, year: 2020}
+  direct_admit: null
+  AOI: CSE
+  college:
+  majors: [CSE]
+  degrees: [BS]
+  major_requirement_versions: [{semester: Fall, year: 2025}]
+  minors: []
   minor_requirement_versions: []
-  planned_majors: [] # planned additional majors that are not yet declared.
-  planned_major_requirement_versions: [] # degree requirements version for each planned major
-  planned_degrees: [] # degree types corresponding to planned_majors
-  planned_minors: [POL] # planned additional minors that are not yet declared.
-  planned_minor_requirement_versions: [{semester: Fall, year: 2022}] # degree requirements version for each planned minor
-  graduation: null # term in which the student graduated (if they did), otherwise null
-  transfer_courses: # list of transfer courses and transfer credits.
-    # 'class' and 'university' identify the original class.  department and course_num identify the equivalent SBU course, if any, otherwise they are null.
+  planned_majors: []
+  planned_major_requirement_versions: []
+  planned_degrees: []
+  planned_minors: [POL]
+  planned_minor_requirement_versions: [{semester: Fall, year: 2022}]
+  graduation: null
+  transfer_courses:
     - {class: CSE101, university: SCCC, credits: 3, department: CSE, course_num: 101, grade: A}
-    - {class: CSE999, university: SCCC, credits: 3, department: null, course_num: null, grade : A}
-  classes:  # list of classes the student took, is taking, or is registered for in a future semester.
-    # GPNC is a boolean flag indicating whether GPMC option was selected.
-    - {class_id: 23456, department: CSE, course_num: 114, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: A-}
+  classes:
+    # CSE 114 with C- grade (insufficient for prerequisites that require C or higher)
+    - {class_id: 23456, department: CSE, course_num: 114, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: C-}
+    # CSE 214 in progress (grade null)
     - {class_id: 34567, department: CSE, course_num: 214, section: 2, semester: SummerI, year: 2021, credits: 4, GPNC: true, grade: null}
-  course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
+  course_plan:
+    # CSE 216 requires CSE 114 with C or higher - should show unsatisfied prerequisite
     - {department: CSE, course_num: 216, semester: Fall, year: 2026, credits: 3}
+    # CSE 320 requires CSE 214 and CSE 220 - should show unsatisfied prerequisite
     - {department: CSE, course_num: 320, semester: Spring, year: 2027, credits: 3}
 
+# ======================================================================
+# Test Case 2: Unsatisfied Prerequisites - In Progress Course
+# ======================================================================
 - SBU_ID: 114665644
   first_name: Minseo2
   last_name: Student
@@ -107,162 +114,34 @@ students:
   college:
   majors: [CSE]
   degrees: [BS]
-  major_requirement_versions: [{semester: Spring, year: 2025}]
+  major_requirement_versions: [{semester: Fall, year: 2025}]
   minors: []
   minor_requirement_versions: []
   planned_majors: []
   planned_major_requirement_versions: []
   planned_degrees: []
-  planned_minors: [CSE]
-  planned_minor_requirement_versions: [{semester: Spring, year: 2025}]
+  planned_minors: [BIO]
+  planned_minor_requirement_versions: [{semester: Fall, year: 2025}]
   graduation: null
   transfer_courses: null
-  classes:  # list of classes the student took, is taking, or is registered for in a future semester.
-    # GPNC is a boolean flag indicating whether GPMC option was selected.
+  classes:
     - {class_id: 12345, department: CSE, course_num: 114, section: 2, semester: Fall, year: 2020, credits: 4, GPNC: false, grade: A}
-    - {class_id: 23456, department: CSE, course_num: 214, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: A-}
-    - {class_id: 34567, department: CSE, course_num: 215, section: 2, semester: Fall, year: 2021, credits: 4, GPNC: true, grade: P}
+    # CSE 214 in progress (grade null) - CSE 220 requires completed CSE 214
+    - {class_id: 23456, department: CSE, course_num: 214, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: B}
+    - {class_id: 34567, department: CSE, course_num: 215, section: 2, semester: Fall, year: 2021, credits: 4, GPNC: true, grade: A-}
     - {class_id: 45678, department: CSE, course_num: 216, section: 1, semester: Spring, year: 2025, credits: 4, GPNC: false, grade : A}
-    - {class_id: 56789, department: CSE, course_num: 220, section: 1, semester: Spring, year: 2025, credits: 4, GPNC: false, grade : A}
-  course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
-    - {department: CSE, course_num: 101, semester: Spring, year: 2026, credits: 3}
-    - {department: CSE, course_num: 114, semester: Spring, year: 2026, credits: 3}
+    - {class_id: 44251, department: CSE, course_num: 220, section: 1, semester: Spring, year: 2025, credits: 4, GPNC: false, grade : A}
+  course_plan: []
+ 
 
-- SBU_ID: 113949353
-  first_name: Sihoon
-  last_name: Sung
-  email: sihoon.sung@stonybrook.edu
-  university_entry: {semester: Spring, year: 2020}
-  direct_admit: null
-  AOI: null
-  college:
-  majors: [CSE]
-  degrees: [BS]
-  major_requirement_versions: [{semester: Spring, year: 2021}]
-  minors: []
-  minor_requirement_versions: []
-  planned_majors: []
-  planned_major_requirement_versions: []
-  planned_degrees: []
-  planned_minors: [BM]
-  planned_minor_requirement_versions: [{semester: Spring, year: 2025}]
-  graduation: null
-  transfer_courses: null
-  classes:  # list of classes the student took, is taking, or is registered for in a future semester.
-    # GPNC is a boolean flag indicating whether GPMC option was selected.
-    - {class_id: 12345, department: CSE, course_num: 101, section: 2, semester: Fall, year: 2020, credits: 3, GPNC: false, grade: A}
-    - {class_id: 23456, department: AMS, course_num: 151, section: 1, semester: Spring, year: 2021, credits: 3, GPNC: false, grade: A-}
-    - {class_id: 34567, department: CSE, course_num: 214, section: 2, semester: SummerI, year: 2020, credits: 3, GPNC: true, grade: P}
-    - {class_id: 45678, department: AMS, course_num: 261, section: 1, semester: Fall, year: 2025, credits: 3, GPNC: false, grade: null}
-    - {class_id: 56789, department: CSE, course_num: 220, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: null}
-  course_plan: # list of classes the student plans to take in future semesters.  should be disjoint from 'classes'.
-    - {department: CSE, course_num: 101, semester: Spring, year: 2026, credits: 3}
-    - {department: CSE, course_num: 114, semester: Spring, year: 2026, credits: 3}
-
-- SBU_ID: 100234567
-  first_name: Sarah
-  last_name: Johnson
-  email: sarah.johnson@stonybrook.edu
-  university_entry: {semester: Fall, year: 2022}
-  direct_admit: BIO
-  AOI: null
-  college: CAS
-  majors: [BIO]
-  degrees: [BA]
-  major_requirement_versions: [{semester: Fall, year: 2022}]
-  minors: [PSY]
-  minor_requirement_versions: [{semester: Fall, year: 2023}]
-  planned_majors: []
-  planned_major_requirement_versions: []
-  planned_degrees: []
-  planned_minors: []
-  planned_minor_requirement_versions: []
-  graduation: null
-  transfer_courses: null
-  classes:
-    - {class_id: 38203, department: BIO, course_num: 201, section: 01, semester: Fall, year: 2022, credits: 3, GPNC: null, grade: B+}
-    - {class_id: 38203, department: CHE, course_num: 129, section: 01, semester: Fall, year: 2022, credits: 3, GPNC: null, grade: B+}
-    - {class_id: 38764, department: BIO, course_num: 202, section: 01, semester: Spring, year: 2023, credits: 3, GPNC: null, grade: A}
-    - {class_id: 45189, department: PSY, course_num: 103, section: 02, semester: Fall, year: 2023, credits: 3, GPNC: null, grade: A-}
-    - {class_id: 43222, department: BIO, course_num: 310, section: 01, semester: Spring, year: 2024, credits: 4, GPNC: null, grade: B}
-    - {class_id: 47263, department: BIO, course_num: 314, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: A}
-  course_plan:
-    - {department: BIO, course_num: 341, semester: Spring, year: 2025, credits: 3}
-    - {department: BIO, course_num: 343, semester: Fall, year: 2025, credits: 3}
-
-- SBU_ID: 100345678
-  first_name: Michael
-  last_name: Chen
-  email: michael.chen@stonybrook.edu
-  university_entry: {semester: Spring, year: 2023}
-  direct_admit: null
-  AOI: ECO
-  college: CAS
-  majors: [ECO]
-  degrees: [BA]
-  major_requirement_versions: [{semester: Spring, year: 2023}]
-  minors: []
-  minor_requirement_versions: []
-  planned_majors: [PSY]
-  planned_major_requirement_versions: [{semester: Spring, year: 2024}]
-  planned_degrees: [BA]
-  planned_minors: []
-  planned_minor_requirement_versions: []
-  graduation: null
-  transfer_courses:
-    - {class: ECON101, university: NYU, credits: 3, department: ECO, course_num: 108, grade: A-}
-    - {class: MATH120, university: NYU, credits: 4, department: MAT, course_num: 131, grade: B+}
-  classes:
-    - {class_id: 41982, department: ECO, course_num: 110, section: 01, semester: Spring, year: 2023, credits: 3, GPNC: null, grade: B+}
-    - {class_id: 41332, department: ECO, course_num: 303, section: 02, semester: Fall, year: 2023, credits: 3, GPNC: null, grade: A-}
-    - {class_id: 45189, department: PSY, course_num: 103, section: 01, semester: Spring, year: 2024, credits: 3, GPNC: C, grade: P}
-    - {class_id: 41323, department: ECO, course_num: 320, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: B}
-    - {class_id: 10101, department: ECO, course_num: 305, section: 01, semester: Spring, year: 2025, credits: 3, GPNC: null, grade: C}
-  course_plan:
-    - {department: ECO, course_num: 389, semester: Fall, year: 2025, credits: 3}
-    - {department: ECO, course_num: 362, semester: Spring, year: 2026, credits: 3}
-
-- SBU_ID: 100456789
-  first_name: Emily
-  last_name: Rodriguez
-  email: emily.rodriguez@stonybrook.edu
-  university_entry: {semester: Fall, year: 2021}
-  direct_admit: null
-  AOI: null
-  college: CAS
-  majors: [POL]
-  degrees: [BA]
-  major_requirement_versions: [{semester: Fall, year: 2021}]
-  minors: [CSE]
-  minor_requirement_versions: [{semester: Fall, year: 2022}]
-  planned_majors: []
-  planned_major_requirement_versions: []
-  planned_degrees: []
-  planned_minors: []
-  planned_minor_requirement_versions: []
-  graduation: {semester: Spring, year: 2025}
-  transfer_courses: null
-  classes:
-    - {class_id: 20202, department: POL, course_num: 101, section: 01, semester: Fall, year: 2021, credits: 3, GPNC: null, grade: A}
-    - {class_id: 30303, department: CSE, course_num: 101, section: 02, semester: Spring, year: 2022, credits: 4, GPNC: null, grade: B+}
-    - {class_id: 40404, department: POL, course_num: 102, section: 01, semester: Fall, year: 2022, credits: 3, GPNC: null, grade: A-}
-    - {class_id: 50505, department: ARS, course_num: 204, section: 03, semester: Spring, year: 2023, credits: 4, GPNC: B, grade: P}
-    - {class_id: 60606, department: POL, course_num: 334, section: 02, semester: Fall, year: 2023, credits: 3, GPNC: null, grade: A}
-    - {class_id: 70707, department: POL, course_num: 305, section: 01, semester: Spring, year: 2024, credits: 4, GPNC: null, grade: B+}
-    - {class_id: 80808, department: POL, course_num: 338, section: 01, semester: Fall, year: 2024, credits: 3, GPNC: null, grade: A}
-  course_plan:
-    - {department: POL, course_num: 368, semester: Spring, year: 2025, credits: 3}
 
 # ======================================================================
-# Test Cases for Degree Requirements Status API
-# Students for testing each requirement type
+# Test Case 3: Degree Requirements - Status Format Test
 # ======================================================================
-
-# Test Case 1: CSE BS - test all_of, one_of, one_of_sequences, electives
 - SBU_ID: 200111111
   first_name: TestCSE1
-  last_name: AllTypes
-  email: testcse1.alltypes@stonybrook.edu
+  last_name: StatusTest
+  email: testcse1.statustest@stonybrook.edu
   university_entry: {semester: Fall, year: 2021}
   direct_admit: null
   AOI: null
@@ -280,39 +159,44 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # all_of test: intro_courses partially completed (NOT SATISFIED)
+    # all_of: intro_courses - 3 completed, 2 missing
+    # Expected: status = "still remaining 2 courses"
     - {class_id: 70001, department: CSE, course_num: 114, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A}
     - {class_id: 70002, department: CSE, course_num: 214, section: 1, semester: Spring, year: 2022, credits: 4, GPNC: false, grade: B+}
     - {class_id: 70003, department: CSE, course_num: 215, section: 1, semester: Fall, year: 2022, credits: 4, GPNC: false, grade: A-}
-    # CSE 216, 220 not taken -> all_of NOT SATISFIED
+    # CSE 216, 220 missing
     
-    # one_of_sequences test: AMS sequence completed (SATISFIED)
+    # one_of_sequences: AMS sequence completed
+    # Expected: status = "Completed"
     - {class_id: 70004, department: AMS, course_num: 151, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A}
     - {class_id: 70005, department: AMS, course_num: 161, section: 1, semester: Spring, year: 2022, credits: 4, GPNC: false, grade: B+}
     
-    # one_of test: linear_algebra completed (SATISFIED)
+    # one_of: linear_algebra completed
+    # Expected: status = "Completed"
     - {class_id: 70006, department: AMS, course_num: 210, section: 1, semester: Fall, year: 2022, credits: 4, GPNC: false, grade: A}
     
-    # all_of test: statistics partially completed (NOT SATISFIED)
+    # all_of: statistics - 1 completed, 1 missing
+    # Expected: status = "still remaining 1 course"
     - {class_id: 70007, department: AMS, course_num: 301, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
-    # AMS 310 not taken -> all_of NOT SATISFIED
     
-    # electives test: natural_science_requirement partially completed
+    # electives: natural_science_requirement - 5 credits completed, 9 required
+    # Expected: status = "still remaining 2 courses" (9-5=4 credits, 4/3=2 courses)
     - {class_id: 70008, department: BIO, course_num: 201, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
     - {class_id: 70009, department: BIO, course_num: 204, section: 1, semester: Spring, year: 2024, credits: 2, GPNC: false, grade: B+}
-    # 9 credits required, currently 5 credits -> NOT SATISFIED
     
-    # advanced_fixed all_of test: partially completed (NOT SATISFIED)
+    # advanced_fixed all_of: 2 completed, 4 missing
+    # Expected: status = "still remaining 4 courses"
     - {class_id: 70010, department: CSE, course_num: 303, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: B+}
     - {class_id: 70011, department: CSE, course_num: 310, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A-}
-    # CSE 316, 320, 373, 416 not taken -> NOT SATISFIED
   course_plan: []
 
-# Test Case 2: CSE BS - complete student with all requirements satisfied
+# ======================================================================
+# Test Case 4: Degree Requirements - In Progress Status
+# ======================================================================
 - SBU_ID: 200222222
   first_name: TestCSE2
-  last_name: Complete
-  email: testcse2.complete@stonybrook.edu
+  last_name: InProgress
+  email: testcse2.inprogress@stonybrook.edu
   university_entry: {semester: Fall, year: 2020}
   direct_admit: null
   AOI: null
@@ -330,263 +214,80 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # all_of: intro_courses completed
+    # intro_courses: 3 completed, 1 in progress, 1 missing
+    # Expected: status = "in progress, still remaining 1 course"
     - {class_id: 71001, department: CSE, course_num: 114, section: 1, semester: Fall, year: 2020, credits: 4, GPNC: false, grade: A}
     - {class_id: 71002, department: CSE, course_num: 214, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: A}
     - {class_id: 71003, department: CSE, course_num: 215, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A-}
-    - {class_id: 71004, department: CSE, course_num: 216, section: 1, semester: Spring, year: 2022, credits: 4, GPNC: false, grade: B+}
-    - {class_id: 71005, department: CSE, course_num: 220, section: 1, semester: Fall, year: 2022, credits: 4, GPNC: false, grade: A}
+    - {class_id: 71004, department: CSE, course_num: 216, section: 1, semester: Spring, year: 2025, credits: 4, GPNC: false, grade: null}
+    # CSE 220 missing
     
-    # all_of: advanced_fixed completed
-    - {class_id: 71006, department: CSE, course_num: 303, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
-    - {class_id: 71007, department: CSE, course_num: 310, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A-}
-    - {class_id: 71008, department: CSE, course_num: 316, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: B+}
-    - {class_id: 71009, department: CSE, course_num: 320, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    - {class_id: 71010, department: CSE, course_num: 373, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: A-}
-    - {class_id: 71011, department: CSE, course_num: 416, section: 1, semester: Fall, year: 2025, credits: 3, GPNC: false, grade : A}
+    # statistics: 1 completed, 1 in progress
+    # Expected: status = "in progress"
+    - {class_id: 71005, department: AMS, course_num: 301, section: 1, semester: Spring, year: 2022, credits: 3, GPNC: false, grade: A}
+    - {class_id: 71006, department: AMS, course_num: 310, section: 1, semester: Fall, year: 2025, credits: 3, GPNC: false, grade: null}
     
-    # one_of_sequences: MAT sequence completed
-    - {class_id: 71012, department: MAT, course_num: 131, section: 1, semester: Fall, year: 2020, credits: 4, GPNC: false, grade: A}
-    - {class_id: 71013, department: MAT, course_num: 132, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: B+}
+    # electives: cse_upper_electives - 3 credits completed, 3 credits in progress, 6 credits needed
+    # Expected: status = "in progress, still remaining 2 courses" (6/3=2)
+    - {class_id: 71007, department: CSE, course_num: 305, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
+    - {class_id: 71008, department: CSE, course_num: 310, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: null}
+  course_plan: []
+
+# ======================================================================
+# Test Case 5: Degree Requirements - Completed Status
+# ======================================================================
+- SBU_ID: 200333333
+  first_name: TestCSE3
+  last_name: Completed
+  email: testcse3.completed@stonybrook.edu
+  university_entry: {semester: Fall, year: 2020}
+  direct_admit: null
+  AOI: null
+  college: CEAS
+  majors: [CSE]
+  degrees: [BS]
+  major_requirement_versions: [{semester: Fall, year: 2025}]
+  minors: []
+  minor_requirement_versions: []
+  planned_majors: []
+  planned_major_requirement_versions: []
+  planned_degrees: []
+  planned_minors: []
+  planned_minor_requirement_versions: []
+  graduation: null
+  transfer_courses: null
+  classes:
+    # intro_courses: all completed
+    # Expected: status = "Completed"
+    - {class_id: 72001, department: CSE, course_num: 114, section: 1, semester: Fall, year: 2020, credits: 4, GPNC: false, grade: A}
+    - {class_id: 72002, department: CSE, course_num: 214, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: A}
+    - {class_id: 72003, department: CSE, course_num: 215, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A-}
+    - {class_id: 72004, department: CSE, course_num: 216, section: 1, semester: Spring, year: 2022, credits: 4, GPNC: false, grade: B+}
+    - {class_id: 72005, department: CSE, course_num: 220, section: 1, semester: Fall, year: 2022, credits: 4, GPNC: false, grade: A}
     
     # one_of: linear_algebra completed
-    - {class_id: 71014, department: MAT, course_num: 211, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A}
+    # Expected: status = "Completed"
+    - {class_id: 72006, department: AMS, course_num: 210, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A}
     
-    # all_of: statistics completed
-    - {class_id: 71015, department: AMS, course_num: 301, section: 1, semester: Spring, year: 2022, credits: 3, GPNC: false, grade: A}
-    - {class_id: 71016, department: AMS, course_num: 310, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: B+}
-    
-    # electives: natural_science_requirement completed (9 credits)
-    - {class_id: 71017, department: CHE, course_num: 131, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
-    - {class_id: 71018, department: CHE, course_num: 133, section: 1, semester: Spring, year: 2023, credits: 1, GPNC: false, grade: A}
-    - {class_id: 71019, department: PHY, course_num: 125, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: B+}
-    - {class_id: 71020, department: PHY, course_num: 127, section: 1, semester: Spring, year: 2024, credits: 2, GPNC: false, grade: A}
-    # Total 9 credits -> SATISFIED
-    
-    # all_of: professional_ethics completed
-    - {class_id: 71021, department: CSE, course_num: 312, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    
-    # all_of: upper_division_writing completed
-    - {class_id: 71022, department: CSE, course_num: 300, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    
-    # electives: cse_upper_electives (12 credits required)
-    - {class_id: 71023, department: CSE, course_num: 305, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    - {class_id: 71024, department: CSE, course_num: 320, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    - {class_id: 71025, department: CSE, course_num: 330, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    - {class_id: 71026, department: CSE, course_num: 340, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # Total 12 credits -> SATISFIED
+    # electives: natural_science_requirement - 9 credits completed
+    # Expected: status = "Completed"
+    - {class_id: 72007, department: BIO, course_num: 201, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
+    - {class_id: 72008, department: BIO, course_num: 204, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
+    - {class_id: 72009, department: CHE, course_num: 131, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
   course_plan: []
 
-# Test Case 3: BIO BA - includes two_of test
-- SBU_ID: 200333333
-  first_name: TestBIO1
-  last_name: TwoOfTest
-  email: testbio1.twoof@stonybrook.edu
-  university_entry: {semester: Fall, year: 2022}
-  direct_admit: BIO
-  AOI: null
-  college: CAS
-  majors: [BIO]
-  degrees: [BA]
-  major_requirement_versions: [{semester: Fall, year: 2025}]
-  minors: []
-  minor_requirement_versions: []
-  planned_majors: []
-  planned_major_requirement_versions: []
-  planned_degrees: []
-  planned_minors: []
-  planned_minor_requirement_versions: []
-  graduation: null
-  transfer_courses: null
-  classes:
-    # one_of_sequences: chemistry_lecture_sequence completed
-    - {class_id: 72001, department: CHE, course_num: 131, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: B+}
-    # - {class_id: 72002, department: CHE, course_num: 132, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
-    
-    # one_of_sequences: chemistry_lab_sequence completed
-    - {class_id: 72003, department: CHE, course_num: 133, section: 1, semester: Fall, year: 2022, credits: 1, GPNC: false, grade: A}
-    - {class_id: 72004, department: CHE, course_num: 134, section: 1, semester: Spring, year: 2023, credits: 1, GPNC: false, grade: A}
-    
-    # one_of_sequences: organic_chemistry_lecture_sequence completed
-    - {class_id: 72005, department: CHE, course_num: 321, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A-}
-    - {class_id: 72006, department: CHE, course_num: 322, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: B+}
-    
-    # one_of: organic_chemistry_lab completed
-    - {class_id: 72007, department: CHE, course_num: 327, section: 1, semester: Spring, year: 2024, credits: 2, GPNC: false, grade: A}
-    
-    # one_of: calculus_requirement completed
-    - {class_id: 72008, department: AMS, course_num: 151, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: A}
-    
-    # one_of_sequences: physics_sequence completed
-    - {class_id: 72009, department: PHY, course_num: 125, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    - {class_id: 72010, department: PHY, course_num: 126, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    - {class_id: 72011, department: PHY, course_num: 127, section: 1, semester: Spring, year: 2025, credits: 1, GPNC: false, grade : A}
-    - {class_id: 72012, department: PHY, course_num: 133, section: 1, semester: Fall, year: 2024, credits: 1, GPNC: false, grade: A}
-    - {class_id: 72013, department: PHY, course_num: 134, section: 1, semester: Spring, year: 2025, credits: 1, GPNC: false, grade : A}
-    
-    # one_of: statistics_requirement completed
-    - {class_id: 72014, department: AMS, course_num: 310, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
-    
-    # all_of: bio_core_lectures completed
-    - {class_id: 72015, department: BIO, course_num: 201, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: A}
-    - {class_id: 72016, department: BIO, course_num: 202, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
-    - {class_id: 72017, department: BIO, course_num: 203, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: B+}
-    
-    # one_of_sequences: bio_core_lab_sequence completed
-    - {class_id: 72018, department: BIO, course_num: 204, section: 1, semester: Spring, year: 2024, credits: 2, GPNC: false, grade: A}
-    - {class_id: 72019, department: BIO, course_num: 205, section: 1, semester: Fall, year: 2024, credits: 2, GPNC: false, grade: A}
-    
-    # one_of: advanced_bio_requirement completed
-    - {class_id: 72020, department: BIO, course_num: 320, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    
-    # electives: advanced_bio_electives (6 credits required) - partially completed
-    - {class_id: 72021, department: BIO, course_num: 310, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # Only 3 credits -> NOT SATISFIED
-  course_plan: []
-
-# Test Case 4: BIO MINOR - two_of test
+# ======================================================================
+# Test Case 6: Non-Required Classes in Plan
+# ======================================================================
 - SBU_ID: 200444444
-  first_name: TestBIO2
-  last_name: MinorTwoOf
-  email: testbio2.minortwoof@stonybrook.edu
-  university_entry: {semester: Fall, year: 2023}
-  direct_admit: null
-  AOI: null
-  college: CAS
-  majors: [POL]
-  degrees: [BA]
-  major_requirement_versions: [{semester: Fall, year: 2025}]
-  minors: [BIO]
-  minor_requirement_versions: [{semester: Fall, year: 2025}]
-  planned_majors: []
-  planned_major_requirement_versions: []
-  planned_degrees: []
-  planned_minors: []
-  planned_minor_requirement_versions: []
-  graduation: null
-  transfer_courses: null
-  classes:
-    # POL major courses
-    - {class_id: 73001, department: POL, course_num: 101, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
-    - {class_id: 73002, department: POL, course_num: 102, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: B+}
-    
-    # two_of test: minor_fundamentals - 2 completed (SATISFIED)
-    - {class_id: 73003, department: BIO, course_num: 201, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
-    - {class_id: 73004, department: BIO, course_num: 202, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
-    # BIO 203 not taken, but 2 completed -> SATISFIED
-    
-    # one_of_sequences: minor_lab_sequence completed
-    - {class_id: 73005, department: BIO, course_num: 204, section: 1, semester: Fall, year: 2024, credits: 2, GPNC: false, grade: A}
-    - {class_id: 73006, department: BIO, course_num: 205, section: 1, semester: Spring, year: 2025, credits: 2, GPNC: false, grade : A}
-    
-    # electives: minor_advanced_courses (9 credits required) - partially completed
-    - {class_id: 73007, department: BIO, course_num: 310, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    # Only 3 credits -> NOT SATISFIED
-  course_plan: []
-
-# Test Case 5: PSY BA - electives various patterns test
-- SBU_ID: 200555555
-  first_name: TestPSY1
-  last_name: ElectivesTest
-  email: testpsy1.electives@stonybrook.edu
-  university_entry: {semester: Fall, year: 2022}
-  direct_admit: null
-  AOI: null
-  college: CAS
-  majors: [PSY]
-  degrees: [BA]
-  major_requirement_versions: [{semester: Fall, year: 2025}]
-  minors: []
-  minor_requirement_versions: []
-  planned_majors: []
-  planned_major_requirement_versions: []
-  planned_degrees: []
-  planned_minors: []
-  planned_minor_requirement_versions: []
-  graduation: null
-  transfer_courses: null
-  classes:
-    # all_of: psy_core_intro completed
-    - {class_id: 74001, department: PSY, course_num: 103, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: A}
-    
-    # one_of: psy_statistics completed
-    - {class_id: 74002, department: PSY, course_num: 201, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
-    
-    # all_of: psy_research_writing completed
-    - {class_id: 74003, department: PSY, course_num: 310, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
-    
-    # one_of: psy_survey_a completed
-    - {class_id: 74004, department: PSY, course_num: 220, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: B+}
-    
-    # one_of: psy_survey_b completed
-    - {class_id: 74005, department: PSY, course_num: 250, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    
-    # one_of: psy_survey_third completed
-    - {class_id: 74006, department: PSY, course_num: 230, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    
-    # electives: psy_advanced_one (3 credits) - completed
-    - {class_id: 74007, department: PSY, course_num: 240, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    
-    # electives: psy_advanced_four (12 credits required) - partially completed
-    - {class_id: 74008, department: PSY, course_num: 320, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    - {class_id: 74009, department: PSY, course_num: 330, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # Only 6 credits -> NOT SATISFIED
-  course_plan: []
-
-# Test Case 6: ECO BA - electives test
-- SBU_ID: 200666666
-  first_name: TestECO1
-  last_name: ElectivesTest
-  email: testeco1.electives@stonybrook.edu
-  university_entry: {semester: Spring, year: 2023}
-  direct_admit: null
-  AOI: ECO
-  college: CAS
-  majors: [ECO]
-  degrees: [BA]
-  major_requirement_versions: [{semester: Spring, year: 2025}]
-  minors: []
-  minor_requirement_versions: []
-  planned_majors: []
-  planned_major_requirement_versions: []
-  planned_degrees: []
-  planned_minors: []
-  planned_minor_requirement_versions: []
-  graduation: null
-  transfer_courses: null
-  classes:
-    # all_of: eco_intro completed
-    - {class_id: 75001, department: ECO, course_num: 110, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: B+}
-    - {class_id: 75002, department: ECO, course_num: 111, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
-    
-    # all_of: eco_intermediate completed
-    - {class_id: 75003, department: ECO, course_num: 303, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
-    - {class_id: 75004, department: ECO, course_num: 305, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A-}
-    - {class_id: 75005, department: ECO, course_num: 320, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    - {class_id: 75006, department: ECO, course_num: 321, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    
-    # one_of: eco_mathematics completed
-    - {class_id: 75007, department: MAT, course_num: 125, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: A}
-    
-    # electives: eco_advanced_five (15 credits required) - partially completed
-    - {class_id: 75008, department: ECO, course_num: 326, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    - {class_id: 75009, department: ECO, course_num: 327, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # Only 6 credits -> NOT SATISFIED
-    
-    # electives: eco_additional_one (3 credits required) - not completed
-    # NOT SATISFIED
-  course_plan: []
-
-# Test Case 7: AMS BS - one_of_sequences different patterns test
-- SBU_ID: 200777777
-  first_name: TestAMS1
-  last_name: SequencesTest
-  email: testams1.sequences@stonybrook.edu
+  first_name: TestCSE4
+  last_name: NonRequired
+  email: testcse4.nonrequired@stonybrook.edu
   university_entry: {semester: Fall, year: 2021}
   direct_admit: null
   AOI: null
   college: CEAS
-  majors: [AMS]
+  majors: [CSE]
   degrees: [BS]
   major_requirement_versions: [{semester: Fall, year: 2025}]
   minors: []
@@ -599,128 +300,31 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # one_of_sequences: ams_calculus_sequence completed (MAT sequence)
-    - {class_id: 76001, department: MAT, course_num: 125, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A}
-    - {class_id: 76002, department: MAT, course_num: 126, section: 1, semester: Spring, year: 2022, credits: 4, GPNC: false, grade: B+}
-    # - {class_id: 76003, department: MAT, course_num: 127, section: 1, semester: Fall, year: 2022, credits: 4, GPNC: false, grade: A}
-    
-    # one_of: ams_linear_algebra completed
-    - {class_id: 76004, department: AMS, course_num: 210, section: 1, semester: Spring, year: 2023, credits: 4, GPNC: false, grade: A}
-    
-    # one_of: ams_calculus_iii completed
-    - {class_id: 76005, department: AMS, course_num: 261, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: A-}
-    
-    # one_of: ams_computing completed
-    - {class_id: 76006, department: CSE, course_num: 114, section: 1, semester: Spring, year: 2024, credits: 4, GPNC: false, grade: B+}
-    
-    # all_of: ams_301_required completed
-    - {class_id: 76007, department: AMS, course_num: 301, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    
-    # one_of: ams_probability_stats completed
-    - {class_id: 76008, department: AMS, course_num: 310, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    
-    # one_of: ams_differential_eq completed
-    - {class_id: 76009, department: AMS, course_num: 315, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    
-    # electives: ams_advanced_courses (18 credits required) - partially completed
-    - {class_id: 76010, department: AMS, course_num: 311, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    - {class_id: 76011, department: AMS, course_num: 312, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # Only 6 credits -> NOT SATISFIED
-  course_plan: []
+    # Some required courses completed
+    - {class_id: 73001, department: CSE, course_num: 114, section: 1, semester: Fall, year: 2021, credits: 4, GPNC: false, grade: A}
+    - {class_id: 73002, department: CSE, course_num: 214, section: 1, semester: Spring, year: 2022, credits: 4, GPNC: false, grade: A}
+  course_plan:
+    # Required course for degree requirement
+    - {department: CSE, course_num: 215, semester: Fall, year: 2026, credits: 4}
+    # Required course as prerequisite for CSE 320
+    - {department: CSE, course_num: 220, semester: Spring, year: 2027, credits: 4}
+    # Non-required course (doesn't satisfy prerequisites or degree requirements)
+    - {department: MUS, course_num: 101, semester: Fall, year: 2026, credits: 3}
+    # Non-required course
+    - {department: MUS, course_num: 123, semester: Spring, year: 2027, credits: 3}
 
-# Test Case 8: POL BA - electives and two_of test
-- SBU_ID: 200888888
-  first_name: TestPOL1
-  last_name: ElectivesTwoOf
-  email: testpol1.electivestwoof@stonybrook.edu
+# ======================================================================
+# Test Case 7: Minor Degree Requirement
+# ======================================================================
+- SBU_ID: 200555555
+  first_name: TestCSE5
+  last_name: MinorTest
+  email: testcse5.minortest@stonybrook.edu
   university_entry: {semester: Fall, year: 2022}
   direct_admit: null
   AOI: null
   college: CAS
   majors: [POL]
-  degrees: [BA]
-  major_requirement_versions: [{semester: Fall, year: 2025}]
-  minors: []
-  minor_requirement_versions: []
-  planned_majors: []
-  planned_major_requirement_versions: []
-  planned_degrees: []
-  planned_minors: []
-  planned_minor_requirement_versions: []
-  graduation: null
-  transfer_courses: null
-  classes:
-    # all_of: pol_required completed
-    - {class_id: 77001, department: POL, course_num: 101, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: A}
-    - {class_id: 77002, department: POL, course_num: 102, section: 1, semester: Spring, year: 2023, credits: 3, GPNC: false, grade: A}
-    - {class_id: 77003, department: POL, course_num: 103, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: B+}
-    
-    # one_of: pol_methodology completed
-    - {class_id: 77004, department: POL, course_num: 201, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
-    
-    # electives: pol_concentration (12 credits required) - partially completed
-    - {class_id: 77005, department: POL, course_num: 302, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    - {class_id: 77006, department: POL, course_num: 308, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # Only 6 credits -> NOT SATISFIED
-    
-    # electives: pol_electives (12 credits required) - partially completed
-    - {class_id: 77007, department: POL, course_num: 334, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    # Only 3 credits -> NOT SATISFIED
-    
-    # electives: pol_related_areas (6 credits required) - partially completed
-    - {class_id: 77008, department: ECO, course_num: 303, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
-    # Only 3 credits -> NOT SATISFIED
-  course_plan: []
-
-# Test Case 9: POL MINOR - two_of test
-- SBU_ID: 200999999
-  first_name: TestPOL2
-  last_name: MinorTwoOf
-  email: testpol2.minortwoof@stonybrook.edu
-  university_entry: {semester: Fall, year: 2023}
-  direct_admit: null
-  AOI: null
-  college: CAS
-  majors: [CSE]
-  degrees: [BS]
-  major_requirement_versions: [{semester: Fall, year: 2025}]
-  minors: [POL]
-  minor_requirement_versions: [{semester: Fall, year: 2025}]
-  planned_majors: []
-  planned_major_requirement_versions: []
-  planned_degrees: []
-  planned_minors: []
-  planned_minor_requirement_versions: []
-  graduation: null
-  transfer_courses: null
-  classes:
-    # CSE major courses (partial)
-    - {class_id: 78001, department: CSE, course_num: 114, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: A}
-    
-    # two_of test: pol_minor_intro - 2 completed (SATISFIED)
-    - {class_id: 78002, department: POL, course_num: 101, section: 1, semester: Fall, year: 2023, credits: 3, GPNC: false, grade: A}
-    - {class_id: 78003, department: POL, course_num: 102, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: B+}
-    # 2 completed -> SATISFIED
-    
-    # electives: pol_minor_concentration (9 credits required) - partially completed
-    - {class_id: 78004, department: POL, course_num: 302, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    # Only 3 credits -> NOT SATISFIED
-    
-    # electives: pol_minor_electives (6 credits required) - partially completed
-    - {class_id: 78005, department: POL, course_num: 334, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # Only 3 credits -> NOT SATISFIED
-  course_plan: []
-
-# Test Case 10: CSE MINOR - electives and excluded_courses test
-- SBU_ID: 201010101
-  first_name: TestCSE3
-  last_name: MinorExcluded
-  email: testcse3.minorexcluded@stonybrook.edu
-  university_entry: {semester: Fall, year: 2022}
-  direct_admit: null
-  AOI: null
-  college: CAS
-  majors: [BIO]
   degrees: [BA]
   major_requirement_versions: [{semester: Fall, year: 2025}]
   minors: [CSE]
@@ -733,18 +337,149 @@ students:
   graduation: null
   transfer_courses: null
   classes:
-    # BIO major courses (partial)
-    - {class_id: 79001, department: BIO, course_num: 201, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: A}
+    # POL major courses
+    - {class_id: 74001, department: POL, course_num: 101, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade: A}
     
-    # all_of: minor_core completed
-    - {class_id: 79002, department: CSE, course_num: 114, section: 1, semester: Spring, year: 2023, credits: 4, GPNC: false, grade: A}
-    - {class_id: 79003, department: CSE, course_num: 214, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: B+}
-    - {class_id: 79004, department: CSE, course_num: 216, section: 1, semester: Spring, year: 2024, credits: 4, GPNC: false, grade: A}
+    # CSE minor: all_of minor_core - 2 completed, 1 missing
+    # Expected: status = "still remaining 1 course"
+    - {class_id: 74002, department: CSE, course_num: 114, section: 1, semester: Spring, year: 2023, credits: 4, GPNC: false, grade: A}
+    - {class_id: 74003, department: CSE, course_num: 214, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: B+}
+    # CSE 216 missing
     
-    # electives: minor_electives (9 credits required, CSE 3xx+)
-    # excluded: CSE 301, 312, 475, 487, 488 should be excluded
-    - {class_id: 79005, department: CSE, course_num: 305, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
-    - {class_id: 79006, department: CSE, course_num: 310, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade : A}
-    # Only 6 credits -> NOT SATISFIED
-    # CSE 301, 312 are excluded, so they should not be included
+    # CSE minor: electives minor_electives - 6 credits completed, 9 required
+    # Expected: status = "still remaining 1 course" (3 credits needed, 3/3=1)
+    - {class_id: 74004, department: CSE, course_num: 305, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
+    - {class_id: 74005, department: CSE, course_num: 310, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
+  course_plan: []
+
+# ======================================================================
+# Test Case 8: Grade-based Status (C- vs null vs C)
+# ======================================================================
+- SBU_ID: 200666666
+  first_name: TestCSE6
+  last_name: GradeStatus
+  email: testcse6.gradestatus@stonybrook.edu
+  university_entry: {semester: Fall, year: 2022}
+  direct_admit: null
+  AOI: null
+  college: CEAS
+  majors: [CSE]
+  degrees: [BS]
+  major_requirement_versions: [{semester: Fall, year: 2025}]
+  minors: []
+  minor_requirement_versions: []
+  planned_majors: []
+  planned_major_requirement_versions: []
+  planned_degrees: []
+  planned_minors: []
+  planned_minor_requirement_versions: []
+  graduation: null
+  transfer_courses: null
+  classes:
+    # intro_courses: CSE 114 with C- (NOT_SATISFIED), CSE 214 with null (PENDING), CSE 215 with C (SATISFIED)
+    # Expected: status = "still remaining 3 courses" (CSE 114 C- doesn't count, CSE 214 null doesn't count, CSE 216, 220 missing)
+    - {class_id: 75001, department: CSE, course_num: 114, section: 1, semester: Fall, year: 2022, credits: 4, GPNC: false, grade: C-}
+    - {class_id: 75002, department: CSE, course_num: 214, section: 1, semester: Spring, year: 2023, credits: 4, GPNC: false, grade: null}
+    - {class_id: 75003, department: CSE, course_num: 215, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: C}
+    
+    # statistics: AMS 301 with C (SATISFIED), AMS 310 with null (PENDING)
+    # Expected: status = "in progress"
+    - {class_id: 75004, department: AMS, course_num: 301, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: C}
+    - {class_id: 75005, department: AMS, course_num: 310, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: null}
+    
+    # linear_algebra: AMS 210 with C- (NOT_SATISFIED)
+    # Expected: status = "still remaining 1 course"
+    - {class_id: 75006, department: AMS, course_num: 210, section: 1, semester: Spring, year: 2024, credits: 4, GPNC: false, grade: C-}
+  course_plan: []
+
+# ======================================================================
+# Test Case 9: SBC Requirements - Partial Logic
+# ======================================================================
+- SBU_ID: 200777777
+  first_name: TestCSE7
+  last_name: SBCPartial
+  email: testcse7.sbcpartial@stonybrook.edu
+  university_entry: {semester: Fall, year: 2023}
+  direct_admit: null
+  AOI: null
+  college: CEAS
+  majors: [CSE]
+  degrees: [BS]
+  major_requirement_versions: [{semester: Fall, year: 2025}]
+  minors: []
+  minor_requirement_versions: []
+  planned_majors: []
+  planned_major_requirement_versions: []
+  planned_degrees: []
+  planned_minors: []
+  planned_minor_requirement_versions: []
+  graduation: null
+  transfer_courses: null
+  classes:
+    # SBS+ has 2 courses in required_major_courses_partial: CSE 316, CSE 416
+    # Rule: Need BOTH (2 courses = need both)
+    # Status: Only CSE 316 completed -> SBS+ NOT SATISFIED
+    - {class_id: 76001, department: CSE, course_num: 316, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
+    
+    # EXP+ has 3 courses in required_major_courses_partial: CSE 316, CSE 356, CSE 416
+    # Rule: Need 2 of 3 (3+ courses = need 2)
+    # Status: Only CSE 316 completed -> EXP+ NOT SATISFIED (need 1 more)
+    - {class_id: 76002, department: CSE, course_num: 316, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
+    
+    # STEM+ has 3 courses in required_major_courses_partial: AMS 310, CSE 316, CSE 416
+    # Rule: Need 2 of 3 (3+ courses = need 2)
+    # Status: AMS 310 and CSE 316 completed -> STEM+ SATISFIED
+    - {class_id: 76003, department: AMS, course_num: 310, section: 1, semester: Spring, year: 2024, credits: 3, GPNC: false, grade: A}
+    - {class_id: 76004, department: CSE, course_num: 316, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
+    
+    # TECH: required_major_courses = CSE 114
+    # Status: CSE 114 completed -> TECH SATISFIED
+    - {class_id: 76005, department: CSE, course_num: 114, section: 1, semester: Fall, year: 2023, credits: 4, GPNC: false, grade: A}
+  course_plan: []
+
+# ======================================================================
+# Test Case 10: SBC Requirements - Optional Substitution
+# ======================================================================
+- SBU_ID: 200888888
+  first_name: TestCSE8
+  last_name: SBCOptional
+  email: testcse8.sbcoptional@stonybrook.edu
+  university_entry: {semester: Fall, year: 2023}
+  direct_admit: null
+  AOI: null
+  college: CEAS
+  majors: [CSE]
+  degrees: [BS]
+  major_requirement_versions: [{semester: Fall, year: 2025}]
+  minors: []
+  minor_requirement_versions: []
+  planned_majors: []
+  planned_major_requirement_versions: []
+  planned_degrees: []
+  planned_minors: []
+  planned_minor_requirement_versions: []
+  graduation: null
+  transfer_courses: null
+  classes:
+    # ESI: required_major_courses = CSE 312, optional_major_courses_partial = CSE 306
+    # Rule: CSE 306 can substitute for CSE 312 (one required_major_courses)
+    # Status: CSE 306 completed (substitutes for CSE 312) -> required condition SATISFIED
+    # ESI partial: CSE 316 and CSE 416 (both needed) - only CSE 316 completed -> partial NOT SATISFIED
+    # Overall: ESI NOT SATISFIED (partial not met)
+    - {class_id: 77001, department: CSE, course_num: 306, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
+    - {class_id: 77002, department: CSE, course_num: 316, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: A}
+    
+    # EXP+: required_major_courses_partial = CSE 316, CSE 356, CSE 416 (need 2 of 3)
+    # optional_major_courses_partial = CSE 306
+    # Rule: CSE 306 can substitute for one missing required_major_courses_partial
+    # Status: CSE 306 and CSE 316 completed -> EXP+ SATISFIED (2 of 3, one is optional)
+    - {class_id: 77003, department: CSE, course_num: 306, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
+    - {class_id: 77004, department: CSE, course_num: 316, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: A}
+    
+    # SBS+: required_major_courses_partial = CSE 316, CSE 416 (need both)
+    # optional_major_courses_partial = CSE 306
+    # Rule: CSE 306 can substitute for one missing required_major_courses_partial
+    # Status: CSE 306 and CSE 316 completed -> SBS+ SATISFIED (both satisfied, one is optional)
+    - {class_id: 77005, department: CSE, course_num: 306, section: 1, semester: Fall, year: 2024, credits: 3, GPNC: false, grade: A}
+    - {class_id: 77006, department: CSE, course_num: 316, section: 1, semester: Spring, year: 2025, credits: 3, GPNC: false, grade: A}
   course_plan: []

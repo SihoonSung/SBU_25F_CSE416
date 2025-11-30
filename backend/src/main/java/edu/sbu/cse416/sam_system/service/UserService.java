@@ -323,8 +323,6 @@ public class UserService {
      * Normalize YAML content to handle multiple blank lines and formatting issues
      */
     private String normalizeYamlContent(String content) {
-        System.out.println("DEBUG: Original YAML content length: " + content.length());
-        
         // Replace multiple consecutive newlines (2 or more) with double newline
         content = content.replaceAll("\\n\\s*\\n\\s*\\n+", "\n\n");
         
@@ -340,10 +338,6 @@ public class UserService {
         // Fix any remaining multiple blank lines between sections
         content = content.replaceAll("(\\n\\s*\\n\\s*\\n)+", "\n\n");
         
-        System.out.println("DEBUG: Normalized YAML content length: " + content.length());
-        System.out.println("DEBUG: YAML content preview (last 200 chars): " + 
-            content.substring(Math.max(0, content.length() - 200)));
-        
         return content;
     }
 
@@ -351,21 +345,13 @@ public class UserService {
         if (data.containsKey(roleKey)) {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> usersData = (List<Map<String, Object>>) data.get(roleKey);
-            System.out.println("DEBUG: Processing " + usersData.size() + " users for role: " + roleKey);
             for (Map<String, Object> userData : usersData) {
-                System.out.println("DEBUG: Processing user: " + userData.get("first_name") + " " + userData.get("last_name") + " (SBU ID: " + userData.get("SBU_ID") + ")");
                 User user = createUserFromSBUYamlData(userData, role);
                 if (user != null) {
-                    System.out.println("DEBUG: Created user object for: " + user.getFirstName() + " " + user.getLastName());
                     User saved = processUserForImport(user, userData);
                     if (saved != null) {
-                        System.out.println("DEBUG: Successfully saved user: " + saved.getFirstName() + " " + saved.getLastName() + " (ID: " + saved.getUserId() + ")");
                         importedUsers.add(saved);
-                    } else {
-                        System.out.println("DEBUG: Failed to save user: " + user.getFirstName() + " " + user.getLastName());
                     }
-                } else {
-                    System.out.println("DEBUG: Failed to create user object for: " + userData.get("first_name") + " " + userData.get("last_name"));
                 }
             }
         }
@@ -405,8 +391,6 @@ public class UserService {
 
     /** Normalize email + check for duplicates before saving */
     private User processUserForImport(User user, Map<String, Object> userData) {
-        System.out.println("DEBUG: Processing user for import: " + user.getFirstName() + " " + user.getLastName() + " (SBU ID: " + user.getSbuId() + ", Email: " + user.getEmail() + ")");
-        
         if (!isBlank(user.getEmail())) user.setEmail(safeLower(user.getEmail()));
         
         // Check for existing user by SBU ID (primary identifier)
@@ -414,8 +398,16 @@ public class UserService {
             Optional<User> existingBySbuId = userRepository.findBySbuId(user.getSbuId());
             if (existingBySbuId.isPresent()) {
                 // User exists - delete existing and replace with new data
-                System.out.println("Warning: User with SBU ID " + user.getSbuId() + " already exists. Replacing existing data.");
-                userRepository.delete(existingBySbuId.get());
+                User existingUser = existingBySbuId.get();
+                Long existingUserId = existingUser.getUserId();
+                
+                // Delete related data first (to avoid foreign key constraint issues and orphan records)
+                userCoursePlanRepository.deleteByUserId(existingUserId);
+                userClassesRepository.deleteByUserId(existingUserId);
+                userTransferCoursesRepository.deleteByUserId(existingUserId);
+                
+                // Now delete the user
+                userRepository.delete(existingUser);
             }
         }
         
@@ -423,7 +415,6 @@ public class UserService {
         if (user.getSbuId() != null) {
             Optional<User> existingByEmail = userRepository.findByEmail(user.getEmail());
             if (existingByEmail.isPresent() && !existingByEmail.get().getSbuId().equals(user.getSbuId())) {
-                System.out.println("Warning: User with email " + user.getEmail() + " already exists for different SBU ID. Skipping import.");
                 return null;
             }
         }
@@ -434,9 +425,7 @@ public class UserService {
             return null;
         }
         
-        System.out.println("DEBUG: Attempting to save user: " + user.getFirstName() + " " + user.getLastName());
         User savedUser = userRepository.save(user);
-        System.out.println("DEBUG: User saved successfully with ID: " + savedUser.getUserId());
         
         // Process related data after user is saved
         processUserRelatedData(savedUser, userData);
@@ -447,85 +436,93 @@ public class UserService {
     /** Process related data (classes, transfer_courses, course_plan) into separate tables */
     private void processUserRelatedData(User user, Map<String, Object> userData) {
         try {
-            System.out.println("Processing related data for user: " + user.getSbuId());
-            System.out.println("Available keys in userData: " + userData.keySet());
-            
             // Process classes
             if (userData.containsKey("classes")) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> classes = (List<Map<String, Object>>) userData.get("classes");
-                System.out.println("Found " + classes.size() + " classes to process");
-                
-                for (Map<String, Object> classData : classes) {
-                    System.out.println("Processing class: " + classData);
-                    UserClasses userClass = new UserClasses();
-                    userClass.setUser(user);
-                    userClass.setClassId(getLongValue(classData.get("class_id")));
-                    userClass.setDepartment(getStringValue(classData.get("department")));
-                    userClass.setCourseNum(getIntegerValue(classData.get("course_num")));
-                    userClass.setSection(getStringValue(classData.get("section")));
-                    userClass.setSemester(getStringValue(classData.get("semester")));
-                    userClass.setYear(getIntegerValue(classData.get("year")));
-                    userClass.setCredits(getIntegerValue(classData.get("credits")));
-                    userClass.setGpnc(getStringValue(classData.get("GPNC")));
-                    userClass.setGrade(getStringValue(classData.get("grade")));
+                Object classesObj = userData.get("classes");
+                if (classesObj != null && classesObj instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> classes = (List<Map<String, Object>>) classesObj;
                     
-                    UserClasses saved = userClassesRepository.save(userClass);
-                    System.out.println("Saved UserClass with ID: " + saved.getId());
+                    for (Map<String, Object> classData : classes) {
+                        UserClasses userClass = new UserClasses();
+                        userClass.setUser(user);
+                        userClass.setClassId(getLongValue(classData.get("class_id")));
+                        userClass.setDepartment(getStringValue(classData.get("department")));
+                        userClass.setCourseNum(getIntegerValue(classData.get("course_num")));
+                        userClass.setSection(getStringValue(classData.get("section")));
+                        userClass.setSemester(getStringValue(classData.get("semester")));
+                        userClass.setYear(getIntegerValue(classData.get("year")));
+                        userClass.setCredits(getIntegerValue(classData.get("credits")));
+                        userClass.setGpnc(getStringValue(classData.get("GPNC")));
+                        userClass.setGrade(getStringValue(classData.get("grade")));
+                        
+                        userClassesRepository.save(userClass);
+                    }
                 }
-            } else {
-                System.out.println("No 'classes' key found in userData");
             }
             
             // Process transfer_courses
             if (userData.containsKey("transfer_courses")) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> transferCourses = (List<Map<String, Object>>) userData.get("transfer_courses");
-                System.out.println("Found " + transferCourses.size() + " transfer courses to process");
-                
-                for (Map<String, Object> transferData : transferCourses) {
-                    System.out.println("Processing transfer course: " + transferData);
-                    UserTransferCourses userTransfer = new UserTransferCourses();
-                    userTransfer.setUser(user);
-                    userTransfer.setClassName(getStringValue(transferData.get("class")));
-                    userTransfer.setUniversity(getStringValue(transferData.get("university")));
-                    userTransfer.setCredits(getIntegerValue(transferData.get("credits")));
-                    userTransfer.setDepartment(getStringValue(transferData.get("department")));
-                    userTransfer.setCourseNum(getIntegerValue(transferData.get("course_num")));
-                    userTransfer.setGrade(getStringValue(transferData.get("grade")));
+                Object transferCoursesObj = userData.get("transfer_courses");
+                if (transferCoursesObj != null && transferCoursesObj instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> transferCourses = (List<Map<String, Object>>) transferCoursesObj;
                     
-                    UserTransferCourses saved = userTransferCoursesRepository.save(userTransfer);
-                    System.out.println("Saved UserTransferCourse with ID: " + saved.getId());
+                    for (Map<String, Object> transferData : transferCourses) {
+                        UserTransferCourses userTransfer = new UserTransferCourses();
+                        userTransfer.setUser(user);
+                        userTransfer.setClassName(getStringValue(transferData.get("class")));
+                        userTransfer.setUniversity(getStringValue(transferData.get("university")));
+                        userTransfer.setCredits(getIntegerValue(transferData.get("credits")));
+                        userTransfer.setDepartment(getStringValue(transferData.get("department")));
+                        userTransfer.setCourseNum(getIntegerValue(transferData.get("course_num")));
+                        userTransfer.setGrade(getStringValue(transferData.get("grade")));
+                        
+                        userTransferCoursesRepository.save(userTransfer);
+                    }
                 }
-            } else {
-                System.out.println("No 'transfer_courses' key found in userData");
             }
             
             // Process course_plan
             if (userData.containsKey("course_plan")) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> coursePlan = (List<Map<String, Object>>) userData.get("course_plan");
-                System.out.println("Found " + coursePlan.size() + " course plan items to process");
+                Object coursePlanObj = userData.get("course_plan");
                 
-                for (Map<String, Object> planData : coursePlan) {
-                    System.out.println("Processing course plan: " + planData);
-                    UserCoursePlan userPlan = new UserCoursePlan();
-                    userPlan.setUser(user);
-                    userPlan.setDepartment(getStringValue(planData.get("department")));
-                    userPlan.setCourseNum(getIntegerValue(planData.get("course_num")));
-                    userPlan.setSemester(getStringValue(planData.get("semester")));
-                    userPlan.setYear(getIntegerValue(planData.get("year")));
-                    userPlan.setCredits(getIntegerValue(planData.get("credits")));
+                if (coursePlanObj != null && coursePlanObj instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> coursePlan = (List<Map<String, Object>>) coursePlanObj;
                     
-                    UserCoursePlan saved = userCoursePlanRepository.save(userPlan);
-                    System.out.println("Saved UserCoursePlan with ID: " + saved.getId());
+                    if (!coursePlan.isEmpty()) {
+                        for (Map<String, Object> planData : coursePlan) {
+                            try {
+                                UserCoursePlan userPlan = new UserCoursePlan();
+                                userPlan.setUser(user);
+                                userPlan.setDepartment(getStringValue(planData.get("department")));
+                                userPlan.setCourseNum(getIntegerValue(planData.get("course_num")));
+                                userPlan.setSemester(getStringValue(planData.get("semester")));
+                                userPlan.setYear(getIntegerValue(planData.get("year")));
+                                userPlan.setCredits(getIntegerValue(planData.get("credits")));
+                                
+                                UserCoursePlan saved = userCoursePlanRepository.save(userPlan);
+                                
+                                // Verify the saved record
+                                if (saved.getUser().getUserId() != user.getUserId()) {
+                                    System.err.println("ERROR: Saved UserCoursePlan has wrong userId! Expected: " + user.getUserId() + ", Got: " + saved.getUser().getUserId());
+                                }
+                            } catch (Exception e) {
+                                System.err.println("ERROR: Failed to save course plan item: " + e.getMessage());
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                } else if (coursePlanObj != null) {
+                    System.err.println("ERROR: course_plan is not a List! Type: " + coursePlanObj.getClass().getName());
                 }
-            } else {
-                System.out.println("No 'course_plan' key found in userData");
             }
         } catch (Exception e) {
-            System.err.println("Error processing related data for user " + user.getSbuId() + ": " + e.getMessage());
+            System.err.println("ERROR: Error processing related data for user " + user.getSbuId() + " (userId: " + user.getUserId() + "): " + e.getMessage());
             e.printStackTrace();
+            // Re-throw exception to ensure transaction rollback if needed
+            throw new RuntimeException("Failed to process related data for user " + user.getSbuId() + ": " + e.getMessage(), e);
         }
     }
     
