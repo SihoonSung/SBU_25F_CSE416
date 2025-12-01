@@ -148,29 +148,11 @@ export default function DegreeAudit() {
                   
                   console.log(`[DegreeAudit] Processing major: ${programName}, groups:`, major.groups)
                   
-                  // Fetch SBC requirements from the major's DegreeRequirement
-                  try {
-                    const majorReqResponse = await fetch(`${backendBase}/api/degree-requirements/${encodeURIComponent(subjectCode)}/${encodeURIComponent(degreeType)}`, {
-                      credentials: 'include'
-                    })
-                    console.log(`[DegreeAudit] Degree requirement API response for ${subjectCode}/${degreeType}:`, majorReqResponse.status)
-                    if (majorReqResponse.ok) {
-                      const majorReqData: any = await majorReqResponse.json()
-                      console.log(`[DegreeAudit] Degree requirement data:`, majorReqData)
-                      if (majorReqData.success && majorReqData.requirement && majorReqData.requirement.sbcRequirements) {
-                        console.log(`[DegreeAudit] Found SBC requirements in requirement data`)
-                        try {
-                          const sbcRequirementsJson = typeof majorReqData.requirement.sbcRequirements === 'string' 
-                            ? JSON.parse(majorReqData.requirement.sbcRequirements)
-                            : majorReqData.requirement.sbcRequirements
-                          
-                          // Process SBC requirements - they can be an array or object with categories
-                          // SBC structure from YAML: { sbc: "ARTS" } or { sbc: "SNW", required_major_courses: [...] }
-                          if (Array.isArray(sbcRequirementsJson)) {
-                            for (const sbcItem of sbcRequirementsJson) {
-                              // SBC code is stored in the 'sbc' field
-                              const sbcCode = sbcItem.sbc || ''
-                              if (sbcCode) {
+                  // Get SBC status from the major's status response (already calculated by backend)
+                  if (major.sbcRequirements && major.sbcRequirements.sbcCategories) {
+                    console.log(`[DegreeAudit] Found SBC status in major status response`)
+                    const sbcCategories = major.sbcRequirements.sbcCategories
+                    
                                 // Map SBC codes to full names for better display
                                 const sbcNames: Record<string, string> = {
                                   'ARTS': 'Arts',
@@ -195,45 +177,62 @@ export default function DegreeAudit() {
                                   'WRTD': 'Writing in the Discipline'
                                 }
                                 
-                                sbcReqs.push({
-                                  area: 'ADMISSION',
-                                  programCode: 'SBC',
-                                  programName: 'SBC Requirements',
-                                  code: sbcCode,
-                                  title: sbcNames[sbcCode] || sbcCode,
-                                  status: 'pending', // Will be calculated based on student's courses
-                                  usingClasses: [],
-                                  note: sbcItem.description || (sbcItem.required_major_courses || sbcItem.optional_major_courses ? 'May be satisfied by major courses' : null)
-                                })
-                              }
+                    for (const sbcCategory of sbcCategories) {
+                      const sbcCode = sbcCategory.category || ''
+                      if (sbcCode) {
+                        // Map backend status to frontend status
+                        const backendStatus = sbcCategory.status || 'NOT_SATISFIED'
+                        let frontendStatus: 'satisfied' | 'pending' | 'unsatisfied' = 'unsatisfied'
+                        if (backendStatus === 'SATISFIED') {
+                          frontendStatus = 'satisfied'
+                        } else if (backendStatus === 'PENDING') {
+                          frontendStatus = 'pending'
+                        } else {
+                          frontendStatus = 'unsatisfied'
+                        }
+                        
+                        // Build using classes from satisfied courses
+                        const usingClasses: Array<{ subject: string; courseNum: number; term?: string; grade?: string | null }> = []
+                        if (sbcCategory.satisfiedRequiredCourses && Array.isArray(sbcCategory.satisfiedRequiredCourses)) {
+                          for (const courseCode of sbcCategory.satisfiedRequiredCourses) {
+                            const parts = courseCode.split(' ')
+                            if (parts.length >= 2) {
+                              usingClasses.push({
+                                subject: parts[0],
+                                courseNum: parseInt(parts[1]) || 0
+                              })
                             }
-                          } else if (sbcRequirementsJson && typeof sbcRequirementsJson === 'object') {
-                            // Handle object format with categories
-                            if (sbcRequirementsJson.categories && Array.isArray(sbcRequirementsJson.categories)) {
-                              for (const sbcItem of sbcRequirementsJson.categories) {
-                                const sbcCode = sbcItem.sbc || ''
-                                if (sbcCode) {
-                                  const sbcNames: Record<string, string> = {
-                                    'ARTS': 'Arts',
-                                    'GLO': 'Global Issues',
-                                    'HUM': 'Humanities',
-                                    'LANG': 'Language',
-                                    'USA': 'United States History',
-                                    'WRT': 'Writing & Communication',
-                                    'HFA+': 'Humanities & Fine Arts Plus',
-                                    'CER': 'Community Engagement & Reflection',
-                                    'DIV': 'Diversity',
-                                    'QPS': 'Quantitative & Problem Solving',
-                                    'SNW': 'Natural Sciences & Technology',
-                                    'SBS': 'Social & Behavioral Sciences',
-                                    'SBS+': 'Social & Behavioral Sciences Plus',
-                                    'STAS': 'Statistics & Data Analysis',
-                                    'TECH': 'Technology & Innovation',
-                                    'EXP+': 'Experience Plus',
-                                    'STEM+': 'Science, Technology, Engineering & Math Plus',
-                                    'ESI': 'Environmental Sustainability',
-                                    'SPK': 'Speaking',
-                                    'WRTD': 'Writing in the Discipline'
+                          }
+                        }
+                        if (sbcCategory.satisfiedPartialRequired && Array.isArray(sbcCategory.satisfiedPartialRequired)) {
+                          for (const courseCode of sbcCategory.satisfiedPartialRequired) {
+                            const parts = courseCode.split(' ')
+                            if (parts.length >= 2) {
+                              usingClasses.push({
+                                subject: parts[0],
+                                courseNum: parseInt(parts[1]) || 0
+                              })
+                            }
+                          }
+                        }
+                        if (sbcCategory.satisfiedOptionalPartial && Array.isArray(sbcCategory.satisfiedOptionalPartial)) {
+                          for (const courseCode of sbcCategory.satisfiedOptionalPartial) {
+                            const parts = courseCode.split(' ')
+                            if (parts.length >= 2) {
+                              usingClasses.push({
+                                subject: parts[0],
+                                courseNum: parseInt(parts[1]) || 0
+                              })
+                            }
+                          }
+                        }
+                        
+                        // Build note with pending courses info
+                        let note: string | null = null
+                        if (frontendStatus === 'pending' && sbcCategory.pendingCourses && Array.isArray(sbcCategory.pendingCourses) && sbcCategory.pendingCourses.length > 0) {
+                          note = `In progress: ${sbcCategory.pendingCourses.join(', ')}`
+                        } else if (sbcCategory.missingPartialRequired && Array.isArray(sbcCategory.missingPartialRequired) && sbcCategory.missingPartialRequired.length > 0) {
+                          note = `Missing: ${sbcCategory.missingPartialRequired.join(', ')}`
                                   }
                                   
                                   sbcReqs.push({
@@ -242,22 +241,13 @@ export default function DegreeAudit() {
                                     programName: 'SBC Requirements',
                                     code: sbcCode,
                                     title: sbcNames[sbcCode] || sbcCode,
-                                    status: 'pending',
-                                    usingClasses: [],
-                                    note: sbcItem.description || (sbcItem.required_major_courses || sbcItem.optional_major_courses ? 'May be satisfied by major courses' : null)
-                                  })
-                                }
-                              }
-                            }
-                          }
-                          console.log(`[DegreeAudit] Found ${sbcReqs.length} SBC requirements from ${subjectCode} ${degreeType}`)
-                        } catch (e) {
-                          console.error('[DegreeAudit] Error parsing SBC requirements:', e)
-                        }
+                          status: frontendStatus,
+                          usingClasses: usingClasses,
+                          note: note
+                        })
                       }
                     }
-                  } catch (e) {
-                    console.error(`[DegreeAudit] Error fetching SBC requirements for ${subjectCode} ${degreeType}:`, e)
+                    console.log(`[DegreeAudit] Found ${sbcCategories.length} SBC requirements with status from ${subjectCode} ${degreeType}`)
                   }
                   
                   if (major.groups && Array.isArray(major.groups) && major.groups.length > 0) {
@@ -277,6 +267,38 @@ export default function DegreeAudit() {
                         grade: course.grade || null
                       }))
                       
+                      // Get pending courses (in-progress) from the group
+                      const pendingCourses = group.pendingCourses || []
+                      console.log(`[DegreeAudit] Group ${groupId} (${groupType}) - pendingCourses:`, pendingCourses)
+                      const pendingClasses = pendingCourses.map((course: any) => ({
+                        subject: course.subject || course.department || '',
+                        courseNum: course.courseNum || course.course_num || 0,
+                        term: course.term || course.termCode || null,
+                        grade: course.grade || null
+                      }))
+                      console.log(`[DegreeAudit] Group ${groupId} (${groupType}) - status: ${status}, pendingClasses.length: ${pendingClasses.length}`)
+                      
+                      // Build note with pending courses info
+                      let note = group.message || null
+                      if (status === 'pending' && pendingClasses.length > 0) {
+                        const pendingCourseNames = pendingClasses.map((c: { subject: string; courseNum: number }) => `${c.subject}${c.courseNum}`).join(', ')
+                        const pendingNote = `In progress: ${pendingCourseNames}`
+                        if (group.creditsRequired) {
+                          note = `Credits: ${group.creditsSatisfied || 0}/${group.creditsRequired} | ${pendingNote}`
+                        } else {
+                          note = pendingNote
+                        }
+                      } else if (status === 'pending' && pendingClasses.length === 0) {
+                        // Even if no pending courses found, show that it's pending
+                        if (group.creditsRequired) {
+                          note = `Credits: ${group.creditsSatisfied || 0}/${group.creditsRequired}`
+                        } else {
+                          note = 'In progress'
+                        }
+                      } else if (group.creditsRequired) {
+                        note = `Credits: ${group.creditsSatisfied || 0}/${group.creditsRequired}`
+                      }
+                      
                       // Create a requirement entry for this group
                       transformedReqs.push({
                         area: 'DEGREE',
@@ -286,7 +308,7 @@ export default function DegreeAudit() {
                         title: groupType ? `${groupType.charAt(0).toUpperCase() + groupType.slice(1)} Group (${programName})` : `Requirement Group (${programName})`,
                         status: status,
                         usingClasses: usingClasses,
-                        note: group.message || (group.creditsRequired ? `Credits: ${group.creditsSatisfied || 0}/${group.creditsRequired}` : null)
+                        note: note
                       })
                     }
                   } else {
@@ -533,7 +555,7 @@ export default function DegreeAudit() {
         }
         
         // For students, load their own data
-        const sid = u?.studentId || u?.sbuId || null
+        const sid = u?.studentId || null
         console.log('[DegreeAudit] Student ID:', sid, 'User ID:', u?.userId)
         if (sid && u?.userId) {
           await loadStudentData(sid, u.userId)

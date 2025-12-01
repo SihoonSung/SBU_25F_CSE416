@@ -95,6 +95,13 @@ students:
     - {class_id: 23456, department: CSE, course_num: 114, section: 1, semester: Spring, year: 2021, credits: 4, GPNC: false, grade: C-}
     # CSE 214 in progress (grade null)
     - {class_id: 34567, department: CSE, course_num: 214, section: 2, semester: SummerI, year: 2021, credits: 4, GPNC: true, grade: null}
+    
+    - {class_id: 23832, department: POL, course_num: 101, section: 1, semester: Spring, year: 2022, credits: 3, GPNC: false, grade : B}
+    - {class_id: 22345, department: ARH, course_num: 203, section: 1, semester: Spring, year: 2022, credits: 3, GPNC: false, grade : A}
+    - {class_id: 21432, department: MUS, course_num: 101, section: 1, semester: Spring, year: 2022, credits: 3, GPNC: false, grade : A}
+    - {class_id: 18342, department: GEO, course_num: 101, section: 1, semester: Fall, year: 2022, credits: 3, GPNC: false, grade : null}
+
+
   course_plan:
     # CSE 216 requires CSE 114 with C or higher - should show unsatisfied prerequisite
     - {department: CSE, course_num: 216, semester: Fall, year: 2026, credits: 3}

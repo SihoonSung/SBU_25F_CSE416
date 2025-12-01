@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Optional;
 
 /**
  * Service for checking student's degree requirement status.
@@ -29,6 +30,9 @@ public class DegreeRequirementStatusService {
     
     @Autowired
     private DegreeRequirementRepository degreeRequirementRepository;
+    
+    @Autowired
+    private edu.sbu.cse416.sam_system.repository.CourseRepository courseRepository;
     
     private final ObjectMapper objectMapper = new ObjectMapper();
     
@@ -312,7 +316,7 @@ public class DegreeRequirementStatusService {
         return status;
     }
     
-    // [Kept from Version 1] SBC logic is preserved
+    // [Kept from Version 1] SBC logic is preserved, with status (SATISFIED/PENDING/NOT_SATISFIED) added
     private Map<String, Object> checkSbcRequirements(String sbcRequirementsJson,
                                                        List<UserClasses> completedClasses,
                                                        List<UserClasses> inProgressClasses,
@@ -342,7 +346,10 @@ public class DegreeRequirementStatusService {
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> requiredMajorCourses = (List<Map<String, Object>>) sbcReq.get("required_major_courses");
                 boolean requiredSatisfied = false;
+                boolean requiredPending = false;
+                boolean requiredHasLowGrade = false;
                 List<String> satisfiedRequiredCourses = new ArrayList<>();
+                List<String> pendingRequiredCourses = new ArrayList<>();
                 
                 if (requiredMajorCourses != null && !requiredMajorCourses.isEmpty()) {
                     for (Map<String, Object> courseReq : requiredMajorCourses) {
@@ -371,17 +378,34 @@ public class DegreeRequirementStatusService {
                             satisfiedRequiredCourses.add(code);
                             break;
                         }
+                        
+                        // Check for low grade
+                        if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
+                            requiredHasLowGrade = true;
+                        }
+                        
+                        // Check if in progress
+                        UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
+                        if (inProgress != null && !requiredHasLowGrade) {
+                            requiredPending = true;
+                            pendingRequiredCourses.add(code);
+                        }
                     }
                 }
                 
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> requiredMajorCoursesPartial = (List<Map<String, Object>>) sbcReq.get("required_major_courses_partial");
                 boolean partialRequiredSatisfied = false;
+                boolean partialRequiredPending = false;
+                boolean partialRequiredHasLowGrade = false;
                 List<String> satisfiedPartialRequired = new ArrayList<>();
                 List<String> missingPartialRequired = new ArrayList<>();
+                List<String> pendingPartialRequired = new ArrayList<>();
                 
                 if (requiredMajorCoursesPartial != null && !requiredMajorCoursesPartial.isEmpty()) {
                     int totalPartialRequired = requiredMajorCoursesPartial.size();
+                    int satisfiedCount = 0;
+                    int pendingCount = 0;
                     
                     for (Map<String, Object> courseReq : requiredMajorCoursesPartial) {
                         String code = (String) courseReq.get("code");
@@ -406,15 +430,30 @@ public class DegreeRequirementStatusService {
                         
                         if (matchingClass != null) {
                             satisfiedPartialRequired.add(code);
+                            satisfiedCount++;
                         } else {
                             missingPartialRequired.add(code);
+                            
+                            // Check for low grade
+                            if (hasCompletedCourseWithLowGrade(completedClasses, dept, courseNumStr, minGrade)) {
+                                partialRequiredHasLowGrade = true;
+                            }
+                            
+                            // Check if in progress
+                            UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
+                            if (inProgress != null && !partialRequiredHasLowGrade) {
+                                pendingCount++;
+                                pendingPartialRequired.add(code);
+                            }
                         }
                     }
                     
                     if (totalPartialRequired == 2) {
-                        partialRequiredSatisfied = satisfiedPartialRequired.size() == 2;
+                        partialRequiredSatisfied = satisfiedCount == 2;
+                        partialRequiredPending = (satisfiedCount + pendingCount) >= 2 && !partialRequiredHasLowGrade;
                     } else {
-                        partialRequiredSatisfied = satisfiedPartialRequired.size() >= 2;
+                        partialRequiredSatisfied = satisfiedCount >= 2;
+                        partialRequiredPending = (satisfiedCount + pendingCount) >= 2 && !partialRequiredHasLowGrade;
                     }
                 } else {
                     partialRequiredSatisfied = true;
@@ -423,6 +462,8 @@ public class DegreeRequirementStatusService {
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> optionalMajorCoursesPartial = (List<Map<String, Object>>) sbcReq.get("optional_major_courses_partial");
                 List<String> satisfiedOptionalPartial = new ArrayList<>();
+                List<String> pendingOptionalPartial = new ArrayList<>();
+                boolean optionalPending = false;
                 
                 if (optionalMajorCoursesPartial != null && !optionalMajorCoursesPartial.isEmpty()) {
                     for (Map<String, Object> courseReq : optionalMajorCoursesPartial) {
@@ -448,38 +489,142 @@ public class DegreeRequirementStatusService {
                         
                         if (matchingClass != null) {
                             satisfiedOptionalPartial.add(code);
+                        } else {
+                            // Check if in progress
+                            UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
+                            if (inProgress != null) {
+                                optionalPending = true;
+                                pendingOptionalPartial.add(code);
+                            }
                         }
                     }
                 }
                 
                 boolean sbcMet = false;
+                boolean sbcPending = false;
+                boolean sbcHasLowGrade = false;
                 
                 boolean hasRequiredCourses = (requiredMajorCourses != null && !requiredMajorCourses.isEmpty());
                 boolean hasPartialCourses = (requiredMajorCoursesPartial != null && !requiredMajorCoursesPartial.isEmpty());
                 boolean hasOptionalPartial = (optionalMajorCoursesPartial != null && !optionalMajorCoursesPartial.isEmpty());
                 boolean hasAnyCourseRequirements = hasRequiredCourses || hasPartialCourses || hasOptionalPartial;
                 
+                // If no major course requirements, check general courses' SBC information
+                List<String> pendingGeneralCourses = new ArrayList<>();
                 if (!hasAnyCourseRequirements) {
-                    sbcMet = false;
+                    // Check if any completed course satisfies this SBC category
+                    boolean generalCourseSatisfied = false;
+                    boolean generalCoursePending = false;
+                    
+                    for (UserClasses uc : completedClasses) {
+                        if (uc.getDepartment() != null && uc.getCourseNum() != null && uc.getGrade() != null) {
+                            // Find the course in scraped courses
+                            Optional<edu.sbu.cse416.sam_system.entity.Course> courseOpt = 
+                                courseRepository.findBySubjectAndCourseNumber(uc.getDepartment(), uc.getCourseNum().toString());
+                            
+                            if (courseOpt.isPresent()) {
+                                edu.sbu.cse416.sam_system.entity.Course course = courseOpt.get();
+                                String sbcs = course.getSbcsSatisfied();
+                                
+                                if (sbcs != null && !sbcs.trim().isEmpty()) {
+                                    // Check if this SBC category is in the course's SBCs
+                                    // SBC format can be like "ARTS", "ARTS, GLO", "Partially fulfills: ARTS", etc.
+                                    String sbcsUpper = sbcs.toUpperCase();
+                                    String categoryUpper = category.toUpperCase();
+                                    
+                                    if (sbcsUpper.contains(categoryUpper)) {
+                                        // Check if grade is sufficient (C or higher)
+                                        if (isGradeSufficientForRequirement(uc.getGrade(), "C")) {
+                                            generalCourseSatisfied = true;
+                                            satisfiedRequiredCourses.add(uc.getDepartment() + " " + uc.getCourseNum());
+                                            break;
+                                        } else {
+                                            generalCourseSatisfied = false;
+                                            sbcHasLowGrade = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Check in-progress courses
+                    if (!generalCourseSatisfied && !sbcHasLowGrade) {
+                        for (UserClasses uc : inProgressClasses) {
+                            if (uc.getDepartment() != null && uc.getCourseNum() != null) {
+                                Optional<edu.sbu.cse416.sam_system.entity.Course> courseOpt = 
+                                    courseRepository.findBySubjectAndCourseNumber(uc.getDepartment(), uc.getCourseNum().toString());
+                                
+                                if (courseOpt.isPresent()) {
+                                    edu.sbu.cse416.sam_system.entity.Course course = courseOpt.get();
+                                    String sbcs = course.getSbcsSatisfied();
+                                    
+                                    if (sbcs != null && !sbcs.trim().isEmpty()) {
+                                        String sbcsUpper = sbcs.toUpperCase();
+                                        String categoryUpper = category.toUpperCase();
+                                        
+                                        if (sbcsUpper.contains(categoryUpper)) {
+                                            generalCoursePending = true;
+                                            pendingGeneralCourses.add(uc.getDepartment() + " " + uc.getCourseNum());
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    sbcMet = generalCourseSatisfied;
+                    sbcPending = generalCoursePending;
                 } else {
                     boolean requiredConditionMet = true;
+                    boolean requiredConditionPending = false;
                     if (hasRequiredCourses) {
                         requiredConditionMet = requiredSatisfied || !satisfiedOptionalPartial.isEmpty();
+                        requiredConditionPending = requiredPending || (optionalPending && !requiredSatisfied && satisfiedOptionalPartial.isEmpty());
+                        sbcHasLowGrade = requiredHasLowGrade;
                     }
                     
                     boolean partialConditionMet = true;
+                    boolean partialConditionPending = false;
                     if (hasPartialCourses) {
                         partialConditionMet = partialRequiredSatisfied;
+                        partialConditionPending = partialRequiredPending;
+                        sbcHasLowGrade = sbcHasLowGrade || partialRequiredHasLowGrade;
                     }
                     
                     sbcMet = requiredConditionMet && partialConditionMet;
+                    sbcPending = (requiredConditionPending || partialConditionPending) && !sbcMet && !sbcHasLowGrade;
                 }
                 
+                // Determine status
+                String sbcStatusStr;
+                if (sbcMet) {
+                    sbcStatusStr = "SATISFIED";
+                } else if (sbcHasLowGrade) {
+                    sbcStatusStr = "NOT_SATISFIED";
+                } else if (sbcPending) {
+                    sbcStatusStr = "PENDING";
+                } else {
+                    sbcStatusStr = "NOT_SATISFIED";
+                }
+                
+                status.put("status", sbcStatusStr);
                 status.put("met", sbcMet);
                 status.put("satisfiedRequiredCourses", satisfiedRequiredCourses);
                 status.put("satisfiedPartialRequired", satisfiedPartialRequired);
                 status.put("missingPartialRequired", missingPartialRequired);
                 status.put("satisfiedOptionalPartial", satisfiedOptionalPartial);
+                
+                // Add pending courses info
+                List<String> allPendingCourses = new ArrayList<>();
+                allPendingCourses.addAll(pendingRequiredCourses);
+                allPendingCourses.addAll(pendingPartialRequired);
+                allPendingCourses.addAll(pendingOptionalPartial);
+                allPendingCourses.addAll(pendingGeneralCourses);
+                if (!allPendingCourses.isEmpty()) {
+                    status.put("pendingCourses", allPendingCourses);
+                }
                 
                 sbcStatus.add(status);
             }
@@ -536,6 +681,14 @@ public class DegreeRequirementStatusService {
             
             groupStatus.put("status", status);
             groupStatus.put("satisfiedCourses", satisfiedCourses);
+            
+            // Add pending courses info if status is PENDING
+            if ("PENDING".equals(status)) {
+                List<Map<String, Object>> pendingCourses = findPendingCourses(group, type, completedClasses, inProgressClasses, usedClassIds);
+                if (!pendingCourses.isEmpty()) {
+                    groupStatus.put("pendingCourses", pendingCourses);
+                }
+            }
             
             // [Added from Version 2] Add required courses info if not satisfied
             if (!satisfied && !status.equals("SATISFIED")) {
@@ -1593,21 +1746,131 @@ public class DegreeRequirementStatusService {
             return false;
         }
         
+        String groupMinGrade = (String) group.get("min_grade");
+        if (groupMinGrade == null || groupMinGrade.trim().isEmpty()) {
+            groupMinGrade = "C";
+        }
+        
         int totalCredits = 0;
         
-        if (inProgressClasses != null && !inProgressClasses.isEmpty()) {
-            for (UserClasses uc : inProgressClasses) {
-                // [Merge Fix] Safe ID handling for pending classes
-                String classIdStr = uc.getClassId() != null ? uc.getClassId().toString() : null;
-                String uniqueId = classIdStr != null ? classIdStr : (uc.getDepartment() + "_" + uc.getCourseNum() + "_planned");
-
-                if (uc.getCredits() != null && uniqueId != null && !usedClassIds.contains(uniqueId)) {
-                    totalCredits += uc.getCredits();
+        if (inProgressClasses == null || inProgressClasses.isEmpty()) {
+            return false;
+        }
+        
+        // Check sequences (in-progress courses can partially satisfy sequences)
+        @SuppressWarnings("unchecked")
+        List<List<Map<String, Object>>> sequences = (List<List<Map<String, Object>>>) group.get("sequences");
+        if (sequences != null && !sequences.isEmpty()) {
+            for (List<Map<String, Object>> sequence : sequences) {
+                for (Map<String, Object> courseReq : sequence) {
+                    String code = (String) courseReq.get("code");
+                    if (code == null) continue;
+                    
+                    String[] parts = parseCourseCode(code);
+                    String dept = parts[0];
+                    String courseNumStr = parts[1];
+                    
+                    // Check if already completed
+                    UserClasses completed = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, groupMinGrade);
+                    if (completed != null) continue;
+                    
+                    // Check if in progress
+                    UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
+                    if (inProgress != null) {
+                        String classIdStr = inProgress.getClassId() != null ? inProgress.getClassId().toString() : null;
+                        String uniqueId = classIdStr != null ? classIdStr : (inProgress.getDepartment() + "_" + inProgress.getCourseNum() + "_planned");
+                        if (uniqueId != null && !usedClassIds.contains(uniqueId)) {
+                            @SuppressWarnings("unchecked")
+                            List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
+                            if (excludedCourses == null || !isExcluded(inProgress, excludedCourses)) {
+                                if (inProgress.getCredits() != null) {
+                                    totalCredits += inProgress.getCredits();
+                                    return true; // Found at least one matching in-progress course
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
         
-        return totalCredits > 0;
+        // Check additional courses
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> additionalCourses = (List<Map<String, Object>>) group.get("additional_courses");
+        if (additionalCourses != null && !additionalCourses.isEmpty()) {
+            for (Map<String, Object> courseReq : additionalCourses) {
+                String code = (String) courseReq.get("code");
+                if (code == null) continue;
+                
+                String[] parts = parseCourseCode(code);
+                String dept = parts[0];
+                String courseNumStr = parts[1];
+                
+                // Check if already completed
+                UserClasses completed = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, groupMinGrade);
+                if (completed != null) continue;
+                
+                // Check if in progress
+                UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
+                if (inProgress != null) {
+                    String classIdStr = inProgress.getClassId() != null ? inProgress.getClassId().toString() : null;
+                    String uniqueId = classIdStr != null ? classIdStr : (inProgress.getDepartment() + "_" + inProgress.getCourseNum() + "_planned");
+                    if (uniqueId != null && !usedClassIds.contains(uniqueId)) {
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
+                        if (excludedCourses == null || !isExcluded(inProgress, excludedCourses)) {
+                            if (inProgress.getCredits() != null) {
+                                totalCredits += inProgress.getCredits();
+                                return true; // Found at least one matching in-progress course
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Check wildcard patterns (e.g., "CSE 3xx+")
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
+        if (courses != null && !courses.isEmpty()) {
+            for (Map<String, Object> courseReq : courses) {
+                String code = (String) courseReq.get("code");
+                if (code == null) continue;
+                
+                if (code.contains("xx+") || code.contains("xx")) {
+                    String[] parts = parseCourseCode(code);
+                    String dept = parts[0];
+                    int minLevel = 300;
+                    
+                    if (code.contains("2xx+")) {
+                        minLevel = 200;
+                    } else if (code.contains("4xx+")) {
+                        minLevel = 400;
+                    }
+                    
+                    for (UserClasses uc : inProgressClasses) {
+                        String classIdStr = uc.getClassId() != null ? uc.getClassId().toString() : null;
+                        String uniqueId = classIdStr != null ? classIdStr : (uc.getDepartment() + "_" + uc.getCourseNum() + "_planned");
+                        
+                        if (uc.getDepartment() != null && uc.getDepartment().equalsIgnoreCase(dept) &&
+                            uc.getCourseNum() != null && uc.getCourseNum() >= minLevel &&
+                            uniqueId != null && !usedClassIds.contains(uniqueId)) {
+                            
+                            @SuppressWarnings("unchecked")
+                            List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
+                            if (excludedCourses == null || !isExcluded(uc, excludedCourses)) {
+                                if (uc.getCredits() != null) {
+                                    totalCredits += uc.getCredits();
+                                    return true; // Found at least one matching in-progress course
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return false; // No matching in-progress courses found
     }
     
     private boolean isGradeSufficient(String grade) {
@@ -1631,6 +1894,244 @@ public class DegreeRequirementStatusService {
         } catch (NumberFormatException e) {
             return false;
         }
+    }
+    
+    /**
+     * Find pending courses (in-progress) that match the group requirements
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> findPendingCourses(Map<String, Object> group, String type,
+                                                         List<UserClasses> completedClasses,
+                                                         List<UserClasses> inProgressClasses,
+                                                         Set<String> usedClassIds) {
+        List<Map<String, Object>> pendingCourses = new ArrayList<>();
+        
+        if (inProgressClasses == null || inProgressClasses.isEmpty()) {
+            return pendingCourses;
+        }
+        
+        try {
+            switch (type) {
+                case "all_of": {
+                    List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
+                    if (courses != null) {
+                        for (Map<String, Object> courseReq : courses) {
+                            String code = (String) courseReq.get("code");
+                            if (code == null) continue;
+                            
+                            String minGrade = (String) courseReq.get("min_grade");
+                            if (minGrade == null || minGrade.trim().isEmpty()) {
+                                minGrade = "C";
+                            }
+                            
+                            String[] parts = parseCourseCode(code);
+                            String dept = parts[0];
+                            String courseNumStr = parts[1];
+                            
+                            // Check if already completed
+                            UserClasses completed = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
+                            if (completed != null) continue;
+                            
+                            // Check if in progress
+                            UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
+                            if (inProgress != null) {
+                                pendingCourses.add(buildCourseInfo(inProgress, code));
+                            }
+                        }
+                    }
+                    break;
+                }
+                case "one_of": {
+                    List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
+                    if (courses != null) {
+                        for (Map<String, Object> courseReq : courses) {
+                            String code = (String) courseReq.get("code");
+                            if (code == null) continue;
+                            
+                            String minGrade = (String) courseReq.get("min_grade");
+                            if (minGrade == null || minGrade.trim().isEmpty()) {
+                                minGrade = "C";
+                            }
+                            
+                            String[] parts = parseCourseCode(code);
+                            String dept = parts[0];
+                            String courseNumStr = parts[1];
+                            
+                            // Check if already completed
+                            UserClasses completed = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
+                            if (completed != null) continue;
+                            
+                            // Check if in progress
+                            UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
+                            if (inProgress != null) {
+                                pendingCourses.add(buildCourseInfo(inProgress, code));
+                            }
+                        }
+                    }
+                    break;
+                }
+                case "one_of_sequences": {
+                    List<List<Map<String, Object>>> sequences = (List<List<Map<String, Object>>>) group.get("sequences");
+                    if (sequences != null) {
+                        for (List<Map<String, Object>> sequence : sequences) {
+                            for (Map<String, Object> courseReq : sequence) {
+                                String code = (String) courseReq.get("code");
+                                if (code == null) continue;
+                                
+                                String minGrade = (String) courseReq.get("min_grade");
+                                if (minGrade == null || minGrade.trim().isEmpty()) {
+                                    minGrade = "C";
+                                }
+                                
+                                String[] parts = parseCourseCode(code);
+                                String dept = parts[0];
+                                String courseNumStr = parts[1];
+                                
+                                // Check if already completed
+                                UserClasses completed = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
+                                if (completed != null) continue;
+                                
+                                // Check if in progress
+                                UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
+                                if (inProgress != null) {
+                                    pendingCourses.add(buildCourseInfo(inProgress, code));
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+                case "two_of": {
+                    List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
+                    if (courses != null) {
+                        for (Map<String, Object> courseReq : courses) {
+                            String code = (String) courseReq.get("code");
+                            if (code == null) continue;
+                            
+                            String minGrade = (String) courseReq.get("min_grade");
+                            if (minGrade == null || minGrade.trim().isEmpty()) {
+                                minGrade = "C";
+                            }
+                            
+                            String[] parts = parseCourseCode(code);
+                            String dept = parts[0];
+                            String courseNumStr = parts[1];
+                            
+                            // Check if already completed
+                            UserClasses completed = findMatchingClassWithMinGrade(completedClasses, dept, courseNumStr, minGrade);
+                            if (completed != null) continue;
+                            
+                            // Check if in progress
+                            UserClasses inProgress = findMatchingClass(inProgressClasses, dept, courseNumStr);
+                            if (inProgress != null) {
+                                pendingCourses.add(buildCourseInfo(inProgress, code));
+                            }
+                        }
+                    }
+                    break;
+                }
+                case "electives": {
+                    // For electives, check all in-progress courses that match the group criteria
+                    Integer creditsRequired = (Integer) group.get("credits_required");
+                    String groupMinGrade = (String) group.get("min_grade");
+                    if (groupMinGrade == null || groupMinGrade.trim().isEmpty()) {
+                        groupMinGrade = "C";
+                    }
+                    
+                    for (UserClasses uc : inProgressClasses) {
+                        if (uc.getDepartment() == null || uc.getCourseNum() == null) continue;
+                        
+                        // Check if already used
+                        String classIdStr = uc.getClassId() != null ? uc.getClassId().toString() : null;
+                        String uniqueId = classIdStr != null ? classIdStr : (uc.getDepartment() + "_" + uc.getCourseNum() + "_planned");
+                        if (usedClassIds.contains(uniqueId)) continue;
+                        
+                        // Check if excluded
+                        List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
+                        if (excludedCourses != null && isExcluded(uc, excludedCourses)) continue;
+                        
+                        // Check sequences
+                        List<List<Map<String, Object>>> sequences = (List<List<Map<String, Object>>>) group.get("sequences");
+                        boolean matchesSequence = false;
+                        if (sequences != null) {
+                            for (List<Map<String, Object>> sequence : sequences) {
+                                for (Map<String, Object> courseReq : sequence) {
+                                    String code = (String) courseReq.get("code");
+                                    if (code == null) continue;
+                                    
+                                    String[] parts = parseCourseCode(code);
+                                    String dept = parts[0];
+                                    String courseNumStr = parts[1];
+                                    
+                                    if (uc.getDepartment().equalsIgnoreCase(dept) && 
+                                        uc.getCourseNum().toString().equals(courseNumStr)) {
+                                        matchesSequence = true;
+                                        pendingCourses.add(buildCourseInfo(uc, code));
+                                        break;
+                                    }
+                                }
+                                if (matchesSequence) break;
+                            }
+                        }
+                        
+                        // Check additional courses
+                        if (!matchesSequence) {
+                            List<Map<String, Object>> additionalCourses = (List<Map<String, Object>>) group.get("additional_courses");
+                            if (additionalCourses != null) {
+                                for (Map<String, Object> courseReq : additionalCourses) {
+                                    String code = (String) courseReq.get("code");
+                                    if (code == null) continue;
+                                    
+                                    String[] parts = parseCourseCode(code);
+                                    String dept = parts[0];
+                                    String courseNumStr = parts[1];
+                                    
+                                    if (uc.getDepartment().equalsIgnoreCase(dept) && 
+                                        uc.getCourseNum().toString().equals(courseNumStr)) {
+                                        pendingCourses.add(buildCourseInfo(uc, code));
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Check wildcard patterns (e.g., "CSE 3xx+")
+                        if (!matchesSequence) {
+                            List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
+                            if (courses != null) {
+                                for (Map<String, Object> courseReq : courses) {
+                                    String code = (String) courseReq.get("code");
+                                    if (code == null) continue;
+                                    
+                                    if (code.contains("xx+") || code.contains("xx")) {
+                                        String[] parts = parseCourseCode(code);
+                                        String dept = parts[0];
+                                        int minLevel = 300;
+                                        
+                                        if (code.contains("2xx+")) {
+                                            minLevel = 200;
+                                        } else if (code.contains("4xx+")) {
+                                            minLevel = 400;
+                                        }
+                                        
+                                        if (uc.getDepartment().equalsIgnoreCase(dept) && 
+                                            uc.getCourseNum() != null && uc.getCourseNum() >= minLevel) {
+                                            pendingCourses.add(buildCourseInfo(uc, uc.getDepartment() + " " + uc.getCourseNum()));
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            // Ignore errors, return empty list
+        }
+        
+        return pendingCourses;
     }
     
     private boolean isGradeSufficientForRequirement(String actualGrade, String requiredGrade) {
