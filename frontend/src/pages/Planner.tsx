@@ -4,15 +4,16 @@
 
 import { useMemo, useState } from 'react'
 import './Planner.css'
+import { getDefaultSemester, getDefaultYear, PLANNER_DEFAULTS } from '../constants'
 
 type Course = { code: string; title: string; credits: number }
 
 export default function Planner() {
   const [required, setRequired] = useState({
-    semester: 'Spring',
-    year: '2025',
-    minCredits: 15,
-    maxCredits: 18,
+    semester: getDefaultSemester(),
+    year: String(getDefaultYear()),
+    minCredits: PLANNER_DEFAULTS.MIN_CREDITS,
+    maxCredits: PLANNER_DEFAULTS.MAX_CREDITS,
     dayOff: 'None',
   })
   const [options, setOptions] = useState({
@@ -36,10 +37,13 @@ export default function Planner() {
     onlineOnly: false,
   })
   const [manualCourses, setManualCourses] = useState<string>('')
+  const currentYear = getDefaultYear();
+  const nextYear = currentYear + 1;
+  const defaultSemester = getDefaultSemester();
   const [plan, setPlan] = useState<{ [term: string]: Course[] }>({
-    'Spring 2025': [],
-    'Fall 2025': [],
-    'Spring 2026': [],
+    [`Spring ${currentYear}`]: [],
+    [`Fall ${currentYear}`]: [],
+    [`Spring ${nextYear}`]: [],
   })
 
   const totalByTerm = useMemo(() =>
@@ -63,8 +67,8 @@ export default function Planner() {
 
   const handleGenerate = () => {
     const seeds: Course[] = parseManual(manualCourses)
-    const buckets = ['Spring 2025', 'Fall 2025', 'Spring 2026']
-    const next: { [k: string]: Course[] } = { 'Spring 2025': [], 'Fall 2025': [], 'Spring 2026': [] }
+    const buckets = Object.keys(plan)
+    const next: { [k: string]: Course[] } = Object.fromEntries(buckets.map(b => [b, []]))
     let idx = 0
     for (const c of seeds) {
       const bucket = buckets[idx % buckets.length]

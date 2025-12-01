@@ -75,7 +75,7 @@
 
 .search-container {
   background-color: var(--bg-elevated);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-2xl);
   padding: 2rem;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-subtle);

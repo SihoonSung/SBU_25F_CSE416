@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import './CourseCatalogManagement.css';
+import { getBackendBase, API_ENDPOINTS } from '../constants';
 
 /**
  * Course Catalog Management Component
@@ -46,7 +47,8 @@ const CourseCatalogManagement: React.FC = () => {
 
   const fetchTerms = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/scraping/terms');
+      const backendBase = getBackendBase();
+      const response = await fetch(`${backendBase}${API_ENDPOINTS.SCRAPING_TERMS}`);
       if (response.ok) {
         const termsData = await response.json();
         setTerms(termsData);

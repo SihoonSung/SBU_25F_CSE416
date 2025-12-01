@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import './CourseSearch.css'
+import { getBackendBase, EXTERNAL_URLS, DEFAULT_ITEMS_PER_PAGE } from '../constants'
 
 /**
  * Course Search Page Component
@@ -27,13 +28,13 @@ interface Course {
 }
 
 function CourseSearch() {
-  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+  const backendBase = getBackendBase()
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(10)
+  const [itemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE)
   const [filters, setFilters] = useState({
     courseNumber: '',
     sbc: 'Any',
@@ -525,7 +526,7 @@ function CourseSearch() {
                         {/* External link to Classie-Evals */}
                         <div className="catalog-detail-row">
                           <a 
-                            href={`https://classie-evals.stonybrook.edu/?SearchKeyword=${course.subject}${course.courseNumber}&SearchTerm=ALL`}
+                            href={`${EXTERNAL_URLS.CLASSIE_EVALS}/?SearchKeyword=${course.subject}${course.courseNumber}&SearchTerm=ALL`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="catalog-detail-link"

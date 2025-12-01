@@ -21,7 +21,7 @@
 .card {
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-sm);
   padding: 2rem;
   margin-bottom: 2rem;
@@ -151,7 +151,7 @@ textarea {
 .sbc-area {
   background: var(--bg-page);
   border: 1px solid var(--border-subtle);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   padding: 8px 12px;
 }
 
@@ -171,14 +171,14 @@ textarea {
 .icon-btn {
   border: 1px solid var(--border-default);
   background: var(--bg-elevated);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   height: 34px;
 }
 
 .add-time {
   border: 1px dashed var(--border-default);
   background: var(--bg-elevated);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   padding: 8px 12px;
   width: max-content;
 }

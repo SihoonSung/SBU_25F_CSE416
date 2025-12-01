@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import './Dashboard.css'
+import { getBackendBase, getDefaultSemester, getDefaultYear } from '../constants'
 
 type Me = {
   userId: number
@@ -27,8 +28,8 @@ function Dashboard() {
   const [isLoading, setIsLoading] = useState(false)
   const [me, setMe] = useState<Me>(null)
   const [registrationEligibility, setRegistrationEligibility] = useState<any>(null)
-  const [currentSemester, setCurrentSemester] = useState<string>('Fall')
-  const [currentYear, setCurrentYear] = useState<number>(2025)
+  const [currentSemester, setCurrentSemester] = useState<string>(getDefaultSemester())
+  const [currentYear, setCurrentYear] = useState<number>(getDefaultYear())
   const [latestTerm, setLatestTerm] = useState<{ semester: string; year: number } | null>(null)
   const [timeConflicts, setTimeConflicts] = useState<string[]>([])
   const [activeHolds, setActiveHolds] = useState<any[]>([])
@@ -47,7 +48,7 @@ function Dashboard() {
   const [cumulativeCredits, setCumulativeCredits] = useState<number>(0)
   const [termGpa, setTermGpa] = useState<number | null>(null)
 
-  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+  const backendBase = getBackendBase()
 
   // 1) Handle OAuth success callback + 2) Load current user from session
   useEffect(() => {
@@ -107,8 +108,8 @@ function Dashboard() {
                 const latest = terms[0]
                 const semester = latest.semester ? 
                   (latest.semester.charAt(0).toUpperCase() + latest.semester.slice(1).toLowerCase()) : 
-                  'Spring'
-                const year = latest.year || 2025
+                  getDefaultSemester()
+                const year = latest.year || getDefaultYear()
                 setLatestTerm({ semester, year })
                 setCurrentSemester(semester)
                 setCurrentYear(year)

@@ -60,7 +60,7 @@
   border: 1px solid var(--error-border);
   border-left: 6px solid var(--button-danger-bg);
   /* 와이어프레임 느낌의 강조선 */
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 12px 14px;
   display: flex;
   align-items: flex-start;
@@ -91,7 +91,7 @@
   color: #ffffff;
   width: 24px;
   height: 24px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   /* 완전한 pill */
   display: flex;
   align-items: center;
@@ -141,7 +141,7 @@
 .stat-card {
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-2xl);
   padding: 1.5rem;
   box-shadow: var(--shadow-sm);
   text-align: center;
@@ -483,7 +483,7 @@
 .course-btn {
   background-color: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   /* pill 버튼 */
   padding: 0.5rem 0.75rem;
   font-size: 12px;

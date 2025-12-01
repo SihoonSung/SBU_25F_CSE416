@@ -5,8 +5,9 @@
 import { useEffect, useState } from 'react'
 import './DegreeAudit.css'
 import { getCurrentUser } from '../utils/auth'
+import { getBackendBase, getDefaultSemester, getDefaultYear } from '../constants'
 
-const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+const backendBase = getBackendBase()
 
 type GpaSummary = {
   terms: Array<{ term: string; gpa: number | null; credits: number }>
@@ -30,7 +31,7 @@ export default function DegreeAudit() {
   const [studentId, setStudentId] = useState<string | null>(null)
   const [gpa, setGpa] = useState<number | null>(null)
   const [totalCredits, setTotalCredits] = useState<number>(0)
-  const [catalogTerm, setCatalogTerm] = useState<string>('Spring 2025')
+  const [catalogTerm, setCatalogTerm] = useState<string>(`${getDefaultSemester()} ${getDefaultYear()}`)
   const [progressPct, setProgressPct] = useState<number>(0)
   const [loading, setLoading] = useState<boolean>(true)
   const [sbcRequirements, setSbcRequirements] = useState<RequirementStatus[]>([])
@@ -510,10 +511,10 @@ export default function DegreeAudit() {
             if (Array.isArray(terms) && terms.length > 0) {
               // Get the most recent term
               const latest = terms[0]
-              const semester = latest.semester ? 
-                (latest.semester.charAt(0).toUpperCase() + latest.semester.slice(1).toLowerCase()) : 
-                'Spring'
-              const year = latest.year || 2025
+                const semester = latest.semester ? 
+                  (latest.semester.charAt(0).toUpperCase() + latest.semester.slice(1).toLowerCase()) : 
+                  getDefaultSemester()
+                const year = latest.year || getDefaultYear()
               setCatalogTerm(`${semester} ${year}`)
             }
           }

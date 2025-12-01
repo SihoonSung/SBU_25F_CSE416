@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import './DataImport.css';
+import { getBackendBase, getDefaultSemester, getDefaultYear } from '../constants';
 
 /**
  * Data Import Component
@@ -14,7 +15,7 @@ type TabType = 'classes' | 'users' | 'requirements';
 
 const DataImport: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('classes');
-  const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+  const backendBase = getBackendBase();
 
   return (
     <div className="data-import-page">
@@ -62,8 +63,8 @@ const DataImport: React.FC = () => {
 const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
   const [subTab, setSubTab] = useState<'pdf' | 'scraping'>('pdf');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [semester, setSemester] = useState('Spring');
-  const [year, setYear] = useState(2025);
+  const [semester, setSemester] = useState(getDefaultSemester());
+  const [year, setYear] = useState(getDefaultYear());
   const [subjects, setSubjects] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');

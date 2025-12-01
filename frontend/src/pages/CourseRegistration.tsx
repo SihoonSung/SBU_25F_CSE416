@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import './CourseRegistration.css'
 import { checkTimeConflict } from '../utils/timeConflict'
 import { getCurrentUser } from '../utils/auth'
+import { getBackendBase, EXTERNAL_URLS, DEFAULT_ITEMS_PER_PAGE } from '../constants'
 
 // Allow references to Node's process object in browser build (Jest compatibility)
 declare const process: any
@@ -15,34 +16,12 @@ declare const process: any
  */
 
 function CourseRegistration() {
-  // Support both Vite (import.meta.env) and Jest (process.env) environments
-  // Get backend URL from environment - Vite uses import.meta.env, Jest uses process.env
-  let backendBase = 'http://localhost:8080'
-  
-  // Try to get from process.env first (Jest environment)
-  if (typeof process !== 'undefined' && process.env && process.env.VITE_BACKEND_URL) {
-    backendBase = process.env.VITE_BACKEND_URL
-  } else {
-    // Try to get from import.meta.env (Vite environment) - use eval to avoid parse errors in Jest
-    try {
-      // @ts-ignore - import.meta is Vite-specific
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      // eslint-disable-next-line no-eval
-      /* istanbul ignore next */
-      const viteEnv = eval('import.meta.env')
-      if (viteEnv && viteEnv.VITE_BACKEND_URL) {
-        backendBase = viteEnv.VITE_BACKEND_URL
-      }
-    } catch (e) {
-      // In Jest environment, import.meta is not available
-    }
-  }
+  const backendBase = getBackendBase()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCourse, setSelectedCourse] = useState<any>(null)
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(10)
+  const [itemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE)
   const [availableTerms, setAvailableTerms] = useState<any[]>([])
   const [selectedSemester, setSelectedSemester] = useState('')
   const [selectedYear, setSelectedYear] = useState<number | string>('')
@@ -1261,7 +1240,7 @@ function CourseRegistration() {
                       {/* External link to Classie-Evals for course evaluations */}
                       <div className="detail-row">
                         <a 
-                          href={`https://classie-evals.stonybrook.edu/?SearchKeyword=${course.department}${course.courseNum}&SearchTerm=ALL`}
+                          href={`${EXTERNAL_URLS.CLASSIE_EVALS}/?SearchKeyword=${course.department}${course.courseNum}&SearchTerm=ALL`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="detail-link"

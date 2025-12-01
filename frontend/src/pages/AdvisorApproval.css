@@ -48,7 +48,7 @@
   padding: 0.5rem;
   background-color: #f8f9fa;
   border: 1px solid #dee2e6;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .permission-text {
@@ -63,7 +63,7 @@
   align-items: center;
   padding: 1rem 1.5rem;
   margin-bottom: 2rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 500;
   animation: slideIn 0.3s ease-out;
 }
@@ -202,7 +202,7 @@
 .filter-group select {
   padding: 0.75rem;
   border: 2px solid #e1e8ed;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 1rem;
   background-color: #ffffff;
   transition: border-color 0.3s ease;
@@ -382,7 +382,7 @@
 .status-badge {
   display: inline-block;
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -456,7 +456,7 @@
   color: #721c24;
   background-color: #f8d7da;
   padding: 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   border: 1px solid #f5c6cb;
   max-width: 200px;
 }
@@ -484,7 +484,7 @@
 
 .modal {
   background: white;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   max-width: 500px;
   width: 100%;
@@ -534,7 +534,7 @@
 
 .declaration-summary {
   background: #f8f9fa;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 1rem;
   margin-bottom: 1.5rem;
   margin-bottom: 1.5rem;
@@ -562,7 +562,7 @@
   width: 100%;
   padding: 0.75rem;
   border: 2px solid #e1e8ed;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 1rem;
   font-family: inherit;
   resize: vertical;
@@ -589,7 +589,7 @@
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.3s ease;
@@ -602,7 +602,7 @@
 .modal-footer .approve-button,
 .modal-footer .reject-button {
   padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;

@@ -4,23 +4,9 @@
 
 // src/utils/auth.ts
 
-// Support both Vite (import.meta.env) and Jest (process.env) environments
-let BACKEND_BASE = 'http://localhost:8080'
-try {
-  // @ts-ignore - import.meta is Vite-specific
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
-  // eslint-disable-next-line no-eval
-  const viteEnv = eval('import.meta?.env')
-  if (viteEnv && viteEnv.VITE_BACKEND_URL) {
-    BACKEND_BASE = viteEnv.VITE_BACKEND_URL
-  }
-} catch (e) {
-  // In Jest environment, use process.env
-  if (typeof process !== 'undefined' && process.env && process.env.VITE_BACKEND_URL) {
-    BACKEND_BASE = process.env.VITE_BACKEND_URL
-  }
-}
+import { getBackendBase, API_ENDPOINTS } from '../constants';
+
+const BACKEND_BASE = getBackendBase();
 
 export async function getCurrentUser(): Promise<{
   user?: {
@@ -41,7 +27,7 @@ export async function getCurrentUser(): Promise<{
     officeHours?: string;
   };
 }> {
-  const res = await fetch(`${BACKEND_BASE}/api/auth/me`, {
+  const res = await fetch(`${BACKEND_BASE}${API_ENDPOINTS.AUTH_ME}`, {
     method: 'GET',
     credentials: 'include',
     cache: 'no-cache',
@@ -60,7 +46,7 @@ export async function getCurrentUser(): Promise<{
 export async function isAuthenticated(): Promise<boolean> {
   try {
     // Use /api/auth/me to actually check if user is authenticated
-    const res = await fetch(`${BACKEND_BASE}/api/auth/me`, {
+    const res = await fetch(`${BACKEND_BASE}${API_ENDPOINTS.AUTH_ME}`, {
       method: 'GET',
       credentials: 'include',
       cache: 'no-cache',
@@ -84,11 +70,11 @@ export async function isAuthenticated(): Promise<boolean> {
 }
 
 export function getGoogleLoginUrl(): string {
-  return `${BACKEND_BASE}/oauth2/authorization/google`;
+  return `${BACKEND_BASE}${API_ENDPOINTS.OAUTH_GOOGLE}`;
 }
 
 export async function signOut(): Promise<void> {
-  await fetch(`${BACKEND_BASE}/api/auth/logout`, {
+  await fetch(`${BACKEND_BASE}${API_ENDPOINTS.AUTH_LOGOUT}`, {
     method: 'POST',
     credentials: 'include', 
   });

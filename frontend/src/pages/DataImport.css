@@ -245,7 +245,7 @@
   margin: 1rem 0;
   padding: 1rem;
   background: var(--bg-page);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .selected-subjects strong {

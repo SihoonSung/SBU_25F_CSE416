@@ -4,6 +4,17 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import "./AdminRegistrationSchedule.css";
+import {
+  getBackendBase,
+  STANDINGS,
+  SEMESTERS,
+  STANDING_TO_U,
+  YEAR_MIN,
+  YEAR_MAX,
+  getDefaultSemester,
+  getDefaultYear,
+  API_ENDPOINTS,
+} from "../constants";
 
 type ScheduleRow = {
   scheduleId: number;
@@ -20,20 +31,6 @@ type ScheduleRow = {
   createdAt?: string;
 };
 
-const STANDINGS = ["U1", "U2", "U3", "U4"];
-const SEMESTERS = ["Spring", "Summer", "Fall", "Winter"];
-
-const STANDING_TO_U: Record<string, string> = {
-  U1: "U1",
-  U2: "U2",
-  U3: "U3",
-  U4: "U4",
-  FRESHMAN: "U1",
-  SOPHOMORE: "U2",
-  JUNIOR: "U3",
-  SENIOR: "U4",
-};
-
 function toU(value: string | null | undefined): string {
   if (!value) return "";
   const key = value.toUpperCase();
@@ -48,11 +45,11 @@ function sortStanding(a: ScheduleRow, b: ScheduleRow): number {
 }
 
 export default function AdminRegistrationSchedule() {
-  const backendBase = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
+  const backendBase = getBackendBase();
 
   // Term filter
-  const [semester, setSemester] = useState<string>("Fall");
-  const [year, setYear] = useState<number>(2025);
+  const [semester, setSemester] = useState<string>(getDefaultSemester());
+  const [year, setYear] = useState<number>(getDefaultYear());
 
   // Table
   const [rows, setRows] = useState<ScheduleRow[]>([]);
@@ -63,9 +60,9 @@ export default function AdminRegistrationSchedule() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ScheduleRow>({
     scheduleId: 0,
-    semester: "Fall",
-    year: 2025,
-    classStanding: "U4",
+    semester: getDefaultSemester(),
+    year: getDefaultYear(),
+    classStanding: STANDINGS[STANDINGS.length - 1], // U4 (last in array)
     minCredits: null,
     maxCredits: null,
     startDate: "",
@@ -82,7 +79,7 @@ export default function AdminRegistrationSchedule() {
   // 2) GET /api/profile/student-by-email?email=... -> returns dto with "id" (users.user_id), usable for createdById
   const fetchCurrentUserId = async () => {
     try {
-      const authRes = await fetch(`${backendBase}/api/profile/auth-info`, {
+      const authRes = await fetch(`${backendBase}${API_ENDPOINTS.PROFILE_AUTH_INFO}`, {
         credentials: "include",
       });
       if (!authRes.ok) {
@@ -97,7 +94,7 @@ export default function AdminRegistrationSchedule() {
       }
 
       const byEmailRes = await fetch(
-        `${backendBase}/api/profile/student-by-email?email=${encodeURIComponent(email)}`,
+        `${backendBase}${API_ENDPOINTS.PROFILE_STUDENT_BY_EMAIL}?email=${encodeURIComponent(email)}`,
         { credentials: "include" }
       );
       if (!byEmailRes.ok) {
@@ -134,7 +131,7 @@ export default function AdminRegistrationSchedule() {
     setErrorMsg("");
     try {
       const res = await fetch(
-        `${backendBase}/api/admin/registration-schedules?semester=${encodeURIComponent(
+        `${backendBase}${API_ENDPOINTS.ADMIN_REGISTRATION_SCHEDULES}?semester=${encodeURIComponent(
           semester
         )}&year=${year}`,
         { credentials: "include" }
@@ -174,7 +171,7 @@ export default function AdminRegistrationSchedule() {
       scheduleId: 0,
       semester,
       year,
-      classStanding: "U4",
+      classStanding: STANDINGS[STANDINGS.length - 1], // U4 (last in array)
       minCredits: null,
       maxCredits: null,
       startDate: "",
@@ -219,8 +216,8 @@ export default function AdminRegistrationSchedule() {
     try {
       const url =
         editingId === null
-          ? `${backendBase}/api/admin/registration-schedules`
-          : `${backendBase}/api/admin/registration-schedules/${editingId}`;
+          ? `${backendBase}${API_ENDPOINTS.ADMIN_REGISTRATION_SCHEDULES}`
+          : `${backendBase}${API_ENDPOINTS.ADMIN_REGISTRATION_SCHEDULES}/${editingId}`;
       const method = editingId === null ? "POST" : "PUT";
 
       const res = await fetch(url, {
@@ -258,7 +255,7 @@ export default function AdminRegistrationSchedule() {
     if (!window.confirm("Delete this schedule?")) return;
     try {
       const res = await fetch(
-        `${backendBase}/api/admin/registration-schedules/${row.scheduleId}`,
+        `${backendBase}${API_ENDPOINTS.ADMIN_REGISTRATION_SCHEDULES}/${row.scheduleId}`,
         { method: "DELETE", credentials: "include" }
       );
       const data = await res.json().catch(() => ({}));
@@ -296,8 +293,8 @@ export default function AdminRegistrationSchedule() {
               type="number"
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
-              min={2000}
-              max={2100}
+              min={YEAR_MIN}
+              max={YEAR_MAX}
             />
           </label>
           <button className="rs-btn" onClick={fetchSchedules}>
@@ -349,8 +346,8 @@ export default function AdminRegistrationSchedule() {
               onChange={(e) =>
                 setForm((f) => ({ ...f, year: Number(e.target.value) }))
               }
-              min={2000}
-              max={2100}
+              min={YEAR_MIN}
+              max={YEAR_MAX}
             />
           </label>
 
