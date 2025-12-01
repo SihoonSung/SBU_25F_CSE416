@@ -5,6 +5,7 @@ import edu.sbu.cse416.sam_system.dto.PlannerDtos.AutoPlannerResponse;
 import edu.sbu.cse416.sam_system.dto.PlannerDtos.PlannerCourseDto;
 import edu.sbu.cse416.sam_system.dto.PlannerDtos.PlannerCourseRequest;
 import edu.sbu.cse416.sam_system.dto.PlannerDtos.PlannerSummaryDto;
+import edu.sbu.cse416.sam_system.entity.ClassEntity;
 import edu.sbu.cse416.sam_system.entity.Course;
 import edu.sbu.cse416.sam_system.entity.DegreeRequirement;
 import edu.sbu.cse416.sam_system.entity.DegreeType;
@@ -12,12 +13,14 @@ import edu.sbu.cse416.sam_system.entity.Term;
 import edu.sbu.cse416.sam_system.entity.User;
 import edu.sbu.cse416.sam_system.entity.UserClasses;
 import edu.sbu.cse416.sam_system.entity.UserCoursePlan;
+import edu.sbu.cse416.sam_system.repository.ClassRepository;
 import edu.sbu.cse416.sam_system.repository.CourseRepository;
 import edu.sbu.cse416.sam_system.repository.DegreeRequirementRepository;
 import edu.sbu.cse416.sam_system.repository.TermRepository;
 import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
 import edu.sbu.cse416.sam_system.repository.UserCoursePlanRepository;
 import edu.sbu.cse416.sam_system.repository.UserRepository;
+import edu.sbu.cse416.sam_system.util.TimeConflictChecker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -51,6 +54,9 @@ public class PlannerService {
 
     @Autowired
     private CourseRepository courseRepository;
+
+    @Autowired
+    private ClassRepository classRepository;
 
     @Autowired
     private TermRepository termRepository;
@@ -545,13 +551,21 @@ public class PlannerService {
                               warnings, request.workloadLimits(), request.avoidCourses(), processedCourses,
                               requiredCourseCodes, request.graduationSemester(), request.graduationYear());
 
-            // 2. Add electives (from degree requirements)
+            // 2. Add preferred courses (courses student wants to take)
+            if (request.preferredCourses() != null && !request.preferredCourses().isEmpty()) {
+                addPreferredCourses(student, allCourses, availableTerms, proposedPlan, creditsByTerm,
+                                  majorCoursesByTerm, allAvailableClasses, completedClasses, inProgressClasses,
+                                  warnings, request.workloadLimits(), request.avoidCourses(), processedCourses,
+                                  requiredCourseCodes, request.preferredCourses(), request.graduationSemester(), request.graduationYear());
+            }
+
+            // 3. Add electives (from degree requirements)
             addElectives(student, allCourses, availableTerms, proposedPlan, creditsByTerm,
                         majorCoursesByTerm, allAvailableClasses, completedClasses, inProgressClasses,
                         warnings, request.workloadLimits(), request.avoidCourses(), processedCourses,
                         requiredCourseCodes, request.graduationSemester(), request.graduationYear());
 
-            // 3. Add courses to satisfy SBC requirements
+            // 4. Add courses to satisfy SBC requirements
             addSBCsAndCredits(student, allCourses, availableTerms, proposedPlan, creditsByTerm,
                              majorCoursesByTerm, allAvailableClasses, completedClasses, inProgressClasses,
                              warnings, request.workloadLimits(), request.avoidCourses(), totalCreditsRequired,
@@ -1176,6 +1190,47 @@ public class PlannerService {
     }
 
     /**
+     * Add preferred courses (courses student wants to take)
+     * These are added after required courses but before electives
+     */
+    private void addPreferredCourses(User student, List<Course> allCourses, List<TermInfo> availableTerms,
+                                    List<PlannerCourseDto> proposedPlan,
+                                    Map<String, Double> creditsByTerm,
+                                    Map<String, Integer> majorCoursesByTerm,
+                                    List<UserClasses> allAvailableClasses,
+                                    List<UserClasses> completedClasses,
+                                    List<UserClasses> inProgressClasses,
+                                    List<String> warnings,
+                                    Map<String, Double> workloadLimits,
+                                    List<String> avoidCourses,
+                                    Set<String> processedCourses,
+                                    Set<String> requiredCourseCodes,
+                                    List<String> preferredCourses,
+                                    String graduationSemester, Integer graduationYear) {
+        try {
+            for (String courseCode : preferredCourses) {
+                // Skip if in avoid list
+                if (isAvoided(courseCode, avoidCourses)) {
+                    continue;
+                }
+                
+                // Skip if already planned or completed
+                if (isAlreadyPlannedOrCompleted(courseCode, proposedPlan, completedClasses, inProgressClasses)) {
+                    continue; // Already added
+                }
+                
+                // Try to add course (will check prerequisites and find suitable term)
+                tryAddCourseWithPrerequisites(courseCode, allCourses, availableTerms, proposedPlan,
+                        creditsByTerm, majorCoursesByTerm, allAvailableClasses, completedClasses,
+                        inProgressClasses, warnings, student, workloadLimits, processedCourses, avoidCourses,
+                        requiredCourseCodes, graduationSemester, graduationYear);
+            }
+        } catch (Exception e) {
+            // Error adding preferred courses, skip
+        }
+    }
+
+    /**
      * Add electives from degree requirements
      */
     @SuppressWarnings("unchecked")
@@ -1663,6 +1718,69 @@ public class PlannerService {
             int majorCount = majorCoursesByTerm.getOrDefault(termKey, 0);
             if (majorCount >= 3) {
                 return false; // Major course limit reached
+            }
+        }
+        
+        // Check time conflicts with other courses in the same term
+        String[] courseCodeParts = courseCode.split(" ");
+        String dept = courseCodeParts[0];
+        Integer courseNum = Integer.parseInt(courseCodeParts[1]);
+        
+        // Find ClassEntity for this course in the same term to get schedule
+        List<ClassEntity> classEntities = classRepository.searchClasses(
+                dept, courseNum, null, null, term.semester, term.year);
+        
+        if (!classEntities.isEmpty()) {
+            // Use the first available class entity's schedule
+            ClassEntity classEntity = classEntities.get(0);
+            String newCourseSchedule = classEntity.getSchedule();
+            String newCourseLecSchedule = classEntity.getLecSchedule();
+            
+            // Check conflicts with other courses already in plan for this term
+            for (PlannerCourseDto planned : proposedPlan) {
+                String plannedTermKey = buildTermKey(planned.semester(), planned.year());
+                if (termKey.equals(plannedTermKey)) {
+                    // Same term, check for time conflict
+                    List<ClassEntity> plannedClassEntities = classRepository.searchClasses(
+                            planned.department(), planned.courseNum(), null, null, 
+                            planned.semester(), planned.year());
+                    
+                    if (!plannedClassEntities.isEmpty()) {
+                        ClassEntity plannedClassEntity = plannedClassEntities.get(0);
+                        String plannedSchedule = plannedClassEntity.getSchedule();
+                        String plannedLecSchedule = plannedClassEntity.getLecSchedule();
+                        
+                        // Check main schedule conflict
+                        if (newCourseSchedule != null && !newCourseSchedule.trim().isEmpty() &&
+                            plannedSchedule != null && !plannedSchedule.trim().isEmpty()) {
+                            if (TimeConflictChecker.hasTimeConflict(newCourseSchedule, plannedSchedule)) {
+                                return false; // Time conflict detected, skip this term
+                            }
+                        }
+                        
+                        // Check lecture schedule conflict (for courses with LAB sections)
+                        if (newCourseLecSchedule != null && !newCourseLecSchedule.trim().isEmpty() &&
+                            plannedSchedule != null && !plannedSchedule.trim().isEmpty()) {
+                            if (TimeConflictChecker.hasTimeConflict(newCourseLecSchedule, plannedSchedule)) {
+                                return false; // Time conflict detected, skip this term
+                            }
+                        }
+                        
+                        if (newCourseSchedule != null && !newCourseSchedule.trim().isEmpty() &&
+                            plannedLecSchedule != null && !plannedLecSchedule.trim().isEmpty()) {
+                            if (TimeConflictChecker.hasTimeConflict(newCourseSchedule, plannedLecSchedule)) {
+                                return false; // Time conflict detected, skip this term
+                            }
+                        }
+                        
+                        if (newCourseLecSchedule != null && !newCourseLecSchedule.trim().isEmpty() &&
+                            plannedLecSchedule != null && !plannedLecSchedule.trim().isEmpty()) {
+                            if (TimeConflictChecker.hasTimeConflict(newCourseLecSchedule, plannedLecSchedule)) {
+                                return false; // Time conflict detected, skip this term
+                            }
+                        }
+                    }
+                }
             }
         }
         

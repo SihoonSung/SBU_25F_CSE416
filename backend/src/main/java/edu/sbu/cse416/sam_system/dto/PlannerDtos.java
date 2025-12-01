@@ -46,7 +46,8 @@ public class PlannerDtos {
             String graduationSemester,
             Integer graduationYear,
             Map<String, Double> workloadLimits, // e.g., {"Fall 2025": 17.0, "Spring 2026": 17.0}
-            List<String> avoidCourses // e.g., ["CSE 101", "MAT 123"]
+            List<String> avoidCourses, // e.g., ["CSE 101", "MAT 123"]
+            List<String> preferredCourses // e.g., ["CSE 320", "AMS 301"] - courses student wants to take
     ) {}
 
     /**
