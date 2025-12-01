@@ -33,6 +33,14 @@ public interface WaitlistRepository extends JpaRepository<WaitlistEntry, Long> {
     boolean existsByClassEntityAndUser(ClassEntity classEntity, User user);
 
     long countByClassEntity(ClassEntity classEntity);
+    
+    /**
+     * Count waitlist entries with WAITING status for a class
+     * @param classEntity The class entity
+     * @return count of active waitlist entries
+     */
+    @Query("SELECT COUNT(w) FROM WaitlistEntry w WHERE w.classEntity = :classEntity AND w.status = 'WAITING'")
+    long countActiveWaitlistByClassEntity(@Param("classEntity") ClassEntity classEntity);
 
     @Modifying
     @Transactional

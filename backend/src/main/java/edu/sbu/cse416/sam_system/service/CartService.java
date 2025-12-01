@@ -582,10 +582,22 @@ public class CartService {
                             classEntity.setCurrentCapacity(0);
                         }
 
+                        // Check waitlist capacity (20% of max capacity)
+                        long currentWaitlistCount = waitlistRepository.countActiveWaitlistByClassEntity(classEntity);
+                        if (classEntity.isWaitlistFull(currentWaitlistCount)) {
+                            // Waitlist is full, cannot add
+                            result.put("success", false);
+                            result.put("error", "Waitlist is full for " + classEntity.getDepartment() + " " + 
+                                         classEntity.getCourseNum() + ". Maximum waitlist capacity (" + 
+                                         classEntity.getWaitlistCapacity() + ") has been reached.");
+                            return result;
+                        }
+
                         // Avoid duplicate waitlist entries
                         if (!waitlistRepository.existsByClassEntityAndUser(classEntity, user)) {
                             WaitlistEntry entry = new WaitlistEntry(classEntity, user);
                             waitlistRepository.save(entry);
+                            currentWaitlistCount++; // Update count after adding
                         }
 
                         Map<String, Object> wl = new HashMap<>();
@@ -593,7 +605,7 @@ public class CartService {
                         wl.put("department", classEntity.getDepartment());
                         wl.put("courseNum", classEntity.getCourseNum());
                         wl.put("title", classEntity.getTitle());
-                        wl.put("position", waitlistRepository.countByClassEntity(classEntity));
+                        wl.put("position", currentWaitlistCount);
                         waitlistedClasses.add(wl);
 
                         // Remove from cart regardless

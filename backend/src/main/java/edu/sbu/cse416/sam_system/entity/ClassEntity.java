@@ -318,5 +318,30 @@ public class ClassEntity {
         }
         return Math.max(0, maxCapacity - currentCapacity);
     }
+    
+    /**
+     * Get waitlist capacity (20% of max capacity)
+     * @return waitlist capacity, or null if maxCapacity is null
+     */
+    public Integer getWaitlistCapacity() {
+        if (maxCapacity == null) {
+            return null;
+        }
+        // Calculate 20% of max capacity, rounded up
+        return (int) Math.ceil(maxCapacity * 0.2);
+    }
+    
+    /**
+     * Check if waitlist is full
+     * @param currentWaitlistCount current number of students on waitlist
+     * @return true if waitlist is full, false otherwise
+     */
+    public boolean isWaitlistFull(long currentWaitlistCount) {
+        Integer waitlistCapacity = getWaitlistCapacity();
+        if (waitlistCapacity == null) {
+            return false;
+        }
+        return currentWaitlistCount >= waitlistCapacity;
+    }
 }
 
