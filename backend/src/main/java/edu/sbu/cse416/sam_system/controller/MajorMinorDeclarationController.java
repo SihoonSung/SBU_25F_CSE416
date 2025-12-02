@@ -15,6 +15,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,20 +43,34 @@ public class MajorMinorDeclarationController {
      * Test endpoint to check authentication status
      */
     @GetMapping("/debug/auth-test")
-    // TP: Used cursor to verify OAuth2 authentication context
-    public ResponseEntity<?> testAuth(@AuthenticationPrincipal OAuth2User principal) {
+    // TP: Used cursor to verify OAuth2 authentication context (supports both OAuth2User and UserPrincipal)
+    public ResponseEntity<?> testAuth(@AuthenticationPrincipal Object principal) {
         if (principal == null) {
             return ResponseEntity.ok(Map.of(
                 "authenticated", false,
                 "message", "Not authenticated"
             ));
         } else {
-            return ResponseEntity.ok(Map.of(
-                "authenticated", true,
-                "attributes", principal.getAttributes(),
-                "name", principal.getAttribute("name"),
-                "email", principal.getAttribute("email")
-            ));
+            Map<String, Object> response = new HashMap<>();
+            response.put("authenticated", true);
+            response.put("principalType", principal.getClass().getName());
+            
+            // Handle bypass mode authentication (UserPrincipal)
+            if (principal instanceof UserPrincipal userPrincipal) {
+                User user = userPrincipal.getUser();
+                response.put("userId", user != null ? user.getUserId() : null);
+                response.put("email", user != null ? user.getEmail() : null);
+                response.put("name", user != null ? user.getFullName() : null);
+                response.put("role", user != null ? user.getRole() : null);
+            }
+            // Handle OAuth2 authentication (OAuth2User)
+            else if (principal instanceof OAuth2User oauth2User) {
+                response.put("attributes", oauth2User.getAttributes());
+                response.put("name", oauth2User.getAttribute("name"));
+                response.put("email", oauth2User.getAttribute("email"));
+            }
+            
+            return ResponseEntity.ok(response);
         }
     }
     

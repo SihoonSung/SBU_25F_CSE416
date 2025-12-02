@@ -4,8 +4,6 @@ import edu.sbu.cse416.sam_system.entity.PrerequisiteWaiver;
 import edu.sbu.cse416.sam_system.service.PrerequisiteWaiverService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;

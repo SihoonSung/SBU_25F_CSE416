@@ -187,22 +187,39 @@ public class AuthController {
 
     /**
      * Check authentication status
+     * Supports both OAuth2 (OidcUser) and bypass mode (UserPrincipal) authentication
      */
     @GetMapping("/status")
     // TP: Used cursor to check authentication status
     public ResponseEntity<Map<String, Object>> checkAuthStatus(
-            @AuthenticationPrincipal OidcUser principal) {
+            @AuthenticationPrincipal Object principal) {
 
         Map<String, Object> response = new HashMap<>();
 
-        if (principal != null) {
-            response.put("authenticated", true);
-            response.put("user", Map.of(
-                    "email", principal.getEmail(),
-                    "name", principal.getFullName()
-            ));
-        } else {
+        if (principal == null) {
             response.put("authenticated", false);
+            return ResponseEntity.ok(response);
+        }
+
+        response.put("authenticated", true);
+        response.put("principalType", principal.getClass().getName());
+
+        // Handle bypass mode authentication (UserPrincipal)
+        if (principal instanceof UserPrincipal userPrincipal) {
+            User user = userPrincipal.getUser();
+            if (user != null) {
+                response.put("user", Map.of(
+                        "email", user.getEmail() != null ? user.getEmail() : "",
+                        "name", user.getFullName() != null ? user.getFullName() : ""
+                ));
+            }
+        }
+        // Handle OAuth2 authentication (OidcUser)
+        else if (principal instanceof OidcUser oidcUser) {
+            response.put("user", Map.of(
+                    "email", oidcUser.getEmail() != null ? oidcUser.getEmail() : "",
+                    "name", oidcUser.getFullName() != null ? oidcUser.getFullName() : ""
+            ));
         }
 
         return ResponseEntity.ok(response);
