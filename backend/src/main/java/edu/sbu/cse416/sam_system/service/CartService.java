@@ -257,23 +257,31 @@ public class CartService {
         }
         cartRepository.saveAll(cartItems);
         
-        // Check for conflicts
+        // Check for conflicts (only within the same term)
         for (int i = 0; i < cartItems.size(); i++) {
             for (int j = i + 1; j < cartItems.size(); j++) {
                 CartEntity item1 = cartItems.get(i);
                 CartEntity item2 = cartItems.get(j);
                 
+                ClassEntity class1 = item1.getClassEntity();
+                ClassEntity class2 = item2.getClassEntity();
+                
+                // Only check conflicts if both classes are in the same term
+                if (!isSameTerm(class1, class2)) {
+                    continue;
+                }
+                
                 // Combine schedules for conflict checking
-                String schedule1 = combineSchedules(item1.getClassEntity());
-                String schedule2 = combineSchedules(item2.getClassEntity());
+                String schedule1 = combineSchedules(class1);
+                String schedule2 = combineSchedules(class2);
                 
                 if (schedule1 != null && schedule2 != null) {
                     boolean hasConflict = TimeConflictChecker.hasTimeConflict(schedule1, schedule2);
                     
                     if (hasConflict) {
                         // Update both items to Conflict status
-                        cartRepository.updateStatusByUserIdAndClassId(userId, item1.getClassEntity().getClassId(), "Conflict");
-                        cartRepository.updateStatusByUserIdAndClassId(userId, item2.getClassEntity().getClassId(), "Conflict");
+                        cartRepository.updateStatusByUserIdAndClassId(userId, class1.getClassId(), "Conflict");
+                        cartRepository.updateStatusByUserIdAndClassId(userId, class2.getClassId(), "Conflict");
                     }
                 }
             }
@@ -464,7 +472,7 @@ public class CartService {
                 return result;
             }
             
-            // Check for conflicts among cart items
+            // Check for conflicts among cart items (only within the same term)
             List<String> conflicts = new ArrayList<>();
             for (int i = 0; i < cartItems.size(); i++) {
                 for (int j = i + 1; j < cartItems.size(); j++) {
@@ -472,8 +480,16 @@ public class CartService {
                     CartEntity item2 = cartItems.get(j);
                     
                     if (item1.getStatus().equals("Added") && item2.getStatus().equals("Added")) {
-                        String schedule1 = combineSchedules(item1.getClassEntity());
-                        String schedule2 = combineSchedules(item2.getClassEntity());
+                        ClassEntity class1 = item1.getClassEntity();
+                        ClassEntity class2 = item2.getClassEntity();
+                        
+                        // Only check conflicts if both classes are in the same term
+                        if (!isSameTerm(class1, class2)) {
+                            continue;
+                        }
+                        
+                        String schedule1 = combineSchedules(class1);
+                        String schedule2 = combineSchedules(class2);
                         
                         if (schedule1 != null && schedule2 != null) {
                             boolean hasConflict = TimeConflictChecker.hasTimeConflict(schedule1, schedule2);
@@ -481,13 +497,13 @@ public class CartService {
                                 // Check if there's an approved waiver for this conflict
                                 boolean hasWaiver = waiverService.hasApprovedWaiver(
                                     userId, 
-                                    item1.getClassEntity().getClassId(), 
-                                    item2.getClassEntity().getClassId());
+                                    class1.getClassId(), 
+                                    class2.getClassId());
                                 
                                 if (!hasWaiver) {
                                     conflicts.add(String.format("Conflict between %s and %s", 
-                                        item1.getClassEntity().getDepartment() + item1.getClassEntity().getCourseNum(),
-                                        item2.getClassEntity().getDepartment() + item2.getClassEntity().getCourseNum()));
+                                        class1.getDepartment() + class1.getCourseNum(),
+                                        class2.getDepartment() + class2.getCourseNum()));
                                 }
                             }
                         }
@@ -495,10 +511,11 @@ public class CartService {
                 }
             }
             
-            // Check for conflicts between cart items and already registered classes
+            // Check for conflicts between cart items and already registered classes (only within the same term)
             for (CartEntity cartItem : cartItems) {
                 if (cartItem.getStatus().equals("Added")) {
-                    String cartSchedule = combineSchedules(cartItem.getClassEntity());
+                    ClassEntity cartClassEntity = cartItem.getClassEntity();
+                    String cartSchedule = combineSchedules(cartClassEntity);
                     
                     if (cartSchedule != null) {
                         for (UserClasses registeredClass : alreadyRegisteredClasses) {
@@ -506,6 +523,11 @@ public class CartService {
                             ClassEntity registeredClassEntity = classRepository.findById(registeredClass.getClassId()).orElse(null);
                             
                             if (registeredClassEntity != null) {
+                                // Only check conflicts if both classes are in the same term
+                                if (!isSameTerm(cartClassEntity, registeredClassEntity)) {
+                                    continue;
+                                }
+                                
                                 String registeredSchedule = combineSchedules(registeredClassEntity);
                                 
                                 if (registeredSchedule != null) {
@@ -514,12 +536,12 @@ public class CartService {
                                         // Check if there's an approved waiver for this conflict
                                         boolean hasWaiver = waiverService.hasApprovedWaiver(
                                             userId, 
-                                            cartItem.getClassEntity().getClassId(), 
+                                            cartClassEntity.getClassId(), 
                                             registeredClassEntity.getClassId());
                                         
                                         if (!hasWaiver) {
                                             conflicts.add(String.format("Conflict between cart item %s and already registered %s %s", 
-                                                cartItem.getClassEntity().getDepartment() + cartItem.getClassEntity().getCourseNum(),
+                                                cartClassEntity.getDepartment() + cartClassEntity.getCourseNum(),
                                                 registeredClassEntity.getDepartment(), 
                                                 registeredClassEntity.getCourseNum()));
                                         }
@@ -809,6 +831,28 @@ public class CartService {
             return null;
         }
         return trimmed;
+    }
+
+    /**
+     * Check if two ClassEntity objects are in the same term
+     * @param class1 First class entity
+     * @param class2 Second class entity
+     * @return true if both classes are in the same semester and year
+     */
+    private boolean isSameTerm(ClassEntity class1, ClassEntity class2) {
+        if (class1 == null || class2 == null) {
+            return false;
+        }
+        String semester1 = class1.getSemester();
+        String semester2 = class2.getSemester();
+        Integer year1 = class1.getYear();
+        Integer year2 = class2.getYear();
+        
+        if (semester1 == null || semester2 == null || year1 == null || year2 == null) {
+            return false;
+        }
+        
+        return semester1.equalsIgnoreCase(semester2) && year1.equals(year2);
     }
 
     private static class CourseRequisiteInfo {
