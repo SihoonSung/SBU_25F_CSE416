@@ -2,6 +2,7 @@ package edu.sbu.cse416.sam_system.service;
 
 import edu.sbu.cse416.sam_system.entity.MajorMinorDeclaration;
 import edu.sbu.cse416.sam_system.entity.DeclarationType;
+import edu.sbu.cse416.sam_system.entity.DeclarationStatus;
 import edu.sbu.cse416.sam_system.entity.User;
 import edu.sbu.cse416.sam_system.entity.AcademicEvent;
 import edu.sbu.cse416.sam_system.entity.DegreeRequirement;
@@ -193,7 +194,19 @@ public class MajorMinorDeclarationService {
             }
         }
         
-        declaration.approve(advisor, finalNotes);
+        // Check if this is a CEAS advisor approving
+        if (declaration.getCeasAdvisor() != null && declaration.getCeasAdvisor().equals(advisor)) {
+            // This is a CEAS advisor approval
+            declaration.setStatus(DeclarationStatus.APPROVED);
+            declaration.setCeasAdvisor(advisor);
+            declaration.setAdvisorNotes(finalNotes);
+            declaration.setReviewedAt(java.time.LocalDateTime.now());
+            declaration.setUpdatedAt(java.time.LocalDateTime.now());
+            declaration.setIsActive(true);
+        } else {
+            // Regular department advisor approval
+            declaration.approve(advisor, finalNotes);
+        }
         declarationRepository.save(declaration);
         
         // Update student's majors/minors in User table
@@ -245,7 +258,19 @@ public class MajorMinorDeclarationService {
             throw new IllegalArgumentException("Advisor does not have permission to reject this declaration");
         }
         
-        declaration.reject(advisor, notes);
+        // Check if this is a CEAS advisor rejecting
+        if (declaration.getCeasAdvisor() != null && declaration.getCeasAdvisor().equals(advisor)) {
+            // This is a CEAS advisor rejection
+            declaration.setStatus(DeclarationStatus.REJECTED);
+            declaration.setCeasAdvisor(advisor);
+            declaration.setAdvisorNotes(notes);
+            declaration.setReviewedAt(java.time.LocalDateTime.now());
+            declaration.setUpdatedAt(java.time.LocalDateTime.now());
+            declaration.setIsActive(false);
+        } else {
+            // Regular department advisor rejection
+            declaration.reject(advisor, notes);
+        }
         return declarationRepository.save(declaration);
     }
     
@@ -742,7 +767,18 @@ public class MajorMinorDeclarationService {
             }
         }
         
-        // Priority 2: Find advisor with academic_unit containing any CEAS subject
+        // Priority 2: Find advisor with academic_unit containing "CEAS" (for college-level CEAS advisor)
+        for (User advisor : allAdvisors) {
+            if (advisor.getAcademicUnit() != null) {
+                String academicUnit = advisor.getAcademicUnit();
+                // Check if advisor's academic unit contains "CEAS" (for college-level advisor)
+                if (academicUnit.contains("CEAS")) {
+                    return advisor;
+                }
+            }
+        }
+        
+        // Priority 3: Find advisor with academic_unit containing any CEAS subject
         for (User advisor : allAdvisors) {
             if (advisor.getAcademicUnit() != null) {
                 String academicUnit = advisor.getAcademicUnit();

@@ -122,7 +122,12 @@ public class MajorMinorDeclaration {
     // Business methods
     public void approve(User advisor, String notes) {
         this.status = DeclarationStatus.APPROVED;
-        this.advisor = advisor;
+        // Check if this is a CEAS advisor (if ceasAdvisor was set during creation)
+        if (this.ceasAdvisor != null && this.ceasAdvisor.equals(advisor)) {
+            this.ceasAdvisor = advisor;
+        } else {
+            this.advisor = advisor;
+        }
         this.advisorNotes = notes;
         this.reviewedAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -131,7 +136,12 @@ public class MajorMinorDeclaration {
     
     public void reject(User advisor, String notes) {
         this.status = DeclarationStatus.REJECTED;
-        this.advisor = advisor;
+        // Check if this is a CEAS advisor (if ceasAdvisor was set during creation)
+        if (this.ceasAdvisor != null && this.ceasAdvisor.equals(advisor)) {
+            this.ceasAdvisor = advisor;
+        } else {
+            this.advisor = advisor;
+        }
         this.advisorNotes = notes;
         this.reviewedAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
