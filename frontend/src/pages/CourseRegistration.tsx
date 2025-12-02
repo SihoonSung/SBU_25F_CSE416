@@ -971,8 +971,10 @@ function CourseRegistration() {
           alert(`Registration failed - antirequisites conflict:\n${data.antirequisiteErrors.join('\n')}`)
         } else if (data.corequisiteErrors && data.corequisiteErrors.length > 0) {
           alert(`Registration failed - corequisites not met:\n${data.corequisiteErrors.join('\n')}`)
+        } else if (data.error) {
+          alert('Registration failed: ' + data.error)
         } else {
-          alert('Registration failed: ' + data.message)
+          alert('Registration failed: ' + (data.message || 'Unknown error'))
         }
       }
     } catch (error) {

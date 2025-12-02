@@ -225,6 +225,8 @@ public class RegistrationScheduleService {
     
     /**
      * Check if a student can register for a specific term
+     * During a current term, students can only register for the next term
+     * For example, during Fall 2025, students can only register for Spring 2026
      * @param userId Student ID
      * @param semester Semester (Fall, Spring, Summer)
      * @param year Year
@@ -238,18 +240,79 @@ public class RegistrationScheduleService {
         Integer cumulativeCredits = calculateCumulativeCredits(userId);
         String classStanding = calculateClassStanding(cumulativeCredits);
         
-        // Find all active schedules for the term
-        List<RegistrationSchedule> activeSchedules = scheduleRepository.findActiveSchedulesForTerm(
-            semester, year, currentDate);
+        // Determine the current term based on the current date
+        java.util.Map<String, Object> currentTerm = getCurrentTerm(currentDate);
+        String currentSemester = (String) currentTerm.get("semester");
+        Integer currentYear = (Integer) currentTerm.get("year");
         
-        // Check if any schedule matches the student's criteria
-        for (RegistrationSchedule schedule : activeSchedules) {
-            if (schedule.matchesStudent(cumulativeCredits, classStanding)) {
-                return true;
+        // If we're in a current term, students can only register for the next term
+        if (currentSemester != null && currentYear != null) {
+            // Check if the requested term is the next term after the current term
+            java.util.Map<String, Object> nextTerm = getNextTerm(currentSemester, currentYear);
+            String nextSemester = (String) nextTerm.get("semester");
+            Integer nextYear = (Integer) nextTerm.get("year");
+            
+            // Only allow registration if the requested term matches the next term
+            if (!semester.equalsIgnoreCase(nextSemester) || !year.equals(nextYear)) {
+                return false;
+            }
+            
+            // Check if registration is open for the current term
+            List<RegistrationSchedule> currentTermSchedules = scheduleRepository.findActiveSchedulesForTerm(
+                currentSemester, currentYear, currentDate);
+            
+            // If registration is open for the current term, allow registration for the next term
+            for (RegistrationSchedule schedule : currentTermSchedules) {
+                if (schedule.matchesStudent(cumulativeCredits, classStanding)) {
+                    return true;
+                }
+            }
+        } else {
+            // If we're not in a current term, check if registration is open for the requested term directly
+            List<RegistrationSchedule> activeSchedules = scheduleRepository.findActiveSchedulesForTerm(
+                semester, year, currentDate);
+            
+            for (RegistrationSchedule schedule : activeSchedules) {
+                if (schedule.matchesStudent(cumulativeCredits, classStanding)) {
+                    return true;
+                }
             }
         }
         
         return false;
+    }
+    
+    /**
+     * Determine the current term based on the current date
+     * Fall: August - December
+     * Spring: January - May
+     * Summer: June - July
+     * @param currentDate Current date
+     * @return Map with "semester" and "year" keys, or null if not in any term
+     */
+    private java.util.Map<String, Object> getCurrentTerm(LocalDate currentDate) {
+        java.util.Map<String, Object> term = new java.util.HashMap<>();
+        int month = currentDate.getMonthValue();
+        int year = currentDate.getYear();
+        
+        if (month >= 8 && month <= 12) {
+            // Fall term: August - December
+            term.put("semester", "Fall");
+            term.put("year", year);
+        } else if (month >= 1 && month <= 5) {
+            // Spring term: January - May
+            term.put("semester", "Spring");
+            term.put("year", year);
+        } else if (month >= 6 && month <= 7) {
+            // Summer term: June - July
+            term.put("semester", "Summer");
+            term.put("year", year);
+        } else {
+            // Not in any term period
+            return null;
+        }
+        
+        return term;
     }
     
     /**
