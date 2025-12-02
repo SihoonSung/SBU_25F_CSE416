@@ -31,7 +31,7 @@ public class SamSystemApplication {
 	public static void main(String[] args) {
 		// TP: Used cursor to launch Spring Boot application
 		// Load .env file and set system properties
-		loadEnvFile("/mnt/c/Users/minse/CSE416_project/sbu_cse416/backend/.env");
+		loadEnvFile("/Users/yoonjaeseong/SBU_25F_CSE416/backend/.env");
 		
 		SpringApplication.run(SamSystemApplication.class, args);
 	}

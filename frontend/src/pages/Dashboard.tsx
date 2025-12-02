@@ -2,10 +2,10 @@
  * TP: Used Cursor to implement dashboard page with Google OAuth2 integration and user dashboard
  */
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import './Dashboard.css'
-import { getBackendBase, getDefaultSemester, getDefaultYear } from '../constants'
+import { getBackendBase, getDefaultSemester, getDefaultYear, getCurrentSemester, getCurrentYear } from '../constants'
 
 type Me = {
   userId: number
@@ -16,6 +16,7 @@ type Me = {
   role?: string
   profilePictureUrl?: string
   isActive?: boolean
+  studentId?: string | null
 } | null
 
 /**
@@ -30,7 +31,6 @@ function Dashboard() {
   const [registrationEligibility, setRegistrationEligibility] = useState<any>(null)
   const [currentSemester, setCurrentSemester] = useState<string>(getDefaultSemester())
   const [currentYear, setCurrentYear] = useState<number>(getDefaultYear())
-  const [latestTerm, setLatestTerm] = useState<{ semester: string; year: number } | null>(null)
   const [timeConflicts, setTimeConflicts] = useState<string[]>([])
   const [activeHolds, setActiveHolds] = useState<any[]>([])
   const [pendingOverrides, setPendingOverrides] = useState<number>(0)
@@ -49,6 +49,14 @@ function Dashboard() {
   const [calculatedGpa, setCalculatedGpa] = useState<number | null>(null)
   const [cumulativeCredits, setCumulativeCredits] = useState<number>(0)
   const [termGpa, setTermGpa] = useState<number | null>(null)
+  const [studentSchedule, setStudentSchedule] = useState<any[]>([])
+  const [studentCoursePlan, setStudentCoursePlan] = useState<any[]>([])
+  const [academicEvents, setAcademicEvents] = useState<any[]>([])
+  const [overallProgress, setOverallProgress] = useState<number>(0)
+  const [recentImports, setRecentImports] = useState<{
+    classes: Array<{ term: string; courseCount: number }>
+    degreeReqs: Array<{ subject: string; version: string }>
+  }>({ classes: [], degreeReqs: [] })
 
   const backendBase = getBackendBase()
 
@@ -92,45 +100,25 @@ function Dashboard() {
           const user = data.user ?? null
           setMe(user)
           
-          console.log(`[Dashboard] User data:`, user)
-          
           // Normalize role (handle case-insensitive and array formats)
           const userRole = user?.role ? String(user.role).toUpperCase() : null
-          console.log(`[Dashboard] Normalized role: ${userRole}, userId: ${user?.userId}`)
           
-          // Get latest term for student dashboard
-          try {
-            const termsResponse = await fetch(`${backendBase}/api/classes/terms`, {
-              credentials: 'include'
-            })
-            if (termsResponse.ok) {
-              const terms = await termsResponse.json()
-              if (Array.isArray(terms) && terms.length > 0) {
-                // Get the most recent term
-                const latest = terms[0]
-                const semester = latest.semester ? 
-                  (latest.semester.charAt(0).toUpperCase() + latest.semester.slice(1).toLowerCase()) : 
-                  getDefaultSemester()
-                const year = latest.year || getDefaultYear()
-                setLatestTerm({ semester, year })
-                setCurrentSemester(semester)
-                setCurrentYear(year)
-              }
-            }
-          } catch (error) {
-            console.error('Error fetching terms:', error)
-          }
+          // Set current term based on current date (not API's latest term)
+          const currentDateSemester = getCurrentSemester()
+          const currentDateYear = getCurrentYear()
+          setCurrentSemester(currentDateSemester)
+          setCurrentYear(currentDateYear)
 
           // Check registration eligibility if user is a student
           if (userRole === 'STUDENT' && user?.userId) {
-            console.log(`[Dashboard] User is a student, userId: ${user.userId}`)
             await checkRegistrationEligibility(user.userId)
             await checkTimeConflicts(user.userId)
             await calculateGpa(user.userId)
             await checkActiveHolds(user.userId)
             await checkStudentPendingItems(user.userId)
-          } else {
-            console.log(`[Dashboard] User is not a student. Role: ${userRole}, userId: ${user?.userId}`)
+            await fetchStudentSchedule(user.userId)
+            await fetchStudentCoursePlan(user.userId)
+            await fetchAcademicEvents()
           }
           
           // Fetch professor data if user is an instructor
@@ -150,10 +138,8 @@ function Dashboard() {
           
           // Check pending overrides if user is admin/registrar
           if ((userRole === 'REGISTRAR' || userRole === 'ADMIN') && user?.userId) {
-            console.log('User role for admin dashboard:', userRole, 'User ID:', user.userId)
             await checkPendingOverrides()
-          } else {
-            console.log('User is not registrar/admin. Role:', userRole, 'User ID:', user?.userId)
+            await fetchRecentImports()
           }
         } else {
           setMe(null)
@@ -207,7 +193,6 @@ function Dashboard() {
 
       if (waiversResponse.ok) {
         const waivers = await waiversResponse.json()
-        console.log(`[Dashboard] Received waivers for student ${userId}:`, waivers)
         if (Array.isArray(waivers)) {
           // Filter for pending waivers
           // Pending if: status is PENDING, or any approval field is null (not yet approved/rejected)
@@ -220,17 +205,13 @@ function Dashboard() {
             const waitingForRegistrar = w.registrarApproved === null || w.registrarApproved === undefined
             
             const isPending = isPendingStatus || waitingForAdvisor || waitingForInstructor || waitingForRegistrar
-            console.log(`[Dashboard] Waiver ${w.waiverId}: status=${status}, advisorApproved=${w.advisorApproved}, instructorApproved=${w.instructorApproved}, isPending=${isPending}`)
             return isPending
           })
           setStudentPendingWaivers(pending.length)
-          console.log(`[Dashboard] Found ${pending.length} pending waivers out of ${waivers.length} total for student ${userId}`)
         } else {
-          console.log(`[Dashboard] Waivers response is not an array:`, waivers)
           setStudentPendingWaivers(0)
         }
       } else {
-        console.error(`[Dashboard] Failed to fetch waivers: ${waiversResponse.status}`)
         setStudentPendingWaivers(0)
       }
 
@@ -241,7 +222,6 @@ function Dashboard() {
 
       if (declarationsResponse.ok) {
         const data = await declarationsResponse.json()
-        console.log(`[Dashboard] Received declarations for student ${userId}:`, data)
         if (data.success && Array.isArray(data.declarations)) {
           // Filter for pending declarations
           // Pending if: status is PENDING, or approved is null/false
@@ -250,21 +230,16 @@ function Dashboard() {
             const isPendingStatus = status === 'PENDING' || status === 'SUBMITTED'
             const isNotApproved = d.approved === null || d.approved === undefined || d.approved === false
             const isPending = isPendingStatus || isNotApproved
-            console.log(`[Dashboard] Declaration ${d.declarationId || d.id}: status=${status}, approved=${d.approved}, isPending=${isPending}`)
             return isPending
           })
           setStudentPendingDeclarations(pending.length)
-          console.log(`[Dashboard] Found ${pending.length} pending declarations out of ${data.declarations.length} total for student ${userId}`)
         } else {
-          console.log(`[Dashboard] Declarations response format unexpected:`, data)
           setStudentPendingDeclarations(0)
         }
       } else {
-        console.error(`[Dashboard] Failed to fetch declarations: ${declarationsResponse.status}`)
         setStudentPendingDeclarations(0)
       }
     } catch (error) {
-      console.error('[Dashboard] Error checking student pending items:', error)
       setStudentPendingWaivers(0)
       setStudentPendingDeclarations(0)
     }
@@ -293,7 +268,6 @@ function Dashboard() {
       }
     } catch (error) {
       // Silently ignore - registration can proceed without schedule
-      console.log('Registration schedule check failed:', error)
     }
   }
 
@@ -397,18 +371,13 @@ function Dashboard() {
    * Calculate GPA directly from completed classes
    */
   const calculateGpa = async (userId: number) => {
-    console.log(`[Dashboard] Starting GPA calculation for userId: ${userId}`)
     try {
       const completedClassesResponse = await fetch(`${backendBase}/api/users/${userId}/classes/completed`, {
         credentials: 'include'
       })
       
-      console.log(`[Dashboard] Completed classes API response status: ${completedClassesResponse.status}`)
-      
       if (completedClassesResponse.ok) {
         const completedClasses: Array<{ credits: number; grade: string | null; semester?: string; year?: number }> = await completedClassesResponse.json()
-        
-        console.log(`[Dashboard] Received ${completedClasses.length} completed classes:`, completedClasses)
         
         // Grade to GPA points mapping
         const gradePoints: Record<string, number> = {
@@ -448,7 +417,6 @@ function Dashboard() {
         
         // Calculate cumulative GPA
         const calculatedGpaValue = totalCredits > 0 ? totalPoints / totalCredits : null
-        console.log(`[Dashboard] Calculated cumulative GPA: ${calculatedGpaValue}, Total credits: ${totalCredits}, Graded classes: ${gradedClasses.length}`)
         setCalculatedGpa(calculatedGpaValue)
         
         // Calculate most recent term GPA (find the term with most recent year and semester)
@@ -512,38 +480,226 @@ function Dashboard() {
             })
             
             const termGpaValue = termCredits > 0 ? termPoints / termCredits : null
-            console.log(`[Dashboard] Setting term GPA: ${termGpaValue}, Latest term: ${latestTermKey}, Term credits: ${termCredits}`)
             setTermGpa(termGpaValue)
           } else {
-            console.log(`[Dashboard] No latest term found from completed classes`)
             setTermGpa(null)
           }
         } else {
-          console.log(`[Dashboard] No completed classes found, cannot calculate term GPA`)
           setTermGpa(null)
         }
         
         // Set total credits (include all completed classes)
         const allCredits = completedClasses.reduce((sum, cls) => sum + (cls.credits || 0), 0)
-        console.log(`[Dashboard] Setting cumulative credits: ${allCredits}`)
         setCumulativeCredits(allCredits)
-        
-        // Get final term GPA value (check state will be updated after render)
-        const finalTermGpa = termGpa !== null ? termGpa.toFixed(2) : 'N/A'
-        console.log(`[Dashboard] Final results - Cumulative GPA: ${calculatedGpaValue?.toFixed(2)}, Total Credits: ${allCredits}`)
       } else {
-        console.error(`[Dashboard] Failed to fetch completed classes. Status: ${completedClassesResponse.status}`)
         setCalculatedGpa(null)
         setTermGpa(null)
         setCumulativeCredits(0)
       }
     } catch (error) {
-      console.error('[Dashboard] Error calculating GPA:', error)
       setCalculatedGpa(null)
       setTermGpa(null)
       setCumulativeCredits(0)
     }
   }
+
+  /**
+   * Fetch student schedule for current term (following Profile.tsx logic)
+   */
+  const fetchStudentSchedule = async (userId: number) => {
+    try {
+      const termToUse = `${currentYear}-${currentSemester}`
+      const termYearNum = currentYear
+      const normalizedSemester = currentSemester ? 
+        (currentSemester.charAt(0).toUpperCase() + currentSemester.slice(1).toLowerCase()) : 
+        null
+      
+      console.log('[Dashboard] Fetching schedule for term:', termToUse, 'userId:', userId)
+      
+      // First, try to get studentId from profile
+      let studentId: string | null = null
+      if (me?.studentId) {
+        studentId = me.studentId
+        console.log('[Dashboard] Using studentId from me:', studentId)
+      } else {
+        // Try to get studentId from profile API
+        try {
+          const profileResponse = await fetch(`${backendBase}/api/profile/me`, {
+            credentials: 'include'
+          })
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json()
+            studentId = profileData.studentId || profileData.sbuId || null
+            console.log('[Dashboard] Got studentId from profile API:', studentId)
+          }
+        } catch (error) {
+          console.error('[Dashboard] Error fetching profile:', error)
+          // Continue with roster API
+        }
+      }
+      
+      // Try profile schedule API first (like Profile.tsx)
+      if (studentId && termYearNum && normalizedSemester) {
+        try {
+          const profileScheduleUrl = `${backendBase}/api/profile/student-id/${encodeURIComponent(studentId)}/schedule?term=${encodeURIComponent(termToUse)}`
+          console.log('[Dashboard] Trying profile schedule API:', profileScheduleUrl)
+          const scheduleResponse = await fetch(profileScheduleUrl, {
+            credentials: 'include'
+          })
+          
+          if (scheduleResponse.ok) {
+            const scheduleData = await scheduleResponse.json()
+            console.log('[Dashboard] Profile schedule API response:', scheduleData)
+            if (Array.isArray(scheduleData) && scheduleData.length > 0) {
+              console.log('[Dashboard] Setting schedule from profile API:', scheduleData.length, 'classes')
+              setStudentSchedule(scheduleData)
+              return
+            }
+          } else {
+            console.log('[Dashboard] Profile schedule API failed:', scheduleResponse.status)
+          }
+        } catch (error) {
+          console.error('[Dashboard] Error fetching profile schedule:', error)
+          // Fall through to roster API
+        }
+      }
+      
+      // Fallback to roster API (like Profile.tsx)
+      if (termYearNum && normalizedSemester) {
+        try {
+          const rosterUrl = `${backendBase}/api/roster/student/${userId}`
+          console.log('[Dashboard] Trying roster API:', rosterUrl, 'filtering for:', termYearNum, normalizedSemester)
+          const rosterResponse = await fetch(rosterUrl, {
+            credentials: 'include'
+          })
+          
+          if (rosterResponse.ok) {
+            const rosterData = await rosterResponse.json()
+            console.log('[Dashboard] Roster API response:', rosterData?.length || 0, 'items')
+            
+            if (Array.isArray(rosterData) && rosterData.length > 0) {
+              const filtered = rosterData.filter((item: any) => {
+                const itemYear = typeof item.year === 'number' ? item.year : parseInt(String(item.year))
+                const itemSemester = item.semester ? 
+                  (item.semester.charAt(0).toUpperCase() + item.semester.slice(1).toLowerCase()) : 
+                  null
+                return itemYear === termYearNum && itemSemester === normalizedSemester
+              })
+              
+              console.log('[Dashboard] Filtered roster data:', filtered.length, 'items for term')
+              
+              if (filtered.length > 0) {
+                // Map to schedule format (like Profile.tsx)
+                const scheduleData = filtered.map((item: any) => ({
+                  classId: item.classId,
+                  subject: item.department || item.subject,
+                  courseNum: item.courseNum,
+                  section: item.section || '',
+                  title: item.title || '',
+                  schedule: item.schedule || '',
+                  location: item.location || '',
+                  instructor: item.instructor || '',
+                  credits: item.credits || item.minCredits || 0
+                }))
+                console.log('[Dashboard] Setting schedule from roster API:', scheduleData.length, 'classes')
+                setStudentSchedule(scheduleData)
+                return
+              }
+            }
+          } else {
+            console.log('[Dashboard] Roster API failed:', rosterResponse.status)
+          }
+        } catch (error) {
+          console.error('[Dashboard] Error fetching roster data for schedule:', error)
+        }
+      }
+      
+      // If nothing found, set empty array
+      console.log('[Dashboard] No schedule data found, setting empty array')
+      setStudentSchedule([])
+    } catch (error) {
+      console.error('Error fetching student schedule:', error)
+      setStudentSchedule([])
+    }
+  }
+
+  /**
+   * Fetch student course plan
+   */
+  const fetchStudentCoursePlan = async (userId: number) => {
+    try {
+      const response = await fetch(`${backendBase}/api/planner/${userId}`, {
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.plannedCourses && Array.isArray(data.plannedCourses)) {
+          setStudentCoursePlan(data.plannedCourses)
+        } else {
+          setStudentCoursePlan([])
+        }
+      } else {
+        // Fallback to user course plan API
+        const fallbackResponse = await fetch(`${backendBase}/api/users/${userId}/course-plan`, {
+          credentials: 'include'
+        })
+        
+        if (fallbackResponse.ok) {
+          const planData = await fallbackResponse.json()
+          setStudentCoursePlan(Array.isArray(planData) ? planData : [])
+        } else {
+          setStudentCoursePlan([])
+        }
+      }
+    } catch (error) {
+      setStudentCoursePlan([])
+    }
+  }
+
+  /**
+   * Fetch academic events for reminders
+   */
+  const fetchAcademicEvents = async () => {
+    try {
+      const response = await fetch(`${backendBase}/api/admin/academic-calendar`, {
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const events = await response.json()
+        setAcademicEvents(Array.isArray(events) ? events : [])
+      } else {
+        setAcademicEvents([])
+      }
+    } catch (error) {
+      setAcademicEvents([])
+    }
+  }
+
+  /**
+   * Calculate overall progress based on cumulative credits
+   */
+  useEffect(() => {
+    if (cumulativeCredits > 0) {
+      // Typical degree requirement is 120 credits
+      const totalRequired = 120
+      const progress = Math.min(100, Math.round((cumulativeCredits / totalRequired) * 100))
+      setOverallProgress(progress)
+    } else {
+      setOverallProgress(0)
+    }
+  }, [cumulativeCredits])
+
+  /**
+   * Refetch schedule when semester/year changes
+   */
+  useEffect(() => {
+    if (me?.userId && me?.role === 'STUDENT' && currentSemester && currentYear) {
+      fetchStudentSchedule(me.userId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSemester, currentYear])
 
   /**
    * Fetch advisor data (pending declarations and waivers)
@@ -575,7 +731,6 @@ function Dashboard() {
         }
       }
     } catch (error) {
-      console.error('Error fetching advisor data:', error)
       setPendingDeclarations(0)
       setAdvisorPendingWaivers(0)
     }
@@ -630,7 +785,6 @@ function Dashboard() {
       setPendingOverrides(pendingCount)
       setRecentOverrides(recentWaivers)
     } catch (error) {
-      console.error('Error checking pending overrides:', error)
       setPendingOverrides(0)
       setRecentOverrides([])
     }
@@ -668,7 +822,6 @@ function Dashboard() {
             }
             return null
           } catch (error) {
-            console.error(`Error fetching stats for class ${cls.classId}:`, error)
             return null
           }
         })
@@ -691,7 +844,7 @@ function Dashboard() {
               pendingCount += (roster || []).filter((student: any) => !student.grade && student.status === 'ENROLLED').length
             }
           } catch (error) {
-            console.error(`Error fetching roster for class ${cls.classId}:`, error)
+            // Silently handle errors
           }
         }
         setPendingGrades(pendingCount)
@@ -711,11 +864,11 @@ function Dashboard() {
             setPendingWaivers((waivers || []).length)
           }
         } catch (error) {
-          console.error('Error fetching pending waivers:', error)
+          // Silently handle errors
         }
       }
     } catch (error) {
-      console.error('Error fetching professor data:', error)
+      // Silently handle errors
     }
   }
 
@@ -734,12 +887,6 @@ function Dashboard() {
         const stats = await userStatsResponse.json()
         setUserStats(stats)
       } else {
-        // Silently handle 403 errors - don't log warnings for non-registrar users
-        if (userStatsResponse.status !== 403) {
-          const errorText = await userStatsResponse.text().catch(() => 'Unknown error')
-          console.error('Failed to fetch user statistics:', userStatsResponse.status, errorText)
-        }
-        
         setUserStats({ 
           totalUsers: 0, 
           activeUsers: 0,
@@ -781,6 +928,76 @@ function Dashboard() {
         advisors: 0,
         registrars: 0
       })
+    }
+  }
+
+  /**
+   * Fetch recent imports (scraped terms and degree requirements)
+   */
+  const fetchRecentImports = async () => {
+    try {
+      // Fetch scraped terms (recent class imports)
+      const termsResponse = await fetch(`${backendBase}/api/scraping/terms`, {
+        credentials: 'include'
+      })
+      
+      let classes: Array<{ term: string; courseCount: number }> = []
+      if (termsResponse.ok) {
+        const terms = await termsResponse.json()
+        if (Array.isArray(terms)) {
+          // Get course count for each term
+          const termPromises = terms
+            .filter((t: any) => t.isScraped)
+            .slice(0, 5) // Get 5 most recent
+            .map(async (term: any) => {
+              try {
+                const coursesResponse = await fetch(`${backendBase}/api/scraping/courses/byTerm?term=${encodeURIComponent(term.name)}`, {
+                  credentials: 'include'
+                })
+                if (coursesResponse.ok) {
+                  const courses = await coursesResponse.json()
+                  return {
+                    term: term.name,
+                    courseCount: Array.isArray(courses) ? courses.length : 0
+                  }
+                }
+                return { term: term.name, courseCount: 0 }
+              } catch {
+                return { term: term.name, courseCount: 0 }
+              }
+            })
+          classes = await Promise.all(termPromises)
+        }
+      }
+
+      // Fetch degree requirements (recent degree req imports)
+      const degreeReqsResponse = await fetch(`${backendBase}/api/degree-requirements`, {
+        credentials: 'include'
+      })
+      
+      let degreeReqs: Array<{ subject: string; version: string }> = []
+      if (degreeReqsResponse.ok) {
+        const data = await degreeReqsResponse.json()
+        if (data.success && Array.isArray(data.requirements)) {
+          // Group by subject and get effective term as version
+          const reqsBySubject = new Map<string, string>()
+          data.requirements.forEach((req: any) => {
+            if (req.subjectCode && req.effectiveTerm) {
+              const existing = reqsBySubject.get(req.subjectCode)
+              if (!existing || req.effectiveTerm > existing) {
+                reqsBySubject.set(req.subjectCode, req.effectiveTerm)
+              }
+            }
+          })
+          degreeReqs = Array.from(reqsBySubject.entries())
+            .slice(0, 5)
+            .map(([subject, version]) => ({ subject, version }))
+        }
+      }
+
+      setRecentImports({ classes, degreeReqs })
+    } catch (error) {
+      setRecentImports({ classes: [], degreeReqs: [] })
     }
   }
 
@@ -1148,10 +1365,10 @@ function Dashboard() {
           <div className="progress-section">
             <div className="progress-header">
               <div className="progress-label">Overall Progress</div>
-              <div className="progress-text">85%</div>
+              <div className="progress-text">{overallProgress}%</div>
             </div>
             <div className="progress-bar">
-              <div className="progress-fill" style={{ width: '85%' }}></div>
+              <div className="progress-fill" style={{ width: `${overallProgress}%` }}></div>
             </div>
           </div>
 
@@ -1159,83 +1376,115 @@ function Dashboard() {
           <div className="reminder-card">
             <div className="reminder-title">Reminder</div>
             <div className="reminder-content">
-              <div>3 days left to apply for GPNC.</div>
-              <div>72 more days and you're done with this semester!</div>
+              {academicEvents.length > 0 ? (
+                academicEvents
+                  .filter((event: any) => {
+                    if (!event.date) return false
+                    const eventDate = new Date(event.date)
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const daysDiff = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                    return daysDiff >= 0 && daysDiff <= 30 // Show events in next 30 days
+                  })
+                  .sort((a: any, b: any) => {
+                    const dateA = new Date(a.date).getTime()
+                    const dateB = new Date(b.date).getTime()
+                    return dateA - dateB
+                  })
+                  .slice(0, 2)
+                  .map((event: any, idx: number) => {
+                    const eventDate = new Date(event.date)
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const daysDiff = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                    return (
+                      <div key={idx}>
+                        {daysDiff === 0 ? 'Today: ' : daysDiff === 1 ? 'Tomorrow: ' : `${daysDiff} days left: `}
+                        {event.description || event.eventName || 'Academic event'}
+                      </div>
+                    )
+                  })
+              ) : (
+                <div>No upcoming events.</div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Right Column */}
         <div className="right-column">
-          {/* Course Schedule - Temporary hardcoded */}
+          {/* Course Schedule */}
           <div className="schedule-section">
             <div className="section-header">
-              <h2>Course Schedule</h2>
-              <h3>Spring 2025</h3>
+              <h2>Current Classes</h2>
+              <h3>{currentSemester} {currentYear}</h3>
             </div>
 
-            <table className="schedule-table">
-              <thead>
-                <tr>
-                  <th className="time-header">Time</th>
-                  <th className="day-header">Mon</th>
-                  <th className="day-header">Tue</th>
-                  <th className="day-header">Wed</th>
-                  <th className="day-header">Thu</th>
-                  <th className="day-header">Fri</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="time-cell">9</td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell cse373" rowSpan={2}>CSE373<br/>FREY HALL 317</td>
-                  <td className="course-cell cse312" rowSpan={2}>CSE312<br/>COMPUTER SCI 312B</td>
-                  <td className="course-cell cse300" rowSpan={2}>CSE300<br/>FREY HALL 328</td>
-                  <td className="course-cell cse355" rowSpan={2}>CSE355<br/>ONLINE</td>
-                </tr>
-                <tr>
-                  <td className="time-cell">10</td>
-                  <td className="course-cell"></td>
-                </tr>
-
-                <tr>
-                  <td className="time-cell">11</td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell ams310">AMS310<br/>HUMANITIES 1006</td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                </tr>
-
-                <tr>
-                  <td className="time-cell">12</td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                </tr>
-
-                <tr>
-                  <td className="time-cell">1</td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                </tr>
-
-                <tr>
-                  <td className="time-cell">2</td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell cse416">CSE416<br/>FREY HALL 317</td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                  <td className="course-cell"></td>
-                </tr>
-              </tbody>
-            </table>
+            {studentSchedule.length > 0 ? (
+              <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {studentSchedule.map((course: any, idx: number) => {
+                    const courseCode = `${course.subject || course.department || ''}${course.courseNum || ''}`
+                    const scheduleStr = combineSchedules(course)
+                    const location = course.location || ''
+                    const instructor = course.instructor || ''
+                    const title = course.title || ''
+                    
+                    return (
+                      <div 
+                        key={idx}
+                        style={{
+                          padding: '1rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '8px',
+                          backgroundColor: '#fff'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                          <div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                              {courseCode}
+                              {course.section && <span style={{ fontSize: '0.9rem', fontWeight: 'normal', color: '#666' }}> - Section {course.section}</span>}
+                            </div>
+                            {title && (
+                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.25rem' }}>
+                                {title}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem', color: '#555' }}>
+                          {scheduleStr && (
+                            <div>
+                              <strong>Schedule:</strong> {scheduleStr}
+                            </div>
+                          )}
+                          {location && (
+                            <div>
+                              <strong>Location:</strong> {location}
+                            </div>
+                          )}
+                          {instructor && (
+                            <div>
+                              <strong>Instructor:</strong> {instructor}
+                            </div>
+                          )}
+                          {course.credits && (
+                            <div>
+                              <strong>Credits:</strong> {course.credits}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                No classes scheduled for {currentSemester} {currentYear}
+              </div>
+            )}
           </div>
 
           {/* Planner */}
@@ -1244,44 +1493,59 @@ function Dashboard() {
               <h2>Planner</h2>
             </div>
             <div className="planner-container">
-              <div className="planner-columns">
-                <div className="planner-column">
-                  <div className="planner-semester">Spring 2025</div>
-                  <div className="course-buttons">
-                    <button className="course-btn">AMS 326</button>
-                    <button className="course-btn">AMS 373</button>
-                    <button className="course-btn">CSE 316</button>
-                    <button className="course-btn">CSE 327</button>
-                    <button className="course-btn">CSE 478</button>
-                    <button className="course-btn">WRT 102</button>
-                  </div>
+              {studentCoursePlan.length > 0 ? (
+                (() => {
+                  // Group courses by semester and year
+                  const planByTerm: { [key: string]: any[] } = {}
+                  studentCoursePlan.forEach((course: any) => {
+                    const semester = course.semester || currentSemester
+                    const year = course.year || currentYear
+                    const termKey = `${semester} ${year}`
+                    if (!planByTerm[termKey]) planByTerm[termKey] = []
+                    planByTerm[termKey].push(course)
+                  })
+                  
+                  // Sort terms chronologically
+                  const sortedTerms = Object.keys(planByTerm).sort((a, b) => {
+                    const [semA, yearA] = a.split(' ')
+                    const [semB, yearB] = b.split(' ')
+                    const yearNumA = parseInt(yearA)
+                    const yearNumB = parseInt(yearB)
+                    if (yearNumA !== yearNumB) return yearNumA - yearNumB
+                    const semOrder: { [key: string]: number } = { 'Spring': 0, 'Summer': 1, 'Fall': 2 }
+                    return (semOrder[semA] || 0) - (semOrder[semB] || 0)
+                  })
+                  
+                  return (
+                    <div className="planner-columns">
+                      {sortedTerms.slice(0, 3).map((term, idx) => (
+                        <div key={idx} className="planner-column">
+                          <div className="planner-semester">{term}</div>
+                          <div className="course-buttons">
+                            {planByTerm[term].map((course: any, courseIdx: number) => {
+                              const courseCode = `${course.department || ''} ${course.courseNum || course.courseNumber || ''}`.trim()
+                              return (
+                                <button key={courseIdx} className="course-btn">
+                                  {courseCode}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      {sortedTerms.length === 0 && (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          No courses planned
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()
+              ) : (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  No courses planned
                 </div>
-                <div className="planner-column">
-                  <div className="planner-semester">Fall 2025</div>
-                  <div className="course-buttons">
-                    <button className="course-btn">AMS 310</button>
-                    <button className="course-btn">CSE 300</button>
-                    <button className="course-btn">CSE 312</button>
-                    <button className="course-btn">CSE 355</button>
-                    <button className="course-btn">CSE 373</button>
-                    <button className="course-btn">CSE 416</button>
-                  </div>
-                </div>
-                <div className="planner-column">
-                  <div className="planner-semester">Spring 2026</div>
-                  <div className="course-buttons">
-                    <button className="course-btn">CSE 350</button>
-                    <button className="course-btn">CSE 390</button>
-                    <button className="course-btn">CSE 487</button>
-                    <button className="course-btn">KOR 220</button>
-                    <button className="course-btn">POL 102</button>
-                  </div>
-                </div>
-              </div>
-              <div className="planner-nav">
-                <span className="nav-arrow">←</span>
-                <span className="nav-arrow">→</span>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -1467,21 +1731,33 @@ function Dashboard() {
                   <div className="planner-column">
                     <div className="planner-semester">Classes</div>
                     <div className="course-buttons">
-                      <button className="course-btn">Fall 2025 • 520 rows</button>
-                      <button className="course-btn">Spring 2025 • 498 rows</button>
+                      {recentImports.classes.length > 0 ? (
+                        recentImports.classes.map((item, idx) => (
+                          <button key={idx} className="course-btn">
+                            {item.term} • {item.courseCount} courses
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          No class imports
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="planner-column">
                     <div className="planner-semester">Degree Reqs</div>
                     <div className="course-buttons">
-                      <button className="course-btn">CSE • v2025</button>
-                      <button className="course-btn">AMS • v2025</button>
-                    </div>
-                  </div>
-                  <div className="planner-column">
-                    <div className="planner-semester">SBC</div>
-                    <div className="course-buttons">
-                      <button className="course-btn">Catalog v2025</button>
+                      {recentImports.degreeReqs.length > 0 ? (
+                        recentImports.degreeReqs.map((item, idx) => (
+                          <button key={idx} className="course-btn">
+                            {item.subject} • v{item.version}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          No degree requirements
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

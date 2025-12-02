@@ -268,37 +268,58 @@ const Grades: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {roster.map((student) => (
-                        <tr key={student.rosterId}>
-                          <td>{student.firstName} {student.lastName}</td>
-                          <td>{student.email}</td>
-                          <td>{student.userId}</td>
-                          <td>
-                            <span className={`status-badge ${student.status.toLowerCase()}`}>
-                              {student.status}
-                            </span>
-                          </td>
-                          <td>
-                            <input
-                              type="text"
-                              className="grade-input"
-                              value={editingGrades[student.userId] || ''}
-                              onChange={(e) => handleGradeChange(student.userId, e.target.value)}
-                              placeholder="A, B+, C, etc."
-                              maxLength={3}
-                            />
-                          </td>
-                          <td>
-                            <button
-                              className="save-grade-btn"
-                              onClick={() => handleSaveGrade(selectedClass.classId, student.userId, editingGrades[student.userId] || '')}
-                              disabled={!editingGrades[student.userId] || editingGrades[student.userId].trim() === ''}
-                            >
-                              Save
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {roster.map((student) => {
+                        // Check if grade is already saved and not "I" (Incomplete)
+                        const hasSavedGrade = student.grade && student.grade.trim() !== '' && student.grade.trim().toUpperCase() !== 'I'
+                        const canEdit = !hasSavedGrade || (student.grade && student.grade.trim().toUpperCase() === 'I')
+                        
+                        return (
+                          <tr key={student.rosterId}>
+                            <td>{student.firstName} {student.lastName}</td>
+                            <td>{student.email}</td>
+                            <td>{student.userId}</td>
+                            <td>
+                              <span className={`status-badge ${student.status.toLowerCase()}`}>
+                                {student.status}
+                              </span>
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                className="grade-input"
+                                value={editingGrades[student.userId] || ''}
+                                onChange={(e) => handleGradeChange(student.userId, e.target.value)}
+                                placeholder="A, B+, C, etc."
+                                maxLength={3}
+                                disabled={!canEdit}
+                                style={{
+                                  opacity: canEdit ? 1 : 0.6,
+                                  cursor: canEdit ? 'text' : 'not-allowed',
+                                  backgroundColor: canEdit ? 'white' : '#f5f5f5'
+                                }}
+                              />
+                              {hasSavedGrade && (
+                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '4px' }}>
+                                  Grade locked (can only edit if grade is "I")
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <button
+                                className="save-grade-btn"
+                                onClick={() => handleSaveGrade(selectedClass.classId, student.userId, editingGrades[student.userId] || '')}
+                                disabled={!canEdit || !editingGrades[student.userId] || editingGrades[student.userId].trim() === ''}
+                                style={{
+                                  opacity: (!canEdit || !editingGrades[student.userId] || editingGrades[student.userId].trim() === '') ? 0.5 : 1,
+                                  cursor: (!canEdit || !editingGrades[student.userId] || editingGrades[student.userId].trim() === '') ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                Save
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                   <div className="grades-summary">
