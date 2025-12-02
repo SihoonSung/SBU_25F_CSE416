@@ -13,10 +13,10 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.bind.annotation.*;
 import java.sql.Connection;
 import javax.sql.DataSource;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,12 +26,13 @@ import java.util.stream.Stream;
 
 @SpringBootApplication
 @RestController
+@EnableScheduling
 public class SamSystemApplication {
 
 	public static void main(String[] args) {
 		// TP: Used cursor to launch Spring Boot application
 		// Load .env file and set system properties
-		loadEnvFile("/mnt/c/Users/minse/CSE416_project/sbu_cse416/backend/.env");
+		loadEnvFile("/mnt/c/Users/sktjd/OneDrive/바탕 화면/4-1/CSE 416/SAM/SBU_25F_CSE416/backend/.env");
 		
 		SpringApplication.run(SamSystemApplication.class, args);
 	}

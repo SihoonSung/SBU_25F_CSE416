@@ -105,7 +105,7 @@ public class RegistrationScheduleService {
      * Spring -> Fall (same year)
      * Summer -> Fall (same year)
      */
-    private java.util.Map<String, Object> getNextTerm(String semester, Integer year) {
+    public java.util.Map<String, Object> getNextTerm(String semester, Integer year) {
         java.util.Map<String, Object> nextTerm = new java.util.HashMap<>();
         if ("Fall".equalsIgnoreCase(semester)) {
             nextTerm.put("semester", "Spring");
@@ -155,6 +155,132 @@ public class RegistrationScheduleService {
         }
         
         return Optional.empty();
+    }
+    
+    /**
+     * Get waitlist date from academic calendar for a term
+     * @param semester Semester (Fall, Spring, Summer)
+     * @param year Year
+     * @return Optional LocalDate for waitlist deadline
+     */
+    public Optional<LocalDate> getWaitlistDate(String semester, Integer year) {
+        // Try different title formats
+        String[] possibleTitles = {
+            "Waitlist",
+            "waitlist",
+            "Waitlist Deadline",
+            "Last Day To Waitlist"
+        };
+        
+        for (String title : possibleTitles) {
+            Optional<edu.sbu.cse416.sam_system.entity.AcademicEvent> event = 
+                academicEventRepository.findByTitleAndSemesterAndYear(title, semester, year);
+            if (event.isPresent()) {
+                return Optional.of(event.get().getDate());
+            }
+        }
+        
+        // Try case-insensitive search by title keyword
+        List<edu.sbu.cse416.sam_system.entity.AcademicEvent> events = 
+            academicEventRepository.findByTitleKeyword("waitlist");
+        for (edu.sbu.cse416.sam_system.entity.AcademicEvent event : events) {
+            if (event.getSemester() != null && event.getSemester().equalsIgnoreCase(semester) &&
+                event.getYear() != null && event.getYear().equals(year)) {
+                // Check if this is the waitlist deadline (not waitlist_process_ends)
+                if (event.getTitle() != null && !event.getTitle().toLowerCase().contains("process")) {
+                    return Optional.of(event.getDate());
+                }
+            }
+        }
+        
+        return Optional.empty();
+    }
+    
+    /**
+     * Get waitlist_process_ends date from academic calendar for a term
+     * @param semester Semester (Fall, Spring, Summer)
+     * @param year Year
+     * @return Optional LocalDate for waitlist process ends date
+     */
+    public Optional<LocalDate> getWaitlistProcessEndsDate(String semester, Integer year) {
+        // Try different title formats
+        String[] possibleTitles = {
+            "Waitlist Process Ends",
+            "waitlist_process_ends",
+            "Waitlist Process End",
+            "Waitlist Processing Ends"
+        };
+        
+        for (String title : possibleTitles) {
+            Optional<edu.sbu.cse416.sam_system.entity.AcademicEvent> event = 
+                academicEventRepository.findByTitleAndSemesterAndYear(title, semester, year);
+            if (event.isPresent()) {
+                return Optional.of(event.get().getDate());
+            }
+        }
+        
+        // Try case-insensitive search by title keyword
+        List<edu.sbu.cse416.sam_system.entity.AcademicEvent> events = 
+            academicEventRepository.findByTitleKeyword("waitlist process");
+        for (edu.sbu.cse416.sam_system.entity.AcademicEvent event : events) {
+            if (event.getSemester() != null && event.getSemester().equalsIgnoreCase(semester) &&
+                event.getYear() != null && event.getYear().equals(year)) {
+                return Optional.of(event.getDate());
+            }
+        }
+        
+        return Optional.empty();
+    }
+    
+    /**
+     * Check if a student can add to waitlist for a specific term
+     * Waitlist is available from current term's advanced_registration_begins 
+     * until next term's waitlist deadline
+     * @param semester Semester of the class to waitlist (next term)
+     * @param year Year of the class to waitlist (next term)
+     * @return true if waitlist is open, false otherwise
+     */
+    public boolean canAddToWaitlist(String semester, Integer year) {
+        LocalDate currentDate = systemDateService.today();
+        
+        // Get current term
+        java.util.Map<String, Object> currentTerm = getCurrentTerm(currentDate);
+        if (currentTerm == null) {
+            return false; // Not in any term period
+        }
+        
+        String currentSemester = (String) currentTerm.get("semester");
+        Integer currentYear = (Integer) currentTerm.get("year");
+        
+        // Get next term from current term
+        java.util.Map<String, Object> nextTerm = getNextTerm(currentSemester, currentYear);
+        String nextSemester = (String) nextTerm.get("semester");
+        Integer nextYear = (Integer) nextTerm.get("year");
+        
+        // Check if the requested term matches the next term
+        if (!semester.equalsIgnoreCase(nextSemester) || !year.equals(nextYear)) {
+            return false; // Can only waitlist for next term
+        }
+        
+        // Check if current date is after current term's advanced_registration_begins
+        Optional<LocalDate> advancedRegBegins = getAdvancedRegistrationBegins(currentSemester, currentYear);
+        if (advancedRegBegins.isEmpty()) {
+            return false; // Cannot determine if waitlist is open
+        }
+        
+        if (currentDate.isBefore(advancedRegBegins.get())) {
+            return false; // Too early, waitlist not open yet
+        }
+        
+        // Check if current date is before next term's waitlist deadline
+        Optional<LocalDate> waitlistDeadline = getWaitlistDate(nextSemester, nextYear);
+        if (waitlistDeadline.isEmpty()) {
+            // If waitlist deadline is not set, allow waitlist (fallback)
+            return true;
+        }
+        
+        // Waitlist closes at end of waitlist deadline day (inclusive)
+        return !currentDate.isAfter(waitlistDeadline.get());
     }
     
     /**
@@ -290,7 +416,7 @@ public class RegistrationScheduleService {
      * @param currentDate Current date
      * @return Map with "semester" and "year" keys, or null if not in any term
      */
-    private java.util.Map<String, Object> getCurrentTerm(LocalDate currentDate) {
+    public java.util.Map<String, Object> getCurrentTerm(LocalDate currentDate) {
         java.util.Map<String, Object> term = new java.util.HashMap<>();
         int month = currentDate.getMonthValue();
         int year = currentDate.getYear();
