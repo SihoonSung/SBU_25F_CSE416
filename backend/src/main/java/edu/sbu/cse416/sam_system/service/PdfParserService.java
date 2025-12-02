@@ -19,11 +19,16 @@ package edu.sbu.cse416.sam_system.service;
  * and robust pattern matching capabilities.
  */
 
+import edu.sbu.cse416.sam_system.entity.CartEntity;
 import edu.sbu.cse416.sam_system.entity.ClassEntity;
+import edu.sbu.cse416.sam_system.entity.ClassRoster;
+import edu.sbu.cse416.sam_system.entity.User;
+import edu.sbu.cse416.sam_system.entity.UserClasses;
 import edu.sbu.cse416.sam_system.repository.ClassRepository;
 import edu.sbu.cse416.sam_system.repository.CartRepository;
 import edu.sbu.cse416.sam_system.repository.ClassRosterRepository;
 import edu.sbu.cse416.sam_system.repository.WaitlistRepository;
+import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +60,15 @@ public class PdfParserService {
     
     @Autowired
     private WaitlistRepository waitlistRepository;
+    
+    @Autowired
+    private UserClassesRepository userClassesRepository;
+    
+    @Autowired
+    private SystemDateService systemDateService;
+    
+    @Autowired
+    private RegistrationScheduleService registrationScheduleService;
     
     /**
      * Parse uploaded PDF and import classes to database
@@ -92,7 +106,192 @@ public class PdfParserService {
         // Save to database
         classRepository.saveAll(classes);
         
+        // Process all null grade classes after classes are imported
+        processAllNullGradeClasses();
+        
         return classes.size();
+    }
+    
+    /**
+     * Process all UserClasses with null grade (all terms)
+     * Adds them to ClassRoster if needed:
+     * - If class term is before or equal to current term: add to roster without affecting capacity (incomplete grade)
+     * - If class term is next term: add to roster and update capacity (enrolled, like registered)
+     */
+    private void processAllNullGradeClasses() {
+        try {
+            // Find all UserClasses with null grade (all terms)
+            List<UserClasses> nullGradeClasses = userClassesRepository.findAllByGradeIsNull();
+            
+            if (nullGradeClasses.isEmpty()) {
+                return; // No null grade classes
+            }
+            
+            // Get current term
+            java.util.Map<String, Object> currentTerm = registrationScheduleService.getCurrentTerm(systemDateService.today());
+            if (currentTerm == null) {
+                return; // Cannot determine current term
+            }
+            
+            String currentSemester = (String) currentTerm.get("semester");
+            Integer currentYear = (Integer) currentTerm.get("year");
+            
+            // Get next term from current term
+            java.util.Map<String, Object> nextTerm = registrationScheduleService.getNextTerm(currentSemester, currentYear);
+            String nextSemester = (String) nextTerm.get("semester");
+            Integer nextYear = (Integer) nextTerm.get("year");
+            
+            for (UserClasses userClass : nullGradeClasses) {
+                try {
+                    String classSemester = userClass.getSemester();
+                    Integer classYear = userClass.getYear();
+                    Long classId = userClass.getClassId();
+                    
+                    if (classSemester == null || classYear == null || classId == null) {
+                        continue; // Cannot process without required information
+                    }
+                    
+                    // Find ClassEntity
+                    java.util.Optional<ClassEntity> classEntityOpt = classRepository.findById(classId);
+                    if (classEntityOpt.isEmpty()) {
+                        continue; // Class not found
+                    }
+                    
+                    ClassEntity classEntity = classEntityOpt.get();
+                    String instructor = classEntity.getInstructor();
+                    
+                    // Check if class term is next term (future term)
+                    boolean isNextTerm = isSameTerm(classSemester, classYear, nextSemester, nextYear);
+                    
+                    if (isNextTerm) {
+                        // Next term: register like enrolled (capacity affected)
+                        addToRoster(classEntity, userClass.getUser(), true);
+                        // Add to cart as "Enrolled" status so it appears as enrolled
+                        addToCartAsEnrolled(userClass.getUser().getUserId(), classEntity);
+                        continue;
+                    }
+                    
+                    // Check if class term is before or equal to current term
+                    boolean isBeforeOrCurrentTerm = isBeforeOrEqualTerm(classSemester, classYear, currentSemester, currentYear);
+                    
+                    if (isBeforeOrCurrentTerm) {
+                        // Before or current term: incomplete grade processing
+                        // Only add to roster if instructor exists
+                        if (instructor != null && !instructor.trim().isEmpty()) {
+                            // Add to roster for incomplete grade processing (capacity not affected)
+                            addToRoster(classEntity, userClass.getUser(), false);
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("ERROR: Failed to process null grade class for user " + 
+                                     userClass.getUser().getSbuId() + ", classId: " + 
+                                     userClass.getClassId() + ": " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("ERROR: Failed to process all null grade classes: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Add student to class roster
+     * @param classEntity The class entity
+     * @param user The student
+     * @param updateCapacity Whether to update class capacity
+     */
+    private void addToRoster(ClassEntity classEntity, User user, boolean updateCapacity) {
+        try {
+            // Check if already in roster
+            java.util.Optional<ClassRoster> existingRoster = classRosterRepository.findByClassEntityAndUser(classEntity, user);
+            if (existingRoster.isPresent()) {
+                // Already in roster, just update status if needed
+                ClassRoster roster = existingRoster.get();
+                if (!"ENROLLED".equals(roster.getStatus())) {
+                    roster.setStatus("ENROLLED");
+                    classRosterRepository.save(roster);
+                }
+                return;
+            }
+            
+            // Create new roster entry
+            ClassRoster roster = new ClassRoster(classEntity, user);
+            classRosterRepository.save(roster);
+            
+            // Update capacity if needed
+            if (updateCapacity) {
+                if (classEntity.getCurrentCapacity() == null) {
+                    classEntity.setCurrentCapacity(0);
+                }
+                classEntity.setCurrentCapacity(classEntity.getCurrentCapacity() + 1);
+                classRepository.save(classEntity);
+            }
+        } catch (Exception e) {
+            System.err.println("ERROR: Failed to add to roster: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Add class to cart as "Enrolled" status so it appears as enrolled
+     * @param userId User ID
+     * @param classEntity The class entity
+     */
+    private void addToCartAsEnrolled(Long userId, ClassEntity classEntity) {
+        try {
+            // Check if already in cart
+            CartEntity existingCart = cartRepository.findByUserIdAndClassId(userId, classEntity.getClassId());
+            if (existingCart != null) {
+                // Already in cart, update status to "Enrolled"
+                existingCart.setStatus("Enrolled");
+                cartRepository.save(existingCart);
+                return;
+            }
+            
+            // Create new cart entry with "Enrolled" status
+            CartEntity cartEntity = new CartEntity(userId, classEntity, "Enrolled");
+            cartRepository.save(cartEntity);
+        } catch (Exception e) {
+            System.err.println("ERROR: Failed to add to cart as enrolled: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Check if term1 is before or equal to term2
+     */
+    private boolean isBeforeOrEqualTerm(String semester1, Integer year1, String semester2, Integer year2) {
+        if (year1 == null || year2 == null) return false;
+        
+        if (year1 < year2) return true;
+        if (year1 > year2) return false;
+        
+        // Same year, compare semesters
+        int order1 = getSemesterOrder(semester1);
+        int order2 = getSemesterOrder(semester2);
+        return order1 <= order2;
+    }
+    
+    /**
+     * Check if term1 is same as term2
+     */
+    private boolean isSameTerm(String semester1, Integer year1, String semester2, Integer year2) {
+        if (year1 == null || year2 == null) return false;
+        if (!year1.equals(year2)) return false;
+        return semester1 != null && semester1.equalsIgnoreCase(semester2);
+    }
+    
+    /**
+     * Get semester order for comparison (Spring=1, Summer=2, Fall=3)
+     */
+    private int getSemesterOrder(String semester) {
+        if (semester == null) return 0;
+        String sem = semester.trim();
+        if (sem.equalsIgnoreCase("Spring")) return 1;
+        if (sem.equalsIgnoreCase("Summer")) return 2;
+        if (sem.equalsIgnoreCase("Fall")) return 3;
+        return 0;
     }
     
     /**

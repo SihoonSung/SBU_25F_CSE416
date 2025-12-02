@@ -581,7 +581,7 @@ public class UserService {
         if ("null".equalsIgnoreCase(s)) return null;
         return s;
     }
-
+    
     private User createUserFromSBUYamlData(Map<String, Object> userData, UserRole role) {
         try {
             User user = new User();

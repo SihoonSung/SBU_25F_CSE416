@@ -78,4 +78,20 @@ public interface UserClassesRepository extends JpaRepository<UserClasses, Long> 
      */
     @Query("SELECT uc FROM UserClasses uc WHERE uc.user.userId = :userId AND uc.classId = :classId")
     java.util.Optional<UserClasses> findByUserIdAndClassIdOptional(@Param("userId") Long userId, @Param("classId") Long classId);
+    
+    /**
+     * Find all UserClasses with null grade for a specific semester and year
+     * @param semester The semester (e.g., "Fall")
+     * @param year The year (e.g., 2025)
+     * @return List of UserClasses with null grade
+     */
+    @Query("SELECT uc FROM UserClasses uc WHERE uc.semester = :semester AND uc.year = :year AND uc.grade IS NULL")
+    List<UserClasses> findBySemesterAndYearAndGradeIsNull(@Param("semester") String semester, @Param("year") Integer year);
+    
+    /**
+     * Find all UserClasses with null grade (all terms)
+     * @return List of UserClasses with null grade
+     */
+    @Query("SELECT uc FROM UserClasses uc WHERE uc.grade IS NULL")
+    List<UserClasses> findAllByGradeIsNull();
 }
