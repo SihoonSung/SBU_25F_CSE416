@@ -1,3 +1,9 @@
+registrars:
+- SBU_ID: 100000000
+  first_name: jason
+  last_name: yoon
+  email: jason831444@gmail.com
+
 academic_advisors:
 - SBU_ID: 100000001
   first_name: AMS
@@ -52,7 +58,7 @@ students:
 - SBU_ID: 100000026
   first_name: AMS_cse_pol
   last_name: Two
-  email: AMScsepol.Two@stonybrook.edu
+  email: jaeseong.yoon@stonybrook.edu
   university_entry: {semester: Fall, year: 2022 }
   direct_admit: AMS
   AOI: null

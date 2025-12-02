@@ -44,6 +44,8 @@ function Dashboard() {
   const [recentOverrides, setRecentOverrides] = useState<any[]>([])
   const [pendingDeclarations, setPendingDeclarations] = useState<number>(0)
   const [advisorPendingWaivers, setAdvisorPendingWaivers] = useState<number>(0)
+  const [studentPendingWaivers, setStudentPendingWaivers] = useState<number>(0)
+  const [studentPendingDeclarations, setStudentPendingDeclarations] = useState<number>(0)
   const [calculatedGpa, setCalculatedGpa] = useState<number | null>(null)
   const [cumulativeCredits, setCumulativeCredits] = useState<number>(0)
   const [termGpa, setTermGpa] = useState<number | null>(null)
@@ -126,6 +128,7 @@ function Dashboard() {
             await checkTimeConflicts(user.userId)
             await calculateGpa(user.userId)
             await checkActiveHolds(user.userId)
+            await checkStudentPendingItems(user.userId)
           } else {
             console.log(`[Dashboard] User is not a student. Role: ${userRole}, userId: ${user?.userId}`)
           }
@@ -189,6 +192,81 @@ function Dashboard() {
     } catch (error) {
       console.error('Error checking holds:', error)
       setActiveHolds([])
+    }
+  }
+
+  /**
+   * Check for student's pending items (waivers and declarations)
+   */
+  const checkStudentPendingItems = async (userId: number) => {
+    try {
+      // Check pending waivers for student
+      const waiversResponse = await fetch(`${backendBase}/api/waivers/student/${userId}`, {
+        credentials: 'include'
+      })
+
+      if (waiversResponse.ok) {
+        const waivers = await waiversResponse.json()
+        console.log(`[Dashboard] Received waivers for student ${userId}:`, waivers)
+        if (Array.isArray(waivers)) {
+          // Filter for pending waivers
+          // Pending if: status is PENDING, or any approval field is null (not yet approved/rejected)
+          const pending = waivers.filter((w: any) => {
+            const status = (w.status || '').toUpperCase()
+            const isPendingStatus = status === 'PENDING' || status === 'SUBMITTED'
+            // Check if waiting for any approval (null means pending, true/false means decided)
+            const waitingForAdvisor = w.advisorApproved === null || w.advisorApproved === undefined
+            const waitingForInstructor = w.instructorApproved === null || w.instructorApproved === undefined
+            const waitingForRegistrar = w.registrarApproved === null || w.registrarApproved === undefined
+            
+            const isPending = isPendingStatus || waitingForAdvisor || waitingForInstructor || waitingForRegistrar
+            console.log(`[Dashboard] Waiver ${w.waiverId}: status=${status}, advisorApproved=${w.advisorApproved}, instructorApproved=${w.instructorApproved}, isPending=${isPending}`)
+            return isPending
+          })
+          setStudentPendingWaivers(pending.length)
+          console.log(`[Dashboard] Found ${pending.length} pending waivers out of ${waivers.length} total for student ${userId}`)
+        } else {
+          console.log(`[Dashboard] Waivers response is not an array:`, waivers)
+          setStudentPendingWaivers(0)
+        }
+      } else {
+        console.error(`[Dashboard] Failed to fetch waivers: ${waiversResponse.status}`)
+        setStudentPendingWaivers(0)
+      }
+
+      // Check pending declarations for student - use my-declarations endpoint
+      const declarationsResponse = await fetch(`${backendBase}/api/major-minor-declarations/my-declarations`, {
+        credentials: 'include'
+      })
+
+      if (declarationsResponse.ok) {
+        const data = await declarationsResponse.json()
+        console.log(`[Dashboard] Received declarations for student ${userId}:`, data)
+        if (data.success && Array.isArray(data.declarations)) {
+          // Filter for pending declarations
+          // Pending if: status is PENDING, or approved is null/false
+          const pending = data.declarations.filter((d: any) => {
+            const status = (d.status || '').toUpperCase()
+            const isPendingStatus = status === 'PENDING' || status === 'SUBMITTED'
+            const isNotApproved = d.approved === null || d.approved === undefined || d.approved === false
+            const isPending = isPendingStatus || isNotApproved
+            console.log(`[Dashboard] Declaration ${d.declarationId || d.id}: status=${status}, approved=${d.approved}, isPending=${isPending}`)
+            return isPending
+          })
+          setStudentPendingDeclarations(pending.length)
+          console.log(`[Dashboard] Found ${pending.length} pending declarations out of ${data.declarations.length} total for student ${userId}`)
+        } else {
+          console.log(`[Dashboard] Declarations response format unexpected:`, data)
+          setStudentPendingDeclarations(0)
+        }
+      } else {
+        console.error(`[Dashboard] Failed to fetch declarations: ${declarationsResponse.status}`)
+        setStudentPendingDeclarations(0)
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error checking student pending items:', error)
+      setStudentPendingWaivers(0)
+      setStudentPendingDeclarations(0)
     }
   }
 
@@ -1026,6 +1104,26 @@ function Dashboard() {
               <div className="alert-icon"></div>
               <div className="alert-text">
                 <span className="alert-title">Time Conflicts Detected:</span> {`Time conflicts detected: ${timeConflicts.join(', ')}. Please resolve before submitting.`}
+              </div>
+            </div>
+          )}
+
+          {/* Student Pending Waivers Alert */}
+          {studentPendingWaivers > 0 && (
+            <div className="alert-box alert-warning">
+              <div className="alert-icon"></div>
+              <div className="alert-text">
+                <span className="alert-title">Pending Override Requests:</span> You have {studentPendingWaivers} override request{studentPendingWaivers > 1 ? 's' : ''} awaiting review.
+              </div>
+            </div>
+          )}
+
+          {/* Student Pending Declarations Alert */}
+          {studentPendingDeclarations > 0 && (
+            <div className="alert-box alert-warning">
+              <div className="alert-icon"></div>
+              <div className="alert-text">
+                <span className="alert-title">Pending Declarations:</span> You have {studentPendingDeclarations} declaration{studentPendingDeclarations > 1 ? 's' : ''} awaiting review.
               </div>
             </div>
           )}

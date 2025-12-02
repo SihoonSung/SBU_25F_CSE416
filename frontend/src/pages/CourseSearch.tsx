@@ -25,6 +25,17 @@ interface Course {
   advisoryPrerequisites: string
   sbcsSatisfied: string
   warning: boolean
+  classes?: ClassInfo[]
+}
+
+interface ClassInfo {
+  classId: number
+  section: string
+  maxCapacity: number | null
+  currentCapacity: number | null
+  schedule?: string
+  location?: string
+  instructor?: string
 }
 
 function CourseSearch() {
@@ -43,6 +54,7 @@ function CourseSearch() {
   const [availableTerms, setAvailableTerms] = useState<any[]>([])
   const [selectedTerm, setSelectedTerm] = useState<string>('')
   const [warningMessage, setWarningMessage] = useState<string>('')
+  const [classesMap, setClassesMap] = useState<Record<string, ClassInfo[]>>({})
   const supportedSubjects = ['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']
 
   /**
@@ -58,6 +70,7 @@ function CourseSearch() {
   useEffect(() => {
     if (selectedTerm) {
       fetchCourses()
+      fetchClassesForTerm()
     }
   }, [selectedTerm])
 
@@ -163,6 +176,91 @@ function CourseSearch() {
       setCourses(transformedData)
     } catch (error) {
       console.error('Error fetching courses:', error)
+    }
+  }
+
+  /**
+   * Fetch classes for the selected term to get capacity information
+   */
+  const fetchClassesForTerm = async () => {
+    if (!selectedTerm) {
+      setClassesMap({})
+      return
+    }
+
+    try {
+      // Parse term to get semester and year
+      // Term format is typically like "Fall 2025" or "2025-Fall"
+      const termParts = selectedTerm.split(/[\s-]+/)
+      let semester = ''
+      let year: number | null = null
+
+      if (termParts.length >= 2) {
+        // Try to find year (should be a number)
+        for (const part of termParts) {
+          const yearNum = parseInt(part)
+          if (!isNaN(yearNum) && yearNum > 2000 && yearNum < 2100) {
+            year = yearNum
+            break
+          }
+        }
+        // Try to find semester
+        const termStr = selectedTerm.toLowerCase()
+        if (termStr.includes('fall')) {
+          semester = 'Fall'
+        } else if (termStr.includes('spring')) {
+          semester = 'Spring'
+        } else if (termStr.includes('summer')) {
+          semester = 'Summer'
+        }
+      }
+
+      // Fetch all classes
+      const response = await fetch(`${backendBase}/api/registrar/classes`, {
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        console.error('Failed to fetch classes:', response.status)
+        setClassesMap({})
+        return
+      }
+
+      const allClasses = await response.json()
+      
+      // Filter classes by term if we have semester and year
+      let filteredClasses = allClasses
+      if (semester && year) {
+        filteredClasses = allClasses.filter((cls: any) => {
+          const clsYear = cls.year || cls.academicYear
+          const clsSemester = cls.semester
+          return clsYear === year && clsSemester && clsSemester.toLowerCase().includes(semester.toLowerCase())
+        })
+      }
+
+      // Group classes by course (subject + courseNumber)
+      const grouped: Record<string, ClassInfo[]> = {}
+      filteredClasses.forEach((cls: any) => {
+        const key = `${cls.department || cls.subject}-${cls.courseNum || cls.courseNumber}`
+        if (!grouped[key]) {
+          grouped[key] = []
+        }
+        grouped[key].push({
+          classId: cls.classId,
+          section: cls.section || '',
+          maxCapacity: cls.maxCapacity !== null && cls.maxCapacity !== undefined ? cls.maxCapacity : null,
+          currentCapacity: cls.currentCapacity !== null && cls.currentCapacity !== undefined ? cls.currentCapacity : null,
+          schedule: cls.schedule,
+          location: cls.location,
+          instructor: cls.instructor
+        })
+      })
+
+      setClassesMap(grouped)
+      console.log('Fetched classes for term:', Object.keys(grouped).length, 'courses')
+    } catch (error) {
+      console.error('Error fetching classes:', error)
+      setClassesMap({})
     }
   }
 
@@ -471,6 +569,54 @@ function CourseSearch() {
                             <span className="catalog-detail-value catalog-description-text">{course.description}</span>
                           </div>
                         )}
+                        
+                        {/* Capacity Information */}
+                        {(() => {
+                          const courseKey = `${course.subject}-${course.courseNumber}`
+                          const courseClasses = classesMap[courseKey] || []
+                          if (courseClasses.length > 0) {
+                            return (
+                              <div className="catalog-detail-row">
+                                <span className="catalog-detail-label">Sections & Capacity:</span>
+                                <div className="catalog-detail-value" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {courseClasses.map((cls) => (
+                                    <div key={cls.classId} style={{ padding: '8px', background: '#f5f5f5', borderRadius: '4px' }}>
+                                      <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                                        Section {cls.section}
+                                        {cls.instructor && ` - ${cls.instructor}`}
+                                      </div>
+                                      {cls.schedule && (
+                                        <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>
+                                          Schedule: {cls.schedule}
+                                        </div>
+                                      )}
+                                      {cls.location && (
+                                        <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>
+                                          Location: {cls.location}
+                                        </div>
+                                      )}
+                                      {cls.maxCapacity !== null && cls.currentCapacity !== null ? (
+                                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: cls.currentCapacity >= cls.maxCapacity ? '#d32f2f' : '#2e7d32' }}>
+                                          Capacity: {cls.currentCapacity} / {cls.maxCapacity}
+                                          {cls.currentCapacity >= cls.maxCapacity && ' (Full)'}
+                                        </div>
+                                      ) : cls.maxCapacity !== null ? (
+                                        <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                                          Capacity: {cls.maxCapacity}
+                                        </div>
+                                      ) : (
+                                        <div style={{ fontSize: '0.9rem', color: '#999' }}>
+                                          Capacity: Not set
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
                         
                         {/* Requisites Section */}
                         <div className="catalog-requisites-section">

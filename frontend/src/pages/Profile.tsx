@@ -1702,13 +1702,42 @@ function StudentBundleView(props: {
                     <div>Degree</div>
                     <div>Req Version</div>
                   </div>
-                  {(details.majors || []).map((m, i) => (
-                    <div key={`${m}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 160px 160px", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
-                      <div>{m}</div>
-                      <div>{details.degrees?.[i] || "-"}</div>
-                      <div>{fmt.termRef(details.majorRequirementVersions?.[i] || null)}</div>
-                    </div>
-                  ))}
+                  {(details.majors || []).map((m, i) => {
+                    // Helper function to get degree for a major
+                    const getDegreeForMajor = (majorCode: string, index: number): string => {
+                      // First, try to get from degrees array by index
+                      if (details.degrees?.[index]) {
+                        return details.degrees[index];
+                      }
+                      
+                      // If not found, try to find from plans array
+                      const matchingPlan = plans.find(
+                        p => p.kind === "MAJOR" && p.code === majorCode && p.declared === true
+                      );
+                      
+                      if (matchingPlan && matchingPlan.name) {
+                        // Extract degree type from plan name (e.g., "CSE BS" -> "BS", "AMS BA" -> "BA")
+                        const nameParts = matchingPlan.name.trim().split(/\s+/);
+                        if (nameParts.length >= 2) {
+                          const lastPart = nameParts[nameParts.length - 1].toUpperCase();
+                          if (lastPart === "BS" || lastPart === "BA" || lastPart === "MS" || lastPart === "MA" || lastPart === "PHD") {
+                            return lastPart;
+                          }
+                        }
+                      }
+                      
+                      // Default to BS if not found
+                      return "BS";
+                    };
+                    
+                    return (
+                      <div key={`${m}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 160px 160px", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
+                        <div>{m}</div>
+                        <div>{getDegreeForMajor(m, i)}</div>
+                        <div>{fmt.termRef(details.majorRequirementVersions?.[i] || null)}</div>
+                      </div>
+                    );
+                  })}
                   {!details.majors?.length && <div style={{ padding: 12 }}>None</div>}
                 </div>
               </div>
