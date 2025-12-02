@@ -6,7 +6,8 @@
         "name": "SamSystemApplication",
         "request": "launch",
         "mainClass": "edu.sbu.cse416.sam_system.SamSystemApplication",
-        "projectName": "sam-system"
+        "projectName": "sam-system",
+        "cwd": "${workspaceFolder}/backend"
     },
     {
         "type": "java",
@@ -14,7 +15,8 @@
         "request": "launch",
         "mainClass": "edu.sbu.cse416.sam_system.SamSystemApplication",
         "projectName": "backend",
-        "console": "integratedTerminal"
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}/backend"
     },
     {
         "type": "java",
@@ -23,7 +25,8 @@
         "mainClass": "edu.sbu.cse416.sam_system.SamSystemApplication",
         "projectName": "backend",
         "console": "integratedTerminal",
-        "noDebug": true
+        "noDebug": true,
+        "cwd": "${workspaceFolder}/backend"
     }
 ]
 }

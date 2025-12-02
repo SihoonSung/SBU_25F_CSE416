@@ -131,12 +131,15 @@ public class MajorMinorDeclarationService {
         }
         
         // Determine if CEAS advisor approval is needed
-        if (isCeasTransfer(student, subjectCode)) {
-            // Set CEAS advisor (you'll need to implement logic to find CEAS advisor)
+        // For both MAJOR and MINOR: if declaring a CEAS subject and student is not in CEAS, need CEAS advisor
+        if (isCeasSubjectTransfer(student, subjectCode, declarationType)) {
+            // Set CEAS advisor for CEAS transfers (both major and minor)
             User ceasAdvisor = findCeasAdvisor();
             declaration.setCeasAdvisor(ceasAdvisor);
         } else {
-            // Set department advisor (you'll need to implement logic to find department advisor)
+            // Set department/academic unit advisor
+            // For MAJOR: find department advisor for the subject
+            // For MINOR: find academic unit advisor for the minor's subject
             User departmentAdvisor = findDepartmentAdvisor(subjectCode);
             declaration.setAdvisor(departmentAdvisor);
         }
@@ -691,17 +694,33 @@ public class MajorMinorDeclarationService {
     }
     
     /**
-     * Check if this is a CEAS transfer
+     * Check if this is a CEAS transfer (for both MAJOR and MINOR)
      */
     // TP Used cursor to check if declaration requires CEAS transfer
-    private boolean isCeasTransfer(User student, String subjectCode) {
+    private boolean isCeasSubjectTransfer(User student, String subjectCode, DeclarationType declarationType) {
         // CEAS subjects: AMS, BME, CME, CIV, ECE, CSE, ESE, ESG, ISE, MEC, TSM
         if (!isCeasMajor(subjectCode)) {
             return false;
         }
         
-        // Check if student is already in CEAS (has AOI or declared major in CEAS)
-        return !isStudentInCeas(student);
+        // For MAJOR: Check if student is already in CEAS (has AOI or declared major in CEAS)
+        // For MINOR: Check if student is already in CEAS (has AOI, declared major, or declared minor in CEAS)
+        if (declarationType == DeclarationType.MAJOR) {
+            return !isStudentInCeas(student);
+        } else if (declarationType == DeclarationType.MINOR) {
+            // For minor: if declaring a CEAS minor and student is not in CEAS, need CEAS advisor approval
+            return !isStudentInCeas(student);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if this is a CEAS transfer (legacy method for MAJOR only, kept for backward compatibility)
+     */
+    // TP Used cursor to check if declaration requires CEAS transfer
+    private boolean isCeasTransfer(User student, String subjectCode) {
+        return isCeasSubjectTransfer(student, subjectCode, DeclarationType.MAJOR);
     }
     
     /**
@@ -720,6 +739,10 @@ public class MajorMinorDeclarationService {
     
     /**
      * Check if student is already in CEAS
+     * Student is considered in CEAS if they have:
+     * - AOI (Area of Interest) in CEAS, OR
+     * - Any approved CEAS major, OR
+     * - Any approved CEAS minor
      */
     // TP Used cursor to check if student is already in CEAS
     private boolean isStudentInCeas(User student) {
@@ -731,23 +754,39 @@ public class MajorMinorDeclarationService {
         }
         
         // Check if student has any approved CEAS majors
-        if (student.getMajors() == null || student.getMajors().trim().isEmpty()) {
-            return false;
-        }
-        
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            List<?> majors = mapper.readValue(student.getMajors(), List.class);
-            if (majors != null) {
-                for (Object major : majors) {
-                    String majorStr = major.toString();
-                    if (isCeasMajor(majorStr)) {
-                        return true;
+        if (student.getMajors() != null && !student.getMajors().trim().isEmpty()) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                List<?> majors = mapper.readValue(student.getMajors(), List.class);
+                if (majors != null) {
+                    for (Object major : majors) {
+                        String majorStr = major.toString();
+                        if (isCeasMajor(majorStr)) {
+                            return true;
+                        }
                     }
                 }
+            } catch (Exception e) {
+                System.err.println("Error parsing majors JSON: " + e.getMessage());
             }
-        } catch (Exception e) {
-            System.err.println("Error parsing majors JSON: " + e.getMessage());
+        }
+        
+        // Check if student has any approved CEAS minors
+        if (student.getMinors() != null && !student.getMinors().trim().isEmpty()) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                List<?> minors = mapper.readValue(student.getMinors(), List.class);
+                if (minors != null) {
+                    for (Object minor : minors) {
+                        String minorStr = minor.toString();
+                        if (isCeasMajor(minorStr)) {
+                            return true;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error parsing minors JSON: " + e.getMessage());
+            }
         }
         
         return false;

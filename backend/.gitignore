@@ -39,3 +39,5 @@ build/
 *.log
 
 src/main/resources/course_yaml/users1.yaml
+
+.env

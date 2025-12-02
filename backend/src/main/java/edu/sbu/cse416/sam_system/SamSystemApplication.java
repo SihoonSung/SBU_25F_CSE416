@@ -15,7 +15,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.bind.annotation.*;
 import java.sql.Connection;
-import javax.sql.DataSource; 
+import javax.sql.DataSource;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.stream.Stream; 
 
 
 @SpringBootApplication
@@ -24,7 +30,37 @@ public class SamSystemApplication {
 
 	public static void main(String[] args) {
 		// TP: Used cursor to launch Spring Boot application
+		// Load .env file and set system properties
+		loadEnvFile("/mnt/c/Users/minse/CSE416_project/sbu_cse416/backend/.env");
+		
 		SpringApplication.run(SamSystemApplication.class, args);
+	}
+	
+	private static void loadEnvFile(String envFilePath) {
+		Path envFile = Paths.get(envFilePath);
+		if (!Files.exists(envFile)) {
+			System.err.println("Warning: .env file not found at: " + envFilePath);
+			return;
+		}
+		
+		try (Stream<String> lines = Files.lines(envFile)) {
+			lines.filter(line -> !line.trim().isEmpty() && !line.trim().startsWith("#"))
+				.forEach(line -> {
+					int equalsIndex = line.indexOf('=');
+					if (equalsIndex > 0) {
+						String key = line.substring(0, equalsIndex).trim();
+						String value = line.substring(equalsIndex + 1).trim();
+						// Remove quotes if present
+						if ((value.startsWith("\"") && value.endsWith("\"")) ||
+							(value.startsWith("'") && value.endsWith("'"))) {
+							value = value.substring(1, value.length() - 1);
+						}
+						System.setProperty(key, value);
+					}
+				});
+		} catch (IOException e) {
+			System.err.println("Error loading .env file: " + e.getMessage());
+		}
 	}
 
 	@CrossOrigin(origins = "http://localhost:5173")
