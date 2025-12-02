@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
+import edu.sbu.cse416.sam_system.security.UserPrincipal;
 
 import java.util.HashMap;
 import java.util.List;
@@ -42,13 +43,19 @@ public class DegreeRequirementWaiverController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> createWaiver(
             @RequestBody Map<String, Object> body,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         try {
             System.out.println("=== DEBUG: createWaiver called ===");
             System.out.println("DEBUG: Principal is null: " + (principal == null));
             if (principal != null) {
-                System.out.println("DEBUG: Principal attributes: " + principal.getAttributes());
-                System.out.println("DEBUG: Principal name: " + principal.getName());
+                System.out.println("DEBUG: Principal type: " + principal.getClass().getName());
+                if (principal instanceof OAuth2User oauth2User) {
+                    System.out.println("DEBUG: Principal attributes: " + oauth2User.getAttributes());
+                    System.out.println("DEBUG: Principal name: " + oauth2User.getName());
+                } else if (principal instanceof UserPrincipal userPrincipal) {
+                    User user = userPrincipal.getUser();
+                    System.out.println("DEBUG: User from UserPrincipal: " + (user != null ? user.getUserId() : "null"));
+                }
             }
             System.out.println("DEBUG: Request body: " + body);
             
@@ -218,46 +225,61 @@ public class DegreeRequirementWaiverController {
     }
     
     /**
-     * Extract user ID from OAuth2 principal
+     * Extract user ID from authentication principal (supports both OAuth2User and UserPrincipal for bypass mode)
      */
-    private Long getUserIdFromPrincipal(OAuth2User principal) {
+    private Long getUserIdFromPrincipal(Object principal) {
         System.out.println("DEBUG: getUserIdFromPrincipal called");
         if (principal == null) {
             System.out.println("DEBUG: Principal is null!");
             throw new IllegalArgumentException("User not authenticated");
         }
         
-        // Get Google ID and email from OAuth2 principal
-        String googleId = principal.getAttribute("sub");
-        String email = principal.getAttribute("email");
-        
-        System.out.println("DEBUG: Google ID from principal: " + googleId);
-        System.out.println("DEBUG: Email from principal: " + email);
-        
-        if (googleId != null) {
-            // Try to find user by Google ID first
-            Optional<User> user = userRepository.findByGoogleId(googleId);
-            if (user.isPresent()) {
-                System.out.println("DEBUG: Found user by Google ID: " + user.get().getUserId() + " (" + user.get().getEmail() + ")");
-                return user.get().getUserId();
-            } else {
-                System.out.println("DEBUG: User not found by Google ID: " + googleId);
+        // Handle bypass mode authentication (UserPrincipal)
+        if (principal instanceof UserPrincipal userPrincipal) {
+            User user = userPrincipal.getUser();
+            if (user != null && user.getUserId() != null) {
+                System.out.println("DEBUG: Found user from UserPrincipal: " + user.getUserId() + " (" + user.getEmail() + ")");
+                return user.getUserId();
             }
+            throw new IllegalArgumentException("User not found in system. Please contact administrator.");
         }
         
-        if (email != null) {
-            // Try to find user by email
-            Optional<User> user = userRepository.findByEmailIgnoreCase(email);
-            if (user.isPresent()) {
-                System.out.println("DEBUG: Found user by email: " + user.get().getUserId() + " (" + user.get().getEmail() + ")");
-                return user.get().getUserId();
-            } else {
-                System.out.println("DEBUG: User not found by email: " + email);
+        // Handle OAuth2 authentication (OAuth2User)
+        if (principal instanceof OAuth2User oauth2User) {
+            // Get Google ID and email from OAuth2 principal
+            String googleId = oauth2User.getAttribute("sub");
+            String email = oauth2User.getAttribute("email");
+            
+            System.out.println("DEBUG: Google ID from principal: " + googleId);
+            System.out.println("DEBUG: Email from principal: " + email);
+            
+            if (googleId != null) {
+                // Try to find user by Google ID first
+                Optional<User> user = userRepository.findByGoogleId(googleId);
+                if (user.isPresent()) {
+                    System.out.println("DEBUG: Found user by Google ID: " + user.get().getUserId() + " (" + user.get().getEmail() + ")");
+                    return user.get().getUserId();
+                } else {
+                    System.out.println("DEBUG: User not found by Google ID: " + googleId);
+                }
             }
+            
+            if (email != null) {
+                // Try to find user by email
+                Optional<User> user = userRepository.findByEmailIgnoreCase(email);
+                if (user.isPresent()) {
+                    System.out.println("DEBUG: Found user by email: " + user.get().getUserId() + " (" + user.get().getEmail() + ")");
+                    return user.get().getUserId();
+                } else {
+                    System.out.println("DEBUG: User not found by email: " + email);
+                }
+            }
+            
+            System.out.println("DEBUG: User not found - Google ID: " + googleId + ", Email: " + email);
+            throw new IllegalArgumentException("User not found");
         }
         
-        System.out.println("DEBUG: User not found - Google ID: " + googleId + ", Email: " + email);
-        throw new IllegalArgumentException("User not found");
+        throw new IllegalArgumentException("Unsupported authentication principal type");
     }
 }
 

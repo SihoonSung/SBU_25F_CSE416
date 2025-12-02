@@ -26,6 +26,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.transaction.annotation.Transactional;
+import edu.sbu.cse416.sam_system.security.UserPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -187,7 +188,7 @@ public class UserController {
     @GetMapping
     // TP: Used cursor to list all users (registrar)
     public ResponseEntity<List<User>> getAllUsers(
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         // Temporarily disable authorization for testing
         // if (!isRegistrar(principal)) {
@@ -203,7 +204,7 @@ public class UserController {
     // TP: Used cursor to activate a user
     public ResponseEntity<User> activateUser(
             @PathVariable Long userId,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
 
         if (!isRegistrar(principal)) {
             return ResponseEntity.status(403).build();
@@ -222,7 +223,7 @@ public class UserController {
     // TP: Used cursor to deactivate a user
     public ResponseEntity<User> deactivateUser(
             @PathVariable Long userId,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
 
         if (!isRegistrar(principal)) {
             return ResponseEntity.status(403).build();
@@ -241,7 +242,7 @@ public class UserController {
     // TP: Used cursor to import users from YAML upload
     public ResponseEntity<Map<String, Object>> importUsers(
             @RequestParam("file") MultipartFile file,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
 
         // Temporarily disable authorization for testing
         // if (!isRegistrar(principal)) {
@@ -268,7 +269,7 @@ public class UserController {
     @GetMapping("/statistics")
     // TP: Used cursor to provide user statistics
     public ResponseEntity<Map<String, Object>> getUserStatistics(
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
 
         if (!isRegistrar(principal)) {
             return ResponseEntity.status(403).build();
@@ -289,7 +290,7 @@ public class UserController {
             @RequestParam(value = "graduationTerm", required = false) String graduationTerm,
             @RequestParam(value = "advisorLevel", required = false) String advisorLevel,
             @RequestParam(value = "academicUnit", required = false) String academicUnit,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         // Temporarily disable authorization for testing
         // if (!isRegistrar(principal) && !isAdvisor(principal)) {
@@ -306,7 +307,7 @@ public class UserController {
     // TP: Used cursor to export a user's data in YAML-like structure
     public ResponseEntity<Map<String, Object>> exportUserData(
             @PathVariable Long userId,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         if (!isRegistrar(principal)) {
             return ResponseEntity.status(403).build();
@@ -324,21 +325,45 @@ public class UserController {
     }
 
     /** Check if current user is registrar */
-    // TP: Used cursor to check registrar role
-    private boolean isRegistrar(OAuth2User principal) {
+    // TP: Used cursor to check registrar role (supports both OAuth2User and UserPrincipal for bypass mode)
+    private boolean isRegistrar(Object principal) {
         if (principal == null) return false;
-        String googleId = principal.getName();
-        var userOpt = userService.getUserByGoogleId(googleId);
-        return userOpt.isPresent() && userOpt.get().isRegistrar();
+        
+        // Handle bypass mode authentication (UserPrincipal)
+        if (principal instanceof UserPrincipal userPrincipal) {
+            User user = userPrincipal.getUser();
+            return user != null && user.isRegistrar();
+        }
+        
+        // Handle OAuth2 authentication (OAuth2User)
+        if (principal instanceof OAuth2User oauth2User) {
+            String googleId = oauth2User.getName();
+            var userOpt = userService.getUserByGoogleId(googleId);
+            return userOpt.isPresent() && userOpt.get().isRegistrar();
+        }
+        
+        return false;
     }
 
     /** Check if current user is advisor */
-    // TP: Used cursor to check advisor role
-    private boolean isAdvisor(OAuth2User principal) {
+    // TP: Used cursor to check advisor role (supports both OAuth2User and UserPrincipal for bypass mode)
+    private boolean isAdvisor(Object principal) {
         if (principal == null) return false;
-        String googleId = principal.getName();
-        var userOpt = userService.getUserByGoogleId(googleId);
-        return userOpt.isPresent() && userOpt.get().isAdvisor();
+        
+        // Handle bypass mode authentication (UserPrincipal)
+        if (principal instanceof UserPrincipal userPrincipal) {
+            User user = userPrincipal.getUser();
+            return user != null && user.isAdvisor();
+        }
+        
+        // Handle OAuth2 authentication (OAuth2User)
+        if (principal instanceof OAuth2User oauth2User) {
+            String googleId = oauth2User.getName();
+            var userOpt = userService.getUserByGoogleId(googleId);
+            return userOpt.isPresent() && userOpt.get().isAdvisor();
+        }
+        
+        return false;
     }
 
     // ===== New Normalized Table APIs =====

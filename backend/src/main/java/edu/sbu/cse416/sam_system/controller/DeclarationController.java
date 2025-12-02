@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
+import edu.sbu.cse416.sam_system.security.UserPrincipal;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
@@ -71,20 +72,14 @@ public class DeclarationController {
     @PostMapping("/submit")
     public ResponseEntity<Map<String, Object>> submitDeclaration(
             @RequestBody Map<String, Object> request,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             if (principal == null) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
             }
 
-            String googleId = principal.getName();
-            Optional<User> userOpt = userRepository.findByGoogleId(googleId);
-            if (userOpt.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-            }
-
-            User student = userOpt.get();
+            User student = getUserFromPrincipal(principal);
             if (!student.isStudent()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can submit declarations");
             }
@@ -129,20 +124,14 @@ public class DeclarationController {
      */
     @GetMapping("/my-declarations")
     public ResponseEntity<Map<String, Object>> getMyDeclarations(
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             if (principal == null) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
             }
 
-            String googleId = principal.getName();
-            Optional<User> userOpt = userRepository.findByGoogleId(googleId);
-            if (userOpt.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-            }
-
-            User student = userOpt.get();
+            User student = getUserFromPrincipal(principal);
             List<MajorMinorDeclaration> declarations = declarationRepository.findByStudent(student);
 
             Map<String, Object> response = new HashMap<>();
@@ -166,20 +155,14 @@ public class DeclarationController {
      */
     @GetMapping("/pending")
     public ResponseEntity<Map<String, Object>> getPendingDeclarations(
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             if (principal == null) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
             }
 
-            String googleId = principal.getName();
-            Optional<User> userOpt = userRepository.findByGoogleId(googleId);
-            if (userOpt.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-            }
-
-            User advisor = userOpt.get();
+            User advisor = getUserFromPrincipal(principal);
             if (!advisor.isAdvisor()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only advisors can view pending declarations");
             }
@@ -207,20 +190,14 @@ public class DeclarationController {
      */
     @GetMapping("/all")
     public ResponseEntity<Map<String, Object>> getAllDeclarations(
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             if (principal == null) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
             }
 
-            String googleId = principal.getName();
-            Optional<User> userOpt = userRepository.findByGoogleId(googleId);
-            if (userOpt.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-            }
-
-            User advisor = userOpt.get();
+            User advisor = getUserFromPrincipal(principal);
             if (!advisor.isAdvisor()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only advisors can view all declarations");
             }
@@ -250,20 +227,14 @@ public class DeclarationController {
     public ResponseEntity<Map<String, Object>> approveDeclaration(
             @PathVariable Long declarationId,
             @RequestBody Map<String, Object> request,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             if (principal == null) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
             }
 
-            String googleId = principal.getName();
-            Optional<User> userOpt = userRepository.findByGoogleId(googleId);
-            if (userOpt.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-            }
-
-            User advisor = userOpt.get();
+            User advisor = getUserFromPrincipal(principal);
             if (!advisor.isAdvisor()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only advisors can approve declarations");
             }
@@ -298,20 +269,14 @@ public class DeclarationController {
     public ResponseEntity<Map<String, Object>> rejectDeclaration(
             @PathVariable Long declarationId,
             @RequestBody Map<String, Object> request,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             if (principal == null) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
             }
 
-            String googleId = principal.getName();
-            Optional<User> userOpt = userRepository.findByGoogleId(googleId);
-            if (userOpt.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-            }
-
-            User advisor = userOpt.get();
+            User advisor = getUserFromPrincipal(principal);
             if (!advisor.isAdvisor()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only advisors can reject declarations");
             }
@@ -348,20 +313,14 @@ public class DeclarationController {
     @PostMapping("/{declarationId}/withdraw")
     public ResponseEntity<Map<String, Object>> withdrawDeclaration(
             @PathVariable Long declarationId,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             if (principal == null) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
             }
 
-            String googleId = principal.getName();
-            Optional<User> userOpt = userRepository.findByGoogleId(googleId);
-            if (userOpt.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-            }
-
-            User student = userOpt.get();
+            User student = getUserFromPrincipal(principal);
             if (!student.isStudent()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can withdraw declarations");
             }
@@ -388,5 +347,42 @@ public class DeclarationController {
             response.put("error", "Failed to withdraw declaration: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
+    }
+    
+    /**
+     * Extract user from authentication principal (supports both OAuth2User and UserPrincipal for bypass mode)
+     */
+    private User getUserFromPrincipal(Object principal) {
+        if (principal == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
+        }
+        
+        // Handle bypass mode authentication (UserPrincipal)
+        if (principal instanceof UserPrincipal userPrincipal) {
+            User user = userPrincipal.getUser();
+            if (user == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+            }
+            return user;
+        }
+        
+        // Handle OAuth2 authentication (OAuth2User)
+        if (principal instanceof OAuth2User oauth2User) {
+            String googleId = oauth2User.getName();
+            Optional<User> userOpt = userRepository.findByGoogleId(googleId);
+            if (userOpt.isEmpty()) {
+                // Try email as fallback
+                String email = oauth2User.getAttribute("email");
+                if (email != null) {
+                    userOpt = userRepository.findByEmail(email);
+                }
+            }
+            if (userOpt.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+            }
+            return userOpt.get();
+        }
+        
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unsupported authentication principal type");
     }
 }

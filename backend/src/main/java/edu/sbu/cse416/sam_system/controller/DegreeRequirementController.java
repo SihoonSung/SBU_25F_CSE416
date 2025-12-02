@@ -39,7 +39,7 @@ public class DegreeRequirementController {
     // TP: Used cursor to import degree requirements via YAML upload
     public ResponseEntity<Map<String, Object>> importRequirements(
             @RequestParam("file") MultipartFile file,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             // Check if user is registrar
@@ -192,7 +192,7 @@ public class DegreeRequirementController {
     // TP: Used cursor to create a new degree requirement
     public ResponseEntity<Map<String, Object>> createRequirement(
             @RequestBody DegreeRequirement requirement,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             // Check if user is registrar
@@ -225,7 +225,7 @@ public class DegreeRequirementController {
     public ResponseEntity<Map<String, Object>> updateRequirement(
             @PathVariable Long requirementId,
             @RequestBody DegreeRequirement requirement,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             // Check if user is registrar
@@ -256,7 +256,7 @@ public class DegreeRequirementController {
     // TP: Used cursor to deactivate a requirement
     public ResponseEntity<Map<String, Object>> deactivateRequirement(
             @PathVariable Long requirementId,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             // Check if user is registrar
@@ -286,7 +286,7 @@ public class DegreeRequirementController {
     // TP: Used cursor to delete a specific requirement
     public ResponseEntity<Map<String, Object>> deleteRequirement(
             @PathVariable Long requirementId,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             // Check if user is registrar
@@ -315,7 +315,7 @@ public class DegreeRequirementController {
     @DeleteMapping("/delete-all")
     // TP: Used cursor to delete all degree requirements
     public ResponseEntity<Map<String, Object>> deleteAllRequirements(
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             // Check if user is registrar

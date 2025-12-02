@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
+import edu.sbu.cse416.sam_system.security.UserPrincipal;
 
 import java.util.List;
 import java.util.Map;
@@ -40,7 +41,7 @@ public class PlannedMajorController {
     @PostMapping("/plan")
     public ResponseEntity<?> planMajor(
             @RequestBody Map<String, Object> request,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             Long studentId = getUserIdFromPrincipal(principal);
@@ -90,7 +91,7 @@ public class PlannedMajorController {
     @PostMapping("/unplan")
     public ResponseEntity<?> unplanMajor(
             @RequestBody Map<String, Object> request,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             Long studentId = getUserIdFromPrincipal(principal);
@@ -137,7 +138,7 @@ public class PlannedMajorController {
      */
     // TP: Used cursor to get all planned majors for the current student
     @GetMapping("/my-planned")
-    public ResponseEntity<?> getMyPlannedMajors(@AuthenticationPrincipal OAuth2User principal) {
+    public ResponseEntity<?> getMyPlannedMajors(@AuthenticationPrincipal Object principal) {
         try {
             Long studentId = getUserIdFromPrincipal(principal);
             List<Map<String, Object>> plannedMajors = plannedMajorService.getAllPlannedMajorsWithStatus(studentId);
@@ -162,7 +163,7 @@ public class PlannedMajorController {
     public ResponseEntity<?> getPlannedMajorStatus(
             @PathVariable String subjectCode,
             @PathVariable String degreeType,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             Long studentId = getUserIdFromPrincipal(principal);
@@ -201,7 +202,7 @@ public class PlannedMajorController {
     public ResponseEntity<?> canPlanMajor(
             @PathVariable String subjectCode,
             @PathVariable String degreeType,
-            @AuthenticationPrincipal OAuth2User principal) {
+            @AuthenticationPrincipal Object principal) {
         
         try {
             Long studentId = getUserIdFromPrincipal(principal);
@@ -275,33 +276,47 @@ public class PlannedMajorController {
     }
     
     /**
-     * Extract user ID from OAuth2 principal
+     * Extract user ID from authentication principal (supports both OAuth2User and UserPrincipal for bypass mode)
      */
-    private Long getUserIdFromPrincipal(OAuth2User principal) {
+    private Long getUserIdFromPrincipal(Object principal) {
         if (principal == null) {
             throw new IllegalArgumentException("User not authenticated");
         }
         
-        // Get Google ID and email from OAuth2 principal
-        String googleId = principal.getAttribute("sub");
-        String email = principal.getAttribute("email");
-        
-        if (googleId != null) {
-            // Try to find user by Google ID first
-            Optional<User> user = userRepository.findByGoogleId(googleId);
-            if (user.isPresent()) {
-                return user.get().getUserId();
+        // Handle bypass mode authentication (UserPrincipal)
+        if (principal instanceof UserPrincipal userPrincipal) {
+            User user = userPrincipal.getUser();
+            if (user != null && user.getUserId() != null) {
+                return user.getUserId();
             }
+            throw new IllegalArgumentException("User not found in system. Please contact administrator.");
         }
         
-        if (email != null) {
-            // Try to find user by email
-            Optional<User> user = userRepository.findByEmail(email);
-            if (user.isPresent()) {
-                return user.get().getUserId();
+        // Handle OAuth2 authentication (OAuth2User)
+        if (principal instanceof OAuth2User oauth2User) {
+            // Get Google ID and email from OAuth2 principal
+            String googleId = oauth2User.getAttribute("sub");
+            String email = oauth2User.getAttribute("email");
+            
+            if (googleId != null) {
+                // Try to find user by Google ID first
+                Optional<User> user = userRepository.findByGoogleId(googleId);
+                if (user.isPresent()) {
+                    return user.get().getUserId();
+                }
             }
+            
+            if (email != null) {
+                // Try to find user by email
+                Optional<User> user = userRepository.findByEmail(email);
+                if (user.isPresent()) {
+                    return user.get().getUserId();
+                }
+            }
+            
+            throw new IllegalArgumentException("User not found in system. Please contact administrator.");
         }
         
-        throw new IllegalArgumentException("User not found in system. Please contact administrator.");
+        throw new IllegalArgumentException("Unsupported authentication principal type");
     }
 }
