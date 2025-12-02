@@ -55,6 +55,26 @@ public class PlanValidationService {
     private ClassRosterRepository classRosterRepository;
 
     /**
+     * Helper method to resolve course by subject and course number.
+     * Handles cases where multiple courses exist (same course in different terms) by returning the most recent one.
+     */
+    private Optional<Course> resolveCourse(String department, String courseNumber) {
+        List<Course> courses = courseRepository.findAllBySubjectAndCourseNumber(department, courseNumber);
+        if (courses.isEmpty()) {
+            return Optional.empty();
+        }
+        if (courses.size() == 1) {
+            return Optional.of(courses.get(0));
+        }
+        // If multiple courses found, return the one with the most recent term
+        return courses.stream()
+                .filter(c -> c.getTerm() != null && c.getTerm().getStartDate() != null)
+                .max(Comparator.comparing(c -> c.getTerm().getStartDate()))
+                .map(Optional::of)
+                .orElse(Optional.of(courses.get(0))); // Fallback to first if no dates available
+    }
+
+    /**
      * Get plan validation report showing unsatisfied prerequisites and degree requirement final status.
      * This is the "show" functionality - displays what issues exist and what the final status will be.
      * 
@@ -179,16 +199,21 @@ public class PlanValidationService {
             availableCourses.add(plan.getDepartment() + " " + plan.getCourseNum());
         }
 
-        // Check all UserClasses courses (both completed and in-progress) for unsatisfied prerequisites/corequisites/antirequisites
-        // This checks courses that the student has taken or is taking
+        // Check only in-progress courses (not completed courses) for unsatisfied prerequisites/corequisites/antirequisites
+        // Completed courses are already finished, so we don't need to check them
         // Examples:
-        // 1. A course was completed without completing its prerequisites first (e.g., CSE 216 completed while CSE 214 is still in progress)
-        // 2. An in-progress course (grade null) with unsatisfied prerequisites
+        // 1. An in-progress course (grade null) with unsatisfied prerequisites
+        // 2. An enrolled course with missing corequisites
         for (UserClasses userClass : allUserClasses) {
+            // Skip completed courses - they are already finished
+            if (userClass.getGrade() != null && !userClass.getGrade().trim().isEmpty() && !userClass.getGrade().equals("I")) {
+                continue;
+            }
+            
             String courseCode = userClass.getDepartment() + " " + userClass.getCourseNum();
             
             // Get course information from Course entity (scraped data)
-            Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+            Optional<Course> courseOpt = resolveCourse(
                 userClass.getDepartment(), userClass.getCourseNum().toString());
             
             if (courseOpt.isEmpty()) {
@@ -284,7 +309,7 @@ public class PlanValidationService {
             String courseCode = plan.getDepartment() + " " + plan.getCourseNum();
             
             // Get course information from Course entity (scraped data)
-            Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+            Optional<Course> courseOpt = resolveCourse(
                 plan.getDepartment(), plan.getCourseNum().toString());
             
             if (courseOpt.isEmpty()) {
@@ -744,25 +769,51 @@ public class PlanValidationService {
         allCourses.addAll(enrolledCourseCodes);
 
         // Calculate total credits (from completed courses, enrolled courses, and in-progress courses, not planned)
+        // Avoid double counting: enrolledRosters and inProgressClasses may overlap
         int totalCredits = 0;
+        Set<String> processedCourseCodes = new HashSet<>(); // Track processed courses to avoid duplicates
+        
+        // First, count completed courses
+        int completedCredits = 0;
         for (UserClasses uc : completedCourses) {
             if (uc.getCredits() != null) {
-                totalCredits += uc.getCredits();
+                completedCredits += uc.getCredits();
+                String courseCode = uc.getDepartment() + " " + uc.getCourseNum();
+                processedCourseCodes.add(courseCode);
             }
         }
-        // Add credits from enrolled courses (from ClassRoster)
+        totalCredits += completedCredits;
+        System.out.println("[DEBUG calculateDegreeRequirementStatus] Completed courses credits: " + completedCredits);
+        
+        // Add credits from enrolled courses (from ClassRoster) - only if not already counted
+        int enrolledCredits = 0;
         for (ClassRoster roster : enrolledRosters) {
             ClassEntity classEntity = roster.getClassEntity();
             if (classEntity != null && classEntity.getMinCredits() != null) {
-                totalCredits += classEntity.getMinCredits();
+                String courseCode = classEntity.getDepartment() + " " + classEntity.getCourseNum();
+                if (!processedCourseCodes.contains(courseCode)) {
+                    enrolledCredits += classEntity.getMinCredits();
+                    processedCourseCodes.add(courseCode);
+                }
             }
         }
-        // Add credits from in-progress courses (grade: null in user_classes)
+        totalCredits += enrolledCredits;
+        System.out.println("[DEBUG calculateDegreeRequirementStatus] Enrolled courses credits: " + enrolledCredits);
+        
+        // Add credits from in-progress courses (grade: null in user_classes) - only if not already counted
+        int inProgressCredits = 0;
         for (UserClasses uc : inProgressClasses) {
             if (uc.getCredits() != null) {
-                totalCredits += uc.getCredits();
+                String courseCode = uc.getDepartment() + " " + uc.getCourseNum();
+                if (!processedCourseCodes.contains(courseCode)) {
+                    inProgressCredits += uc.getCredits();
+                    processedCourseCodes.add(courseCode);
+                }
             }
         }
+        totalCredits += inProgressCredits;
+        System.out.println("[DEBUG calculateDegreeRequirementStatus] In-progress courses credits: " + inProgressCredits);
+        System.out.println("[DEBUG calculateDegreeRequirementStatus] Total credits calculated: " + totalCredits);
 
         // Process declared majors
         for (Map<String, Object> declaredMajor : declaredMajors) {
@@ -1347,7 +1398,7 @@ public class PlanValidationService {
                     for (UserClasses userClass : completedCourses) {
                             String courseCode = userClass.getDepartment() + " " + userClass.getCourseNum();
                             System.out.println("[DEBUG checkSbcRequirements] Looking up course in repository: " + courseCode);
-                        Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                        Optional<Course> courseOpt = resolveCourse(
                             userClass.getDepartment(), userClass.getCourseNum().toString());
                         if (courseOpt.isPresent()) {
                             Course course = courseOpt.get();
@@ -1377,7 +1428,7 @@ public class PlanValidationService {
                             if (classEntity != null && classEntity.getDepartment() != null && classEntity.getCourseNum() != null) {
                                 String courseCode = classEntity.getDepartment() + " " + classEntity.getCourseNum();
                                 System.out.println("[DEBUG checkSbcRequirements] Looking up enrolled course in repository: " + courseCode);
-                                Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                                Optional<Course> courseOpt = resolveCourse(
                                     classEntity.getDepartment(), classEntity.getCourseNum().toString());
                                 if (courseOpt.isPresent()) {
                                     Course course = courseOpt.get();
@@ -1407,7 +1458,7 @@ public class PlanValidationService {
                             if (userClass.getGrade() == null || userClass.getGrade().trim().isEmpty()) {
                                 String courseCode = userClass.getDepartment() + " " + userClass.getCourseNum();
                                 System.out.println("[DEBUG checkSbcRequirements] Looking up in-progress course in repository: " + courseCode);
-                                Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                                Optional<Course> courseOpt = resolveCourse(
                                     userClass.getDepartment(), userClass.getCourseNum().toString());
                                 if (courseOpt.isPresent()) {
                                     Course course = courseOpt.get();
@@ -1438,7 +1489,7 @@ public class PlanValidationService {
                             if (plan != null && plan.getDepartment() != null && plan.getCourseNum() != null) {
                                 String courseCode = plan.getDepartment() + " " + plan.getCourseNum();
                                 System.out.println("[DEBUG checkSbcRequirements] Looking up planned course in repository: " + courseCode);
-                            Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                            Optional<Course> courseOpt = resolveCourse(
                                 plan.getDepartment(), plan.getCourseNum().toString());
                             if (courseOpt.isPresent()) {
                                 Course course = courseOpt.get();
@@ -1465,9 +1516,10 @@ public class PlanValidationService {
                     // Even if specific courses are required, also check if any planned/taken/enrolled course satisfies the SBC
                     // This is for cases where a planned/enrolled course satisfies the SBC but is not in the required list
                     // Check completed courses
+                    boolean completedCoursesSatisfySbc = false;
                     if (completedCourses != null) {
                     for (UserClasses userClass : completedCourses) {
-                        Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                        Optional<Course> courseOpt = resolveCourse(
                             userClass.getDepartment(), userClass.getCourseNum().toString());
                         if (courseOpt.isPresent()) {
                             Course course = courseOpt.get();
@@ -1478,17 +1530,19 @@ public class PlanValidationService {
                                 if (!satisfiedRequiredCourses.contains(courseCode)) {
                                     satisfiedRequiredCourses.add(courseCode);
                                     }
+                                completedCoursesSatisfySbc = true;
                                 }
                             }
                         }
                     }
                     
                     // Check enrolled courses (in-progress)
+                    boolean enrolledCoursesSatisfySbc = false;
                     if (enrolledRosters != null) {
                         for (ClassRoster roster : enrolledRosters) {
                             ClassEntity classEntity = roster.getClassEntity();
                             if (classEntity != null && classEntity.getDepartment() != null && classEntity.getCourseNum() != null) {
-                                Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                                Optional<Course> courseOpt = resolveCourse(
                                     classEntity.getDepartment(), classEntity.getCourseNum().toString());
                                 if (courseOpt.isPresent()) {
                                     Course course = courseOpt.get();
@@ -1499,6 +1553,7 @@ public class PlanValidationService {
                                         if (!satisfiedRequiredCourses.contains(courseCode)) {
                                             satisfiedRequiredCourses.add(courseCode);
                                         }
+                                        enrolledCoursesSatisfySbc = true;
                                     }
                                 }
                             }
@@ -1506,11 +1561,12 @@ public class PlanValidationService {
                     }
                     
                     // Check in-progress courses from user_classes (grade: null)
+                    boolean inProgressCoursesSatisfySbc = false;
                     if (allUserClasses != null) {
                         for (UserClasses userClass : allUserClasses) {
                             // Only check courses with grade: null (in-progress)
                             if (userClass.getGrade() == null || userClass.getGrade().trim().isEmpty()) {
-                                Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                                Optional<Course> courseOpt = resolveCourse(
                                     userClass.getDepartment(), userClass.getCourseNum().toString());
                                 if (courseOpt.isPresent()) {
                                     Course course = courseOpt.get();
@@ -1521,6 +1577,7 @@ public class PlanValidationService {
                                         if (!satisfiedRequiredCourses.contains(courseCode)) {
                                             satisfiedRequiredCourses.add(courseCode);
                                         }
+                                        inProgressCoursesSatisfySbc = true;
                                     }
                                 }
                             }
@@ -1528,11 +1585,12 @@ public class PlanValidationService {
                     }
                     
                     // Check planned courses
+                    boolean plannedCoursesSatisfySbc = false;
                     System.out.println("[DEBUG checkSbcRequirements] hasAnyCourseRequirements=true, checking planned courses. plannedCourses size=" + (plannedCourses != null ? plannedCourses.size() : "null"));
                     if (plannedCourses != null) {
                         for (UserCoursePlan plan : plannedCourses) {
                             if (plan != null && plan.getDepartment() != null && plan.getCourseNum() != null) {
-                            Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                            Optional<Course> courseOpt = resolveCourse(
                                 plan.getDepartment(), plan.getCourseNum().toString());
                             if (courseOpt.isPresent()) {
                                 Course course = courseOpt.get();
@@ -1548,6 +1606,7 @@ public class PlanValidationService {
                                     if (!satisfiedRequiredCourses.contains(courseCode)) {
                                         satisfiedRequiredCourses.add(courseCode);
                                     }
+                                    plannedCoursesSatisfySbc = true;
                                 }
                             } else {
                                 System.out.println("[DEBUG checkSbcRequirements] Course not found in repository: " + 
@@ -1570,8 +1629,12 @@ public class PlanValidationService {
                         partialConditionMet = partialRequiredSatisfied;
                     }
                     
-                    // Both conditions must be met (if they exist)
-                    sbcMet = requiredConditionMet && partialConditionMet;
+                    // SBC is met if:
+                    // 1. Required/partial conditions are met (if they exist), OR
+                    // 2. Any completed/enrolled/in-progress/planned course satisfies the SBC
+                    boolean anyCourseSatisfiesSbc = completedCoursesSatisfySbc || enrolledCoursesSatisfySbc || 
+                                                    inProgressCoursesSatisfySbc || plannedCoursesSatisfySbc;
+                    sbcMet = (requiredConditionMet && partialConditionMet) || anyCourseSatisfiesSbc;
                 }
                 
                 status.put("met", sbcMet);
@@ -1985,18 +2048,25 @@ public class PlanValidationService {
             }
         }
 
-        // Check total credits requirement
-        boolean totalCreditsMet = totalCredits >= requirement.getTotalCreditsRequired();
-        status.put("totalCreditsRequired", requirement.getTotalCreditsRequired());
-        status.put("totalCreditsEarned", totalCredits);
-        status.put("totalCreditsMet", totalCreditsMet);
-
-        // Parse and check course requirements
+        // Parse and check course requirements first to get satisfied courses
         // Pass enrolled courses info - they should be treated as in-progress
         // Pass allUserClasses so in-progress courses (grade: null) can be detected
         Map<String, Object> courseRequirementsStatus = checkCourseRequirements(
             requirement.getCourseRequirements(), allCourses, completedCourses, allUserClasses, new ArrayList<>(), enrolledRosters);
         status.put("courseRequirements", courseRequirementsStatus);
+        
+        // Calculate credits specific to this major/minor
+        int specificCredits = calculateSpecificCredits(
+            subjectCode, degreeType, courseRequirementsStatus, completedCourses, allUserClasses, enrolledRosters);
+        
+        // For minors, use specific credits; for majors, use total credits (as they need overall graduation credits)
+        int creditsToUse = (degreeType == DegreeType.MINOR) ? specificCredits : totalCredits;
+        
+        // Check total credits requirement
+        boolean totalCreditsMet = creditsToUse >= requirement.getTotalCreditsRequired();
+        status.put("totalCreditsRequired", requirement.getTotalCreditsRequired());
+        status.put("totalCreditsEarned", creditsToUse);
+        status.put("totalCreditsMet", totalCreditsMet);
 
         // Parse and check SBC requirements
         // Note: For SBC checking, we include planned courses (assuming they will be completed with adequate grades)
@@ -2019,6 +2089,91 @@ public class PlanValidationService {
         }
 
         return status;
+    }
+    
+    /**
+     * Calculate credits specific to a major/minor based on satisfied courses.
+     */
+    @SuppressWarnings("unchecked")
+    private int calculateSpecificCredits(String subjectCode,
+                                         DegreeType degreeType,
+                                         Map<String, Object> courseRequirementsStatus,
+                                         List<UserClasses> completedCourses,
+                                         List<UserClasses> allUserClasses,
+                                         List<ClassRoster> enrolledRosters) {
+        int credits = 0;
+        Set<String> satisfiedCourseCodes = new HashSet<>();
+        Set<String> processedCourses = new HashSet<>(); // To avoid counting the same course twice
+        
+        // Collect all satisfied courses from course requirements
+        if (courseRequirementsStatus.containsKey("groups")) {
+            List<Map<String, Object>> groups = (List<Map<String, Object>>) courseRequirementsStatus.get("groups");
+            for (Map<String, Object> group : groups) {
+                List<String> satisfiedCourses = (List<String>) group.get("satisfiedCourses");
+                if (satisfiedCourses != null) {
+                    satisfiedCourseCodes.addAll(satisfiedCourses);
+                }
+                List<String> pendingCourses = (List<String>) group.get("pendingCourses");
+                if (pendingCourses != null) {
+                    satisfiedCourseCodes.addAll(pendingCourses);
+                }
+            }
+        }
+        
+        // Calculate credits from satisfied courses (avoid double counting)
+        for (String courseCode : satisfiedCourseCodes) {
+            if (processedCourses.contains(courseCode)) {
+                continue; // Already processed this course
+            }
+            
+            String[] parts = parseCourseCode(courseCode);
+            String dept = parts[0];
+            String courseNumStr = parts[1];
+            boolean found = false;
+            
+            // Check completed courses
+            for (UserClasses uc : completedCourses) {
+                if (uc.getDepartment() != null && uc.getDepartment().equalsIgnoreCase(dept) &&
+                    uc.getCourseNum() != null && uc.getCourseNum().toString().equals(courseNumStr) &&
+                    uc.getCredits() != null) {
+                    credits += uc.getCredits();
+                    processedCourses.add(courseCode);
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (found) continue;
+            
+            // Check in-progress courses (grade: null)
+            for (UserClasses uc : allUserClasses) {
+                if (uc.getDepartment() != null && uc.getDepartment().equalsIgnoreCase(dept) &&
+                    uc.getCourseNum() != null && uc.getCourseNum().toString().equals(courseNumStr) &&
+                    uc.getCredits() != null && (uc.getGrade() == null || uc.getGrade().trim().isEmpty())) {
+                    credits += uc.getCredits();
+                    processedCourses.add(courseCode);
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (found) continue;
+            
+            // Check enrolled courses
+            for (ClassRoster roster : enrolledRosters) {
+                ClassEntity classEntity = roster.getClassEntity();
+                if (classEntity != null &&
+                    classEntity.getDepartment() != null && classEntity.getDepartment().equalsIgnoreCase(dept) &&
+                    classEntity.getCourseNum() != null && classEntity.getCourseNum().toString().equals(courseNumStr) &&
+                    classEntity.getMinCredits() != null) {
+                    credits += classEntity.getMinCredits();
+                    processedCourses.add(courseCode);
+                    break;
+                }
+            }
+        }
+        
+        return credits;
     }
     
     /**
@@ -2085,7 +2240,7 @@ public class PlanValidationService {
                 nonRequiredClass.put("course", courseCode);
                 
                 // Get course name if available
-                Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                Optional<Course> courseOpt = resolveCourse(
                     plan.getDepartment(), plan.getCourseNum().toString());
                 if (courseOpt.isPresent()) {
                     nonRequiredClass.put("courseName", courseOpt.get().getCourseName());
@@ -2124,7 +2279,7 @@ public class PlanValidationService {
                     nonRequiredClass.put("course", courseCode);
                     
                     // Get course name if available
-                    Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                    Optional<Course> courseOpt = resolveCourse(
                         classEntity.getDepartment(), classEntity.getCourseNum().toString());
                     if (courseOpt.isPresent()) {
                         nonRequiredClass.put("courseName", courseOpt.get().getCourseName());
@@ -2138,42 +2293,49 @@ public class PlanValidationService {
             }
         }
         
-        // Also check taken courses (UserClasses)
-        if (allUserClasses != null && !allUserClasses.isEmpty()) {
-            System.out.println("[DEBUG identifyNonRequiredClasses] Checking " + allUserClasses.size() + " taken courses");
-        for (UserClasses userClass : allUserClasses) {
-            String courseCode = userClass.getDepartment() + " " + userClass.getCourseNum();
-                System.out.println("[DEBUG identifyNonRequiredClasses] Checking taken course: " + courseCode);
+        // Also check in-progress courses (UserClasses with grade null) - NOT completed courses
+        // Completed courses have already contributed to degree requirements, so we don't mark them as non-required
+        List<UserClasses> inProgressClasses = allUserClasses != null ? 
+            allUserClasses.stream()
+                .filter(uc -> uc.getGrade() == null || uc.getGrade().trim().isEmpty() || uc.getGrade().equals("I"))
+                .collect(java.util.stream.Collectors.toList()) : new ArrayList<>();
+        
+        if (!inProgressClasses.isEmpty()) {
+            System.out.println("[DEBUG identifyNonRequiredClasses] Checking " + inProgressClasses.size() + " in-progress courses");
+            for (UserClasses userClass : inProgressClasses) {
+                String courseCode = userClass.getDepartment() + " " + userClass.getCourseNum();
+                System.out.println("[DEBUG identifyNonRequiredClasses] Checking in-progress course: " + courseCode);
             
-            // Check if this course is needed for prerequisites or degree requirements
-            boolean neededForPrerequisites = coursesNeededForPrerequisites.contains(courseCode);
-            boolean neededForDegreeRequirements = coursesNeededForDegreeRequirements.contains(courseCode);
+                // Check if this course is needed for prerequisites or degree requirements
+                boolean neededForPrerequisites = coursesNeededForPrerequisites.contains(courseCode);
+                boolean neededForDegreeRequirements = coursesNeededForDegreeRequirements.contains(courseCode);
                 System.out.println("[DEBUG identifyNonRequiredClasses] " + courseCode + " - neededForPrerequisites: " + neededForPrerequisites + ", neededForDegreeRequirements: " + neededForDegreeRequirements);
             
-            // If not needed for either, it's a non-required class
-            if (!neededForPrerequisites && !neededForDegreeRequirements) {
-                    System.out.println("[DEBUG identifyNonRequiredClasses] " + courseCode + " is NON-REQUIRED (taken)");
-                Map<String, Object> nonRequiredClass = new HashMap<>();
-                nonRequiredClass.put("course", courseCode);
+                // If not needed for either, it's a non-required class
+                if (!neededForPrerequisites && !neededForDegreeRequirements) {
+                    System.out.println("[DEBUG identifyNonRequiredClasses] " + courseCode + " is NON-REQUIRED (in-progress)");
+                    Map<String, Object> nonRequiredClass = new HashMap<>();
+                    nonRequiredClass.put("course", courseCode);
                 
-                // Get course name if available
-                Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
-                    userClass.getDepartment(), userClass.getCourseNum().toString());
-                if (courseOpt.isPresent()) {
-                    nonRequiredClass.put("courseName", courseOpt.get().getCourseName());
+                    // Get course name if available
+                    Optional<Course> courseOpt = resolveCourse(
+                        userClass.getDepartment(), userClass.getCourseNum().toString());
+                    if (courseOpt.isPresent()) {
+                        nonRequiredClass.put("courseName", courseOpt.get().getCourseName());
+                    }
+                
+                    nonRequiredClass.put("semester", userClass.getSemester());
+                    nonRequiredClass.put("year", userClass.getYear());
+                    nonRequiredClass.put("credits", userClass.getCredits());
+                    nonRequiredClass.put("grade", userClass.getGrade());
+                    nonRequiredClass.put("status", "in-progress");
+                    nonRequiredClass.put("reason", "This course does not contribute to satisfying prerequisites or degree requirements (only counts toward minimum graduation credits)");
+                
+                    nonRequired.add(nonRequiredClass);
                 }
-                
-                nonRequiredClass.put("semester", userClass.getSemester());
-                nonRequiredClass.put("year", userClass.getYear());
-                nonRequiredClass.put("credits", userClass.getCredits());
-                nonRequiredClass.put("grade", userClass.getGrade());
-                nonRequiredClass.put("reason", "This course does not contribute to satisfying prerequisites or degree requirements (only counts toward minimum graduation credits)");
-                
-                nonRequired.add(nonRequiredClass);
-            }
             }
         } else {
-            System.out.println("[DEBUG identifyNonRequiredClasses] No taken courses to check");
+            System.out.println("[DEBUG identifyNonRequiredClasses] No in-progress courses to check");
         }
         
         System.out.println("[DEBUG identifyNonRequiredClasses] Total non-required classes found: " + nonRequired.size());
@@ -2197,7 +2359,7 @@ public class PlanValidationService {
         
         // For each planned course, check what prerequisites it needs
         for (UserCoursePlan plan : plannedCourses) {
-            Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+            Optional<Course> courseOpt = resolveCourse(
                 plan.getDepartment(), plan.getCourseNum().toString());
             
             if (courseOpt.isEmpty()) {
@@ -2244,7 +2406,7 @@ public class PlanValidationService {
         
         // Also check taken courses (UserClasses) - they might be prerequisites for other courses
         for (UserClasses userClass : allUserClasses) {
-            Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                    Optional<Course> courseOpt = resolveCourse(
                 userClass.getDepartment(), userClass.getCourseNum().toString());
             
             if (courseOpt.isEmpty()) {
@@ -2375,6 +2537,12 @@ public class PlanValidationService {
                     
                     for (Map<String, Object> group : groups) {
                         extractCourseCodesFromGroup(group, neededCourses);
+                        
+                        // For electives, also check if planned courses match the elective criteria
+                        String groupType = (String) group.get("type");
+                        if ("electives".equals(groupType)) {
+                            extractElectiveCoursesFromGroup(group, plannedCourses, neededCourses);
+                        }
                     }
                 } else {
                     // Old format: check core_courses, math_requirements, etc.
@@ -2444,7 +2612,7 @@ public class PlanValidationService {
                         if (plannedCourses != null) {
                         for (UserCoursePlan plan : plannedCourses) {
                                 if (plan != null && plan.getDepartment() != null && plan.getCourseNum() != null) {
-                            Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                            Optional<Course> courseOpt = resolveCourse(
                                 plan.getDepartment(), plan.getCourseNum().toString());
                             if (courseOpt.isPresent()) {
                                 Course course = courseOpt.get();
@@ -2461,7 +2629,7 @@ public class PlanValidationService {
                         // Check completed courses
                         if (completedCourses != null) {
                         for (UserClasses userClass : completedCourses) {
-                            Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                            Optional<Course> courseOpt = resolveCourse(
                                 userClass.getDepartment(), userClass.getCourseNum().toString());
                             if (courseOpt.isPresent()) {
                                 Course course = courseOpt.get();
@@ -2479,7 +2647,7 @@ public class PlanValidationService {
                             for (ClassRoster roster : enrolledRosters) {
                                 ClassEntity classEntity = roster.getClassEntity();
                                 if (classEntity != null && classEntity.getDepartment() != null && classEntity.getCourseNum() != null) {
-                                    Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                                    Optional<Course> courseOpt = resolveCourse(
                                         classEntity.getDepartment(), classEntity.getCourseNum().toString());
                                     if (courseOpt.isPresent()) {
                                         Course course = courseOpt.get();
@@ -2498,7 +2666,7 @@ public class PlanValidationService {
                         if (allUserClasses != null) {
                         for (UserClasses userClass : allUserClasses) {
                             if (userClass.getGrade() == null) { // In-progress
-                                Optional<Course> courseOpt = courseRepository.findBySubjectAndCourseNumber(
+                                Optional<Course> courseOpt = resolveCourse(
                                     userClass.getDepartment(), userClass.getCourseNum().toString());
                                 if (courseOpt.isPresent()) {
                                     Course course = courseOpt.get();
@@ -2551,9 +2719,182 @@ public class PlanValidationService {
                 }
             }
         } else if ("electives".equals(type)) {
-            // For electives, we'd need to check the course catalog to see which courses count
-            // For now, we'll skip electives as they're harder to determine
-            // This is a limitation - we'd need course catalog data to properly identify elective courses
+            // For electives, extract courses from sequences and courses lists
+            // Sequences
+            List<List<Map<String, Object>>> sequences = (List<List<Map<String, Object>>>) group.get("sequences");
+            if (sequences != null) {
+                for (List<Map<String, Object>> sequence : sequences) {
+                    for (Map<String, Object> courseReq : sequence) {
+                        String code = (String) courseReq.get("code");
+                        if (code != null) {
+                            courseCodes.add(code);
+                        }
+                    }
+                }
+            }
+            
+            // Courses (including patterns like "AMS 3xx+")
+            List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
+            if (courses != null) {
+                for (Map<String, Object> courseReq : courses) {
+                    String code = (String) courseReq.get("code");
+                    if (code != null) {
+                        courseCodes.add(code);
+                    }
+                }
+            }
+            
+            // Additional courses (patterns)
+            List<Map<String, Object>> additionalCourses = (List<Map<String, Object>>) group.get("additional_courses");
+            if (additionalCourses != null) {
+                for (Map<String, Object> courseReq : additionalCourses) {
+                    String code = (String) courseReq.get("code");
+                    if (code != null) {
+                        courseCodes.add(code);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Extract elective courses from planned courses that match the elective group criteria.
+     */
+    @SuppressWarnings("unchecked")
+    private void extractElectiveCoursesFromGroup(Map<String, Object> group, List<UserCoursePlan> plannedCourses, Set<String> neededCourses) {
+        if (plannedCourses == null || plannedCourses.isEmpty()) {
+            return;
+        }
+        
+        // Get excluded courses
+        List<Map<String, Object>> excludedCourses = (List<Map<String, Object>>) group.get("excluded_courses");
+        
+        // Check sequences
+        List<List<Map<String, Object>>> sequences = (List<List<Map<String, Object>>>) group.get("sequences");
+        if (sequences != null) {
+            for (List<Map<String, Object>> sequence : sequences) {
+                for (Map<String, Object> courseReq : sequence) {
+                    String code = (String) courseReq.get("code");
+                    if (code != null) {
+                        String[] parts = parseCourseCode(code);
+                        String dept = parts[0];
+                        String courseNumStr = parts[1];
+                        
+                        // Check if any planned course matches
+                        for (UserCoursePlan plan : plannedCourses) {
+                            if (plan != null && plan.getDepartment() != null && plan.getDepartment().equalsIgnoreCase(dept) &&
+                                plan.getCourseNum() != null && plan.getCourseNum().toString().equals(courseNumStr)) {
+                                String courseCode = plan.getDepartment() + " " + plan.getCourseNum();
+                                if (excludedCourses == null || !isExcluded(courseCode, excludedCourses)) {
+                                    neededCourses.add(courseCode);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Check courses (including patterns like "AMS 3xx+")
+        List<Map<String, Object>> courses = (List<Map<String, Object>>) group.get("courses");
+        if (courses != null) {
+            for (Map<String, Object> courseReq : courses) {
+                String code = (String) courseReq.get("code");
+                if (code == null) continue;
+                
+                // Check for pattern like "AMS 3xx+" or "CSE 3xx"
+                if (code.contains("xx+") || code.contains("xx")) {
+                    String[] parts = parseCourseCode(code);
+                    String dept = parts[0];
+                    int minLevel = 300; // Default for 3xx+
+                    
+                    if (code.contains("2xx+")) {
+                        minLevel = 200;
+                    } else if (code.contains("4xx+")) {
+                        minLevel = 400;
+                    } else if (code.contains("3xx+") || code.contains("3xx")) {
+                        minLevel = 300;
+                    }
+                    
+                    // Check if any planned course matches the pattern
+                    for (UserCoursePlan plan : plannedCourses) {
+                        if (plan != null && plan.getDepartment() != null && plan.getDepartment().equalsIgnoreCase(dept) &&
+                            plan.getCourseNum() != null && plan.getCourseNum() >= minLevel) {
+                            String courseCode = plan.getDepartment() + " " + plan.getCourseNum();
+                            if (excludedCourses == null || !isExcluded(courseCode, excludedCourses)) {
+                                neededCourses.add(courseCode);
+                            }
+                        }
+                    }
+                } else {
+                    // Regular course code
+                    String[] parts = parseCourseCode(code);
+                    String dept = parts[0];
+                    String courseNumStr = parts[1];
+                    
+                    // Check if any planned course matches
+                    for (UserCoursePlan plan : plannedCourses) {
+                        if (plan != null && plan.getDepartment() != null && plan.getDepartment().equalsIgnoreCase(dept) &&
+                            plan.getCourseNum() != null && plan.getCourseNum().toString().equals(courseNumStr)) {
+                            String courseCode = plan.getDepartment() + " " + plan.getCourseNum();
+                            if (excludedCourses == null || !isExcluded(courseCode, excludedCourses)) {
+                                neededCourses.add(courseCode);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Check additional_courses (patterns)
+        List<Map<String, Object>> additionalCourses = (List<Map<String, Object>>) group.get("additional_courses");
+        if (additionalCourses != null) {
+            for (Map<String, Object> courseReq : additionalCourses) {
+                String code = (String) courseReq.get("code");
+                if (code == null) continue;
+                
+                // Check for pattern
+                if (code.contains("xx+") || code.contains("xx")) {
+                    String[] parts = parseCourseCode(code);
+                    String dept = parts[0];
+                    int minLevel = 300; // Default for 3xx+
+                    
+                    if (code.contains("2xx+")) {
+                        minLevel = 200;
+                    } else if (code.contains("4xx+")) {
+                        minLevel = 400;
+                    } else if (code.contains("3xx+") || code.contains("3xx")) {
+                        minLevel = 300;
+                    }
+                    
+                    // Check if any planned course matches the pattern
+                    for (UserCoursePlan plan : plannedCourses) {
+                        if (plan != null && plan.getDepartment() != null && plan.getDepartment().equalsIgnoreCase(dept) &&
+                            plan.getCourseNum() != null && plan.getCourseNum() >= minLevel) {
+                            String courseCode = plan.getDepartment() + " " + plan.getCourseNum();
+                            if (excludedCourses == null || !isExcluded(courseCode, excludedCourses)) {
+                                neededCourses.add(courseCode);
+                            }
+                        }
+                    }
+                } else {
+                    // Regular course code
+                    String[] parts = parseCourseCode(code);
+                    String dept = parts[0];
+                    String courseNumStr = parts[1];
+                    
+                    // Check if any planned course matches
+                    for (UserCoursePlan plan : plannedCourses) {
+                        if (plan != null && plan.getDepartment() != null && plan.getDepartment().equalsIgnoreCase(dept) &&
+                            plan.getCourseNum() != null && plan.getCourseNum().toString().equals(courseNumStr)) {
+                            String courseCode = plan.getDepartment() + " " + plan.getCourseNum();
+                            if (excludedCourses == null || !isExcluded(courseCode, excludedCourses)) {
+                                neededCourses.add(courseCode);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     

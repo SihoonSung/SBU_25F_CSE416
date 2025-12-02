@@ -117,6 +117,9 @@ export default function Planner() {
   
   const [degreeStatus, setDegreeStatus] = useState<any>(null); 
   const [validationResult, setValidationResult] = useState<ValidationReport | null>(null);
+  
+  // Workload limits for each semester
+  const [workloadLimits, setWorkloadLimits] = useState<{ [term: string]: number }>({});
 
   // --- Initialization ---
   useEffect(() => {
@@ -216,6 +219,58 @@ export default function Planner() {
     setTargetGraduation({ semester: finalSem, year: finalYear.toString() });
   }
 
+  // Generate list of all semesters from now until target graduation
+  const generateSemesterList = (targetSem: string, targetYear: number): string[] => {
+    const semesters: string[] = [];
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    let y = now.getFullYear();
+    
+    if (currentMonth >= 7) { 
+        y += 1; 
+    }
+
+    while (y <= targetYear) {
+      const semOrder = ['Spring', 'Fall'];
+      for (const s of semOrder) {
+        if (y < now.getFullYear()) continue;
+        if (y === now.getFullYear() && currentMonth >= 7 && s === 'Spring') continue;
+        if (y > targetYear) break;
+        
+        if (y === targetYear) {
+            if (s === 'Spring' && targetSem === 'Spring') {
+                semesters.push(`${s} ${y}`);
+                break;
+            } else if (s === 'Fall' && targetSem === 'Fall') {
+                semesters.push(`${s} ${y}`);
+                break;
+            } else if (s === 'Spring' && targetSem === 'Fall') {
+                semesters.push(`${s} ${y}`);
+            }
+        } else {
+            semesters.push(`${s} ${y}`);
+        }
+      }
+      y++;
+    }
+    return semesters;
+  }
+
+  // Initialize workload limits when target graduation changes
+  useEffect(() => {
+    const targetYear = parseInt(targetGraduation.year);
+    const semesterList = generateSemesterList(targetGraduation.semester, targetYear);
+    
+    setWorkloadLimits(prev => {
+      const newLimits: { [term: string]: number } = {};
+      semesterList.forEach(term => {
+        // Keep existing value if it exists, otherwise default to 17
+        newLimits[term] = prev[term] || 17;
+      });
+      return newLimits;
+    });
+  }, [targetGraduation.semester, targetGraduation.year]);
+
   const totalByTerm = useMemo(() =>
       Object.fromEntries(
         Object.entries(plan).map(([t, arr]) => [t, arr.reduce((s, c) => s + c.credits, 0)])
@@ -294,7 +349,10 @@ export default function Planner() {
       const manualCodes = manualInputList.map(m => m.code); 
       const combinedPref = [...new Set([...prefList, ...manualCodes])];
 
-      const workloads = generateWorkloadLimits(targetGraduation.semester, parseInt(targetGraduation.year));
+      // Use user-defined workload limits if available, otherwise generate defaults
+      const workloads = Object.keys(workloadLimits).length > 0 
+        ? workloadLimits 
+        : generateWorkloadLimits(targetGraduation.semester, parseInt(targetGraduation.year));
 
       const payload = {
         graduationSemester: targetGraduation.semester,
@@ -533,50 +591,145 @@ export default function Planner() {
     const majors = Array.isArray(statusData) ? statusData : statusData.declaredMajors || [];
 
     if (!majors || majors.length === 0) {
-      return <div>No detailed degree status available.</div>;
+      return <div className="validation-empty">No detailed degree status available.</div>;
     }
 
     return (
       <div className="degree-status-container">
         {majors.map((major: any, idx: number) => (
           <div key={idx} className="major-status-card">
-            <h4>
+            <div className="major-header">
+              <h4 className="major-title">
                 {major.requirementName || `${major.subjectCode} ${major.degreeType}`}
-                <span className={`status-badge ${major.overallStatus === 'SATISFIED' ? 'green' : 'red'}`}>
-                    {major.overallStatus || 'PENDING'}
-                </span>
-            </h4>
+              </h4>
+              <span className={`status-badge ${major.overallStatus === 'SATISFIED' ? 'status-satisfied' : 'status-pending'}`}>
+                {major.overallStatus || 'PENDING'}
+              </span>
+            </div>
             
-            <p>Credits: {major.totalCreditsEarned} / {major.totalCreditsRequired} 
-               {major.gpaRequirement && ` | GPA: ${major.currentGPA?.toFixed(2)} / ${major.gpaRequirement}`}
-            </p>
+            <div className="major-summary">
+              <div className="summary-item">
+                <span className="summary-label">Credits:</span>
+                <span className="summary-value">
+                  {major.totalCreditsEarned} / {major.totalCreditsRequired}
+                </span>
+              </div>
+              {major.gpaRequirement && (
+                <div className="summary-item">
+                  <span className="summary-label">GPA:</span>
+                  <span className="summary-value">
+                    {major.currentGPA?.toFixed(2)} / {major.gpaRequirement}
+                  </span>
+                </div>
+              )}
+            </div>
 
             {major.courseRequirements?.groups && (
-                <ul className="req-group-list">
-                    {major.courseRequirements.groups.map((group: any) => (
-                        <li key={group.groupId} className={`req-item ${group.status.toLowerCase().includes('completed') ? 'satisfied' : 'unsatisfied'}`}>
-                            <strong>{group.groupType} ({group.groupId}): </strong> {group.status}
-                            {group.missingCourses && group.missingCourses.length > 0 && 
-                                <div className="missing-list">Missing: {group.missingCourses.join(', ')}</div>}
-                        </li>
-                    ))}
-                </ul>
+              <div className="course-requirements-section">
+                <h5 className="section-title">Course Requirements</h5>
+                <div className="req-group-list">
+                  {major.courseRequirements.groups.map((group: any) => (
+                    <div key={group.groupId} className={`req-item ${group.status.toLowerCase().includes('completed') ? 'req-satisfied' : 'req-unsatisfied'}`}>
+                      <div className="req-header">
+                        <span className="req-type">{group.groupType}</span>
+                        <span className="req-id">({group.groupId})</span>
+                        <span className={`req-status ${group.status.toLowerCase().includes('completed') ? 'status-completed' : 'status-pending'}`}>
+                          {group.status}
+                        </span>
+                      </div>
+                      {group.missingCourses && group.missingCourses.length > 0 && (
+                        <div className="missing-list">
+                          <span className="missing-label">Missing:</span>
+                          <span className="missing-courses">{group.missingCourses.join(', ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
             
             {major.sbcRequirements?.sbcCategories && (
-                <div className="sbc-section">
-                    <h5>Related SBCs</h5>
-                    <ul className="sbc-list">
-                        {major.sbcRequirements.sbcCategories.map((sbc: any) => (
-                            <li key={sbc.category} className={sbc.met ? 'met' : 'unmet'}>
-                                {sbc.category}: {sbc.met ? '✅' : '❌'}
-                            </li>
-                        ))}
-                    </ul>
+              <div className="sbc-section">
+                <h5 className="section-title">Related SBCs</h5>
+                <div className="sbc-grid-display">
+                  {major.sbcRequirements.sbcCategories.map((sbc: any) => (
+                    <div key={sbc.category} className={`sbc-item ${sbc.met ? 'sbc-met' : 'sbc-unmet'}`}>
+                      <span className="sbc-name">{sbc.category}</span>
+                      <span className="sbc-icon">{sbc.met ? '✅' : '❌'}</span>
+                    </div>
+                  ))}
                 </div>
+              </div>
             )}
           </div>
         ))}
+      </div>
+    );
+  }
+
+  const renderValidationDetails = (validation: ValidationReport) => {
+    return (
+      <div className="validation-details-container">
+        {validation.nonRequiredClasses.length > 0 && (
+          <div className="validation-section non-required-section">
+            <div className="section-header">
+              <span className="section-icon">⚠️</span>
+              <h4 className="section-title">Non-Required Courses</h4>
+              <span className="section-count">{validation.nonRequiredClasses.length}</span>
+            </div>
+            <p className="section-description">These courses do not contribute to satisfying prerequisites or degree requirements (only count toward minimum graduation credits)</p>
+            <div className="item-list">
+              {validation.nonRequiredClasses.map((nr, i) => (
+                <div key={i} className="validation-item">
+                  <span className="item-course">{nr.course}</span>
+                  {nr.semester && nr.year && (
+                    <span className="item-term">{nr.semester} {nr.year}</span>
+                  )}
+                  <span className="item-reason">{nr.reason}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {validation.unsatisfiedPrerequisites.length > 0 && (
+          <div className="validation-section prerequisites-section">
+            <div className="section-header">
+              <span className="section-icon">❌</span>
+              <h4 className="section-title">Unsatisfied Prerequisites</h4>
+              <span className="section-count">{validation.unsatisfiedPrerequisites.length}</span>
+            </div>
+            <div className="item-list">
+              {validation.unsatisfiedPrerequisites.map((up, i) => (
+                <div key={i} className="validation-item prereq-item">
+                  <div className="prereq-header">
+                    <span className="item-course">{up.course}</span>
+                    <span className="item-term">{up.semester} {up.year}</span>
+                  </div>
+                  {up.missingPrerequisites && up.missingPrerequisites.length > 0 && (
+                    <div className="prereq-details">
+                      <span className="prereq-label">Missing Prerequisites:</span>
+                      <span className="prereq-courses">{up.missingPrerequisites.join(', ')}</span>
+                    </div>
+                  )}
+                  {up.missingCorequisites && up.missingCorequisites.length > 0 && (
+                    <div className="prereq-details">
+                      <span className="prereq-label">Missing Corequisites:</span>
+                      <span className="prereq-courses">{up.missingCorequisites.join(', ')}</span>
+                    </div>
+                  )}
+                  {up.violatedAntirequisites && up.violatedAntirequisites.length > 0 && (
+                    <div className="prereq-details">
+                      <span className="prereq-label">Violated Antirequisites:</span>
+                      <span className="prereq-courses">{up.violatedAntirequisites.join(', ')}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -650,6 +803,51 @@ export default function Planner() {
         </div>
 
         <div className="card">
+          <div className="card-title">Semester Max Credits</div>
+          <p style={{fontSize:'0.85em', color:'#666', marginBottom:'10px'}}>
+            Set maximum credits for each semester until graduation
+          </p>
+          <div style={{maxHeight: '300px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '4px', padding: '10px'}}>
+            <table style={{width: '100%', borderCollapse: 'collapse'}}>
+              <thead>
+                <tr style={{borderBottom: '2px solid #ddd'}}>
+                  <th style={{textAlign: 'left', padding: '8px', fontWeight: 'bold'}}>Semester</th>
+                  <th style={{textAlign: 'left', padding: '8px', fontWeight: 'bold'}}>Max Credits</th>
+                </tr>
+              </thead>
+              <tbody>
+                {generateSemesterList(targetGraduation.semester, parseInt(targetGraduation.year)).map(term => (
+                  <tr key={term} style={{borderBottom: '1px solid #eee'}}>
+                    <td style={{padding: '8px'}}>{term}</td>
+                    <td style={{padding: '8px'}}>
+                      <input
+                        type="number"
+                        min="1"
+                        max="24"
+                        value={workloadLimits[term] || 17}
+                        onChange={e => {
+                          const value = parseInt(e.target.value) || 17;
+                          setWorkloadLimits(prev => ({
+                            ...prev,
+                            [term]: value
+                          }));
+                        }}
+                        style={{
+                          width: '80px',
+                          padding: '4px 8px',
+                          border: '1px solid #ccc',
+                          borderRadius: '4px'
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card">
             <div className="card-title">Preferences</div>
             <label>
                 <span>Preferred Courses</span>
@@ -701,34 +899,17 @@ export default function Planner() {
 
         {(degreeStatus || validationResult) && (
             <div className="report-panel">
-                <h3>Degree Requirement Status</h3>
-                {renderDegreeStatusDetails(degreeStatus)}
+                {degreeStatus && (
+                    <div className="validation-section degree-status-section">
+                        <h3 className="panel-title">Degree Requirement Status</h3>
+                        {renderDegreeStatusDetails(degreeStatus)}
+                    </div>
+                )}
                 
                 {validationResult && (
-                    <div className="validation-details">
-                        <h4>Validation Details</h4>
-                        {validationResult.nonRequiredClasses.length > 0 && (
-                            <div className="non-required-alert">
-                                <strong>⚠️ Non-Required Courses (Electives/Extra):</strong>
-                                <ul>
-                                    {validationResult.nonRequiredClasses.map((nr, i) => (
-                                        <li key={i}>{nr.course} - {nr.reason}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                        {validationResult.unsatisfiedPrerequisites.length > 0 && (
-                            <div className="prereq-alert">
-                                <strong>❌ Unsatisfied Prerequisites:</strong>
-                                <ul>
-                                    {validationResult.unsatisfiedPrerequisites.map((up, i) => (
-                                        <li key={i}>
-                                            {up.course} ({up.semester} {up.year}): {up.missingPrerequisites?.join(', ')}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
+                    <div className="validation-section validation-details-section">
+                        <h3 className="panel-title">Validation Details</h3>
+                        {renderValidationDetails(validationResult)}
                     </div>
                 )}
             </div>

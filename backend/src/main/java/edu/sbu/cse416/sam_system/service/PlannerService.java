@@ -252,7 +252,21 @@ public class PlannerService {
                 }
             }
         }
-        return courseRepository.findBySubjectAndCourseNumber(department, courseNum.toString());
+        // If term not found, try to find by subject and course number
+        // This may return multiple results (same course in different terms), so get the most recent one
+        List<Course> courses = courseRepository.findAllBySubjectAndCourseNumber(department, courseNum.toString());
+        if (courses.isEmpty()) {
+            return Optional.empty();
+        }
+        if (courses.size() == 1) {
+            return Optional.of(courses.get(0));
+        }
+        // If multiple courses found, return the one with the most recent term
+        return courses.stream()
+                .filter(c -> c.getTerm() != null && c.getTerm().getStartDate() != null)
+                .max(Comparator.comparing(c -> c.getTerm().getStartDate()))
+                .map(Optional::of)
+                .orElse(Optional.of(courses.get(0))); // Fallback to first if no dates available
     }
 
     private void validateRequisites(Long userId,
