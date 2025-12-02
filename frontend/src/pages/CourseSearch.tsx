@@ -38,8 +38,7 @@ function CourseSearch() {
   const [filters, setFilters] = useState({
     courseNumber: '',
     sbc: 'Any',
-    instructor: '',
-    dayTime: 'Any'
+    instructor: ''
   })
   const [availableTerms, setAvailableTerms] = useState<any[]>([])
   const [selectedTerm, setSelectedTerm] = useState<string>('')
@@ -377,20 +376,6 @@ function CourseSearch() {
               <option value="WRT">WRT</option>
             </select>
           </div>
-          {/* Day/Time Filter (preset) */}
-          <div className="filter-group">
-            <label htmlFor="dayTime">Days/Time:</label>
-            <select
-              id="dayTime"
-              value={filters.dayTime}
-              onChange={(e) => handleFilterChange('dayTime', e.target.value)}
-            >
-              <option value="Any">Any</option>
-              <option value="Morning">Morning</option>
-              <option value="Afternoon">Afternoon</option>
-              <option value="Evening">Evening</option>
-            </select>
-          </div>
           
           <div className="filter-stats">
             <div className="stat-item">
@@ -407,7 +392,7 @@ function CourseSearch() {
           <button 
             className="clear-filters-btn"
             onClick={() => {
-              setFilters({ courseNumber: '', sbc: 'Any', instructor: '', dayTime: 'Any' })
+              setFilters({ courseNumber: '', sbc: 'Any', instructor: '' })
               setSearchTerm('')
               setCurrentPage(1)
             }}

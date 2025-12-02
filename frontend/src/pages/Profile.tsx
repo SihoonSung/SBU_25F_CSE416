@@ -806,11 +806,11 @@ export default function ProfilePage() {
         const transferData = await safeFetch(`${BASE}/api/users/${userId}/transfer-courses`).catch(() => []);
         if (Array.isArray(transferData) && transferData.length > 0) {
           tr = transferData.map((item: any) => ({
-            originalClass: item.originalClass || item.courseName || '',
+            originalClass: item.originalClass || item.courseName || item.className || '',
             originalUniversity: item.originalUniversity || item.university || '',
             credits: item.credits || 0,
-            subject: item.subject || item.equivalentSubject || null,
-            courseNum: item.courseNum || item.equivalentCourseNum || null,
+            subject: item.subject || item.equivalentSubject || item.department || null,
+            courseNum: item.courseNum || item.equivalentCourseNum || item.courseNum || null,
             grade: item.grade || null
           }));
         }
@@ -1921,7 +1921,7 @@ function StudentBundleView(props: {
                   <div key={`${c.classId}`} style={{ display: "grid", gridTemplateColumns: "160px 1fr 1fr 1fr 1fr 100px", padding: "8px 12px", borderTop: "1px solid #f0f0f0", alignItems: "center" }}>
                     <div>{c.subject}{c.courseNum}.{c.section}</div>
                     <div>{c.title}</div>
-                    <div>{c.schedule}</div>
+                    <div>{c.schedule?.replace(/Day\/Time:?\s*/gi, '') || ''}</div>
                     <div>{c.location}</div>
                     <div>{c.instructor || "-"}</div>
                     <div>
