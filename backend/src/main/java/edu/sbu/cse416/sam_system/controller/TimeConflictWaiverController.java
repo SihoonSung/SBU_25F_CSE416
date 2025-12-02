@@ -90,6 +90,29 @@ public class TimeConflictWaiverController {
     }
     
     /**
+     * Get time conflict waivers by student ID (query parameter version)
+     * GET /api/waivers/time-conflicts?studentId={studentId}
+     */
+    @GetMapping("/time-conflicts")
+    public ResponseEntity<List<Map<String, Object>>> getTimeConflictWaivers(
+            @RequestParam(required = false) Long studentId) {
+        try {
+            if (studentId == null) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            List<TimeConflictWaiver> waivers = waiverService.getWaiversByStudent(studentId);
+            List<Map<String, Object>> response = waivers.stream()
+                .map(this::buildWaiverResponse)
+                .toList();
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+    
+    /**
      * Get all pending waivers
      * GET /api/waivers/pending
      */

@@ -140,7 +140,7 @@ type Hold = {
   reason?: string;
 };
 type TimeConflictWaiver = { classA: string; classB: string; term: string; waivedBy: string; waivedAt: string };
-type AuditLogEntry = { id: number; timestamp: string; actorRole: "student" | "advisor" | "registrar" | "system"; actorDisplay: string; action: string; details?: string };
+type AuditLogEntry = { id: number; timestamp: string; actorRole: "student" | "advisor" | "registrar" | "system"; actorDisplay: string; action: string; details?: string | object };
 
 type TransferCourse = { originalClass: string; originalUniversity: string; credits: number; subject: string | null; courseNum: number | null; grade: string | null };
 type HistoricClass = { classId: number; subject: string; courseNum: number; section: number | string; semester: TermRef["semester"]; year: number; credits: number; gpnc: boolean; grade: string | null };
@@ -2198,14 +2198,26 @@ function StudentBundleView(props: {
                   <div>Action</div>
                   <div>Details</div>
                 </div>
-                {audit.map((a) => (
-                  <div key={a.id} style={{ display: "grid", gridTemplateColumns: "200px 140px 180px 1fr", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
-                    <div>{fmt.date(a.timestamp)}</div>
-                    <div>{a.actorDisplay}</div>
-                    <div>{a.action}</div>
-                    <div style={{ whiteSpace: "pre-wrap" }}>{a.details || "-"}</div>
-                  </div>
-                ))}
+                {audit.map((a) => {
+                  // Format details: if it's an object, stringify it; otherwise use as string
+                  let detailsDisplay: string;
+                  if (!a.details) {
+                    detailsDisplay = "-";
+                  } else if (typeof a.details === "object") {
+                    detailsDisplay = JSON.stringify(a.details, null, 2);
+                  } else {
+                    detailsDisplay = String(a.details);
+                  }
+                  
+                  return (
+                    <div key={a.id} style={{ display: "grid", gridTemplateColumns: "200px 140px 180px 1fr", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
+                      <div>{fmt.date(a.timestamp)}</div>
+                      <div>{a.actorDisplay}</div>
+                      <div>{a.action}</div>
+                      <div style={{ whiteSpace: "pre-wrap" }}>{detailsDisplay}</div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>
