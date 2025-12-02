@@ -2251,7 +2251,7 @@ function ReqTable({ data }: { data: RequirementStatus[] }) {
 
   return (
     <div style={{ border: "1px solid #eee", borderRadius: 8, overflow: "hidden" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "160px 140px 1fr 140px 1fr", background: "#fafafa", fontWeight: 600, padding: "8px 12px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "160px 240px 1fr 140px 1fr", background: "#fafafa", fontWeight: 600, padding: "8px 12px" }}>
         <div>Program</div>
         <div>Req Code</div>
         <div>Title</div>
@@ -2259,7 +2259,7 @@ function ReqTable({ data }: { data: RequirementStatus[] }) {
         <div>Using Classes</div>
       </div>
       {data.map((r, i) => (
-        <div key={`${r.programCode}-${r.code}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 140px 1fr 140px 1fr", padding: "8px 12px", borderTop: "1px solid #f0f0f0", alignItems: 'center' }}>
+        <div key={`${r.programCode}-${r.code}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 240px 1fr 140px 1fr", padding: "8px 12px", borderTop: "1px solid #f0f0f0", alignItems: 'center' }}>
           <div>{r.programCode}</div>
           <div>{r.code}</div>
           <div>

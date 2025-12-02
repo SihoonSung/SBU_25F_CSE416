@@ -444,6 +444,11 @@ public class UserService {
                     List<Map<String, Object>> classes = (List<Map<String, Object>>) classesObj;
                     
                     for (Map<String, Object> classData : classes) {
+                        // Skip null entries
+                        if (classData == null) {
+                            continue;
+                        }
+                        
                         UserClasses userClass = new UserClasses();
                         userClass.setUser(user);
                         userClass.setClassId(getLongValue(classData.get("class_id")));
@@ -469,6 +474,11 @@ public class UserService {
                     List<Map<String, Object>> transferCourses = (List<Map<String, Object>>) transferCoursesObj;
                     
                     for (Map<String, Object> transferData : transferCourses) {
+                        // Skip null entries
+                        if (transferData == null) {
+                            continue;
+                        }
+                        
                         UserTransferCourses userTransfer = new UserTransferCourses();
                         userTransfer.setUser(user);
                         userTransfer.setClassName(getStringValue(transferData.get("class")));
@@ -494,6 +504,11 @@ public class UserService {
                     if (!coursePlan.isEmpty()) {
                         for (Map<String, Object> planData : coursePlan) {
                             try {
+                                // Skip null entries
+                                if (planData == null) {
+                                    continue;
+                                }
+                                
                                 UserCoursePlan userPlan = new UserCoursePlan();
                                 userPlan.setUser(user);
                                 userPlan.setDepartment(getStringValue(planData.get("department")));

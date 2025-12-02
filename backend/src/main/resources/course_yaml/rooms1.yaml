@@ -1,4 +1,4 @@
-# sample room capacity file.  version: 2025-09-09
+# room capacity file for demos.  version: 2025-11-30
 # CSE416, Software Engineering, Scott D. Stoller.
 
 rooms:
@@ -11,3 +11,6 @@ rooms:
   - building: JAVITS LECTR
     room: 102
     capacity: 80
+  - building: HVY ENGR LAB
+    room: 201
+    capacity: 1
