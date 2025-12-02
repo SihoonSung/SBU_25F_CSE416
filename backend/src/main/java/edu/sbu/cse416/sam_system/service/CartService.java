@@ -604,6 +604,20 @@ public class CartService {
                             classEntity.setCurrentCapacity(0);
                         }
 
+                        // Check if waitlist is open for this term
+                        String classSemester = classEntity.getSemester();
+                        Integer classYear = classEntity.getYear();
+                        if (classSemester != null && classYear != null) {
+                            boolean canWaitlist = registrationScheduleService.canAddToWaitlist(classSemester, classYear);
+                            if (!canWaitlist) {
+                                result.put("success", false);
+                                result.put("error", "Waitlist is not available for " + classEntity.getDepartment() + " " + 
+                                         classEntity.getCourseNum() + " (" + classSemester + " " + classYear + "). " +
+                                         "Waitlist period has ended or has not started yet.");
+                                return result;
+                            }
+                        }
+
                         // Check waitlist capacity (20% of max capacity)
                         long currentWaitlistCount = waitlistRepository.countActiveWaitlistByClassEntity(classEntity);
                         if (classEntity.isWaitlistFull(currentWaitlistCount)) {
