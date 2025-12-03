@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import './PdfUpload.css'
+import LoadingModal from '../components/LoadingModal'
 
 /**
  * Class Management Page Component
@@ -28,11 +29,13 @@ interface Class {
 function PdfUpload() {
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
   const [classes, setClasses] = useState<Class[]>([])
-  const [editingCapacity, setEditingCapacity] = useState<{[key: number]: number}>({})
+  const [editingCapacity, setEditingCapacity] = useState<{ [key: number]: number }>({})
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [searchTerm, setSearchTerm] = useState('')
   const [loadingCapacity, setLoadingCapacity] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [processingMessage, setProcessingMessage] = useState('')
   const [capacityMessage, setCapacityMessage] = useState('')
 
   /**
@@ -54,7 +57,7 @@ function PdfUpload() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       const data = await response.json()
-      
+
       // Map backend ClassEntity fields to frontend Class interface
       // Backend uses: maxCapacity, currentCapacity
       // Frontend expects: capacity (which should be maxCapacity)
@@ -72,7 +75,7 @@ function PdfUpload() {
         credits: cls.minCredits || cls.maxCredits || 0,
         capacity: cls.maxCapacity !== null && cls.maxCapacity !== undefined ? cls.maxCapacity : null
       })) : []
-      
+
       setClasses(mappedClasses)
       console.log(`[PdfUpload] Fetched ${mappedClasses.length} classes`)
     } catch (error) {
@@ -87,7 +90,7 @@ function PdfUpload() {
   const handleCapacityChange = (classId: number, value: string) => {
     const numValue = parseInt(value)
     if (!isNaN(numValue) && numValue >= 0) {
-      setEditingCapacity({...editingCapacity, [classId]: numValue})
+      setEditingCapacity({ ...editingCapacity, [classId]: numValue })
     }
   }
 
@@ -113,7 +116,7 @@ function PdfUpload() {
       }
 
       const data = await response.json()
-      
+
       if (data.success) {
         setCapacityMessage(`Success: ${data.message || 'Capacity loaded successfully'} (${data.roomsLoaded || 0} rooms, ${data.classesUpdated || 0} classes updated)`)
         // Refresh class list to show updated capacities
@@ -136,6 +139,9 @@ function PdfUpload() {
     const newCapacity = editingCapacity[classId]
     if (newCapacity === undefined) return
 
+    setIsProcessing(true)
+    setProcessingMessage('Updating capacity...')
+
     try {
       const response = await fetch(`${backendBase}/api/registrar/classes/${classId}/capacity`, {
         credentials: 'include',
@@ -147,14 +153,14 @@ function PdfUpload() {
       })
 
       const data = await response.json()
-      
+
       if (data.success) {
         // Update local state
-        setClasses(classes.map(cls => 
-          cls.classId === classId ? {...cls, capacity: newCapacity} : cls
+        setClasses(classes.map(cls =>
+          cls.classId === classId ? { ...cls, capacity: newCapacity } : cls
         ))
         // Clear editing state
-        const newEditing = {...editingCapacity}
+        const newEditing = { ...editingCapacity }
         delete newEditing[classId]
         setEditingCapacity(newEditing)
       } else {
@@ -162,6 +168,8 @@ function PdfUpload() {
       }
     } catch (error) {
       alert('Error updating capacity: ' + error)
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -172,12 +180,12 @@ function PdfUpload() {
   const filteredClasses = classes
     .filter(cls => {
       if (!searchTerm.trim()) return true
-      
+
       const search = searchTerm.toLowerCase()
       const code = `${cls.department}${cls.courseNum}.${cls.section}`.toLowerCase()
       const title = cls.title.toLowerCase()
       const instructor = cls.instructor.toLowerCase()
-      
+
       return code.includes(search) || title.includes(search) || instructor.includes(search)
     })
     .sort((a, b) => {
@@ -230,13 +238,13 @@ function PdfUpload() {
         <p className="section-description">
           Load room capacities from server and automatically calculate class capacities based on room locations.
         </p>
-        
-        <button 
+
+        <button
           className="load-capacity-btn"
           onClick={handleLoadCapacity}
           disabled={loadingCapacity}
         >
-          {loadingCapacity ? 'Loading...' : 'Load Capacity from Server'}
+          Load Capacity from Server
         </button>
 
         {capacityMessage && (
@@ -277,7 +285,7 @@ function PdfUpload() {
             <div className="th">Capacity</div>
             <div className="th">Actions</div>
           </div>
-          
+
           {classes.length === 0 ? (
             <div className="no-classes">No classes found. Upload a schedule to get started.</div>
           ) : (
@@ -290,7 +298,7 @@ function PdfUpload() {
                 <div className="td">{cls.semester} {cls.year}</div>
                 <div className="td">
                   {editingCapacity[cls.classId] !== undefined ? (
-                    <input 
+                    <input
                       type="number"
                       className="capacity-input"
                       value={editingCapacity[cls.classId]}
@@ -304,16 +312,16 @@ function PdfUpload() {
                 <div className="td">
                   {editingCapacity[cls.classId] !== undefined ? (
                     <>
-                      <button 
+                      <button
                         className="save-btn"
                         onClick={() => handleSaveCapacity(cls.classId)}
                       >
                         Save
                       </button>
-                      <button 
+                      <button
                         className="cancel-btn"
                         onClick={() => {
-                          const newEditing = {...editingCapacity}
+                          const newEditing = { ...editingCapacity }
                           delete newEditing[cls.classId]
                           setEditingCapacity(newEditing)
                         }}
@@ -322,9 +330,9 @@ function PdfUpload() {
                       </button>
                     </>
                   ) : (
-                    <button 
+                    <button
                       className="edit-btn"
-                      onClick={() => setEditingCapacity({...editingCapacity, [cls.classId]: cls.capacity || 0})}
+                      onClick={() => setEditingCapacity({ ...editingCapacity, [cls.classId]: cls.capacity || 0 })}
                     >
                       Edit
                     </button>
@@ -338,7 +346,7 @@ function PdfUpload() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="pagination">
-            <button 
+            <button
               className="pagination-btn"
               onClick={handlePrevPage}
               disabled={currentPage === 1}
@@ -348,7 +356,7 @@ function PdfUpload() {
             <span className="pagination-info">
               Page {currentPage} of {totalPages} ({filteredClasses.length} classes)
             </span>
-            <button 
+            <button
               className="pagination-btn"
               onClick={handleNextPage}
               disabled={currentPage === totalPages}
@@ -358,6 +366,7 @@ function PdfUpload() {
           </div>
         )}
       </div>
+      <LoadingModal isOpen={loadingCapacity || isProcessing} message={loadingCapacity ? "Loading capacities..." : processingMessage} />
     </div>
   )
 }

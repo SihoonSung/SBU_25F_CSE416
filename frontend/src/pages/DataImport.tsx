@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import './DataImport.css';
+import LoadingModal from '../components/LoadingModal';
 import { getBackendBase, getDefaultSemester, getDefaultYear } from '../constants';
 
 /**
@@ -11,17 +12,37 @@ import { getBackendBase, getDefaultSemester, getDefaultYear } from '../constants
  * Unified interface for importing different types of data.
  */
 
-type TabType = 'classes' | 'users' | 'requirements';
+type TabType = 'classes' | 'users' | 'requirements' | 'calendar';
 
 const DataImport: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('classes');
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const backendBase = getBackendBase();
+
+  useEffect(() => {
+    // Fetch user roles to determine access
+    const fetchUserRoles = async () => {
+      try {
+        const response = await fetch(`${backendBase}/api/auth/me`, { credentials: 'include' });
+        if (response.ok) {
+          const data = await response.json();
+          const roles = Array.isArray(data.roles) ? data.roles : (data.user?.role ? [String(data.user.role).toUpperCase()] : []);
+          setUserRoles(roles);
+        }
+      } catch (error) {
+        console.error('Error fetching user roles:', error);
+      }
+    };
+    fetchUserRoles();
+  }, [backendBase]);
+
+  const isRegistrar = userRoles.includes('REGISTRAR');
 
   return (
     <div className="data-import-page">
       <div className="page-header">
         <h1>Data Import</h1>
-        <p>Import classes, users, and degree requirements into the system</p>
+        <p>Import classes, users, degree requirements, and academic calendar events</p>
       </div>
 
       {/* Tabs */}
@@ -47,6 +68,15 @@ const DataImport: React.FC = () => {
         >
           Degree Requirements
         </button>
+        {isRegistrar && (
+          <button
+            type="button"
+            className={`tab ${activeTab === 'calendar' ? 'active' : ''}`}
+            onClick={() => setActiveTab('calendar')}
+          >
+            Academic Calendar
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
@@ -54,6 +84,7 @@ const DataImport: React.FC = () => {
         {activeTab === 'classes' && <ClassesTab backendBase={backendBase} />}
         {activeTab === 'users' && <UsersTab backendBase={backendBase} />}
         {activeTab === 'requirements' && <RequirementsTab backendBase={backendBase} />}
+        {activeTab === 'calendar' && isRegistrar && <AcademicCalendarTab backendBase={backendBase} />}
       </div>
     </div>
   );
@@ -145,7 +176,7 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         setUploadMessage(`Success: ${data.message || 'Upload successful'}`);
         setSelectedFile(null);
@@ -156,8 +187,8 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
       } else {
         // Check for format-related errors (same as original PdfUpload page)
         if (data.message && (
-          data.message.toLowerCase().includes('format') || 
-          data.message.toLowerCase().includes('invalid') || 
+          data.message.toLowerCase().includes('format') ||
+          data.message.toLowerCase().includes('invalid') ||
           data.message.toLowerCase().includes('parse') ||
           data.message.toLowerCase().includes('structure') ||
           data.message.toLowerCase().includes('unable to') ||
@@ -194,12 +225,12 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
     if (!trimmed) {
       return;
     }
-    
+
     if (selectedSubjects.includes(trimmed)) {
       setScrapingMessage({ type: 'warning', text: `Subject "${trimmed}" is already selected.` });
       return;
     }
-    
+
     const newSelectedSubjects = [...selectedSubjects, trimmed];
     setSelectedSubjects(newSelectedSubjects);
     setCustomSubject('');
@@ -269,7 +300,7 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
 
     setIsLoading(true);
     setScrapingMessage(null);
-    
+
     // Initialize subject statuses and show progress modal
     const initialStatuses = new Map<string, 'processing' | 'success' | 'skipped' | 'failed'>();
     selectedSubjects.forEach(subject => {
@@ -317,14 +348,14 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
           }
         });
         setSubjectStatuses(updatedStatuses);
-        
+
         let messageType: 'success' | 'warning' = 'success';
         if (result.skippedSubjects && result.skippedSubjects.length > 0) {
           messageType = 'warning';
         }
         setScrapingMessage({ type: messageType, text: result.message || 'Scraping successful' });
         await fetchTerms(); // Refresh terms to update isScraped status
-        
+
         // Close modal after a short delay to show final status
         setTimeout(() => {
           setShowProgressModal(false);
@@ -575,11 +606,11 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
                     </button>
                   )}
                 </div>
-                
+
                 <div style={{ marginBottom: '16px', color: '#6b7280' }}>
                   <strong>Term:</strong> {selectedTerm}
                 </div>
-                
+
                 <div style={{ marginBottom: '20px' }}>
                   <strong style={{ display: 'block', marginBottom: '12px' }}>
                     Processing {selectedSubjects.length} subject(s):
@@ -597,13 +628,12 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
                             padding: '10px 12px',
                             borderRadius: '6px',
                             backgroundColor: status === 'processing' ? '#f3f4f6' :
-                                           status === 'success' ? '#dcfce7' :
-                                           status === 'skipped' ? '#fef3c7' : '#fee2e2',
-                            border: `1px solid ${
-                              status === 'processing' ? '#e5e7eb' :
+                              status === 'success' ? '#dcfce7' :
+                                status === 'skipped' ? '#fef3c7' : '#fee2e2',
+                            border: `1px solid ${status === 'processing' ? '#e5e7eb' :
                               status === 'success' ? '#86efac' :
-                              status === 'skipped' ? '#fde047' : '#fecaca'
-                            }`,
+                                status === 'skipped' ? '#fde047' : '#fecaca'
+                              }`,
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -631,8 +661,8 @@ const ClassesTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
                             style={{
                               fontSize: '12px',
                               color: status === 'processing' ? '#3b82f6' :
-                                     status === 'success' ? '#166534' :
-                                     status === 'skipped' ? '#92400e' : '#991b1b',
+                                status === 'success' ? '#166534' :
+                                  status === 'skipped' ? '#92400e' : '#991b1b',
                               fontWeight: 500,
                             }}
                           >
@@ -758,6 +788,8 @@ const UsersTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
       <button onClick={handleUpload} disabled={!selectedFile || uploading} className="upload-button">
         {uploading ? 'Importing...' : 'Import Users'}
       </button>
+
+      <LoadingModal isOpen={uploading} message="Importing users..." />
     </div>
   );
 };
@@ -809,17 +841,25 @@ const RequirementsTab: React.FC<{ backendBase: string }> = ({ backendBase }) => 
       });
 
       const data = await response.json();
-      setResult(data);
 
-      if (data.success) {
+      if (response.ok) {
+        setResult({
+          success: true,
+          message: `Successfully imported ${data.importedCount} requirements.`,
+          details: data
+        });
         setSelectedFile(null);
-        const fileInput = document.getElementById('requirements-file-input') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
+      } else {
+        setResult({
+          success: false,
+          error: data.error || 'Failed to import requirements',
+          details: data
+        });
       }
     } catch (error) {
       setResult({
         success: false,
-        error: 'Error uploading file. Please try again.'
+        error: 'Network error occurred while uploading file.'
       });
     } finally {
       setUploading(false);
@@ -829,48 +869,154 @@ const RequirementsTab: React.FC<{ backendBase: string }> = ({ backendBase }) => 
   return (
     <div className="requirements-tab">
       <h3>Import Degree Requirements</h3>
-      <p>Upload a YAML file to import degree requirements for majors and minors</p>
+      <p>Upload a YAML file to import degree requirements (majors, minors, courses, etc.)</p>
 
       <div className="form-group">
         <label>Select YAML File:</label>
-        <input
-          id="requirements-file-input"
-          type="file"
-          accept=".yaml,.yml"
-          onChange={handleFileChange}
-        />
+        <input type="file" accept=".yaml,.yml" onChange={handleFileChange} />
         {selectedFile && <p className="file-name">Selected: {selectedFile.name}</p>}
       </div>
 
       {result && (
         <div className={`alert ${result.success ? 'alert-success' : 'alert-error'}`}>
-          {result.success ? (
-            <>
-              <strong>Success:</strong> {result.message || 'Successfully imported degree requirements'}
-              {result.requirements && (
-                <p>Imported {result.requirements.length} requirement(s)</p>
-              )}
-            </>
-          ) : (
-            <>
-              <strong>Error:</strong> {result.error || result.message || 'Failed to import'}
-            </>
+          {result.success ? result.message : result.error}
+          {result.details && result.details.errors && result.details.errors.length > 0 && (
+            <ul style={{ marginTop: '10px', paddingLeft: '20px' }}>
+              {result.details.errors.map((err: string, i: number) => (
+                <li key={i}>{err}</li>
+              ))}
+            </ul>
           )}
-        </div>
-      )}
-
-      {uploadMessage && (
-        <div className={`alert ${uploadMessage.includes('Success') ? 'alert-success' : 'alert-error'}`}>
-          {uploadMessage}
         </div>
       )}
 
       <button onClick={handleUpload} disabled={!selectedFile || uploading} className="upload-button">
         {uploading ? 'Importing...' : 'Import Requirements'}
       </button>
+
+      <LoadingModal isOpen={uploading} message="Importing degree requirements..." />
+    </div>
+  );
+};
+
+// Academic Calendar Tab Component
+const AcademicCalendarTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState('');
+  const [events, setEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Load existing events
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch(`${backendBase}/api/admin/academic-calendar`, { credentials: 'include' });
+        if (response.ok) {
+          const data = await response.json();
+          setEvents(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      }
+    };
+    fetchEvents();
+  }, [backendBase]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (!file.name.toLowerCase().endsWith('.yaml') && !file.name.toLowerCase().endsWith('.yml')) {
+        setUploadMessage('Error: Please select a YAML file (.yaml or .yml)');
+        setSelectedFile(null);
+        return;
+      }
+      setSelectedFile(file);
+      setUploadMessage('');
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      setUploadMessage('Please select a YAML file');
+      return;
+    }
+
+    setUploading(true);
+    setUploadMessage('');
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const response = await fetch(`${backendBase}/api/admin/academic-calendar/import`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+
+      if (response.ok || result.imported !== undefined) {
+        setUploadMessage(
+          `Imported: ${result.imported} (skipped ${result.skipped})${result.errors?.length ? "\nErrors:\n- " + result.errors.join("\n- ") : ""
+          }`
+        );
+        setSelectedFile(null);
+        // Refresh events
+        const evRes = await fetch(`${backendBase}/api/admin/academic-calendar`, { credentials: 'include' });
+        if (evRes.ok) {
+          const evData = await evRes.json();
+          setEvents(Array.isArray(evData) ? evData : []);
+        }
+      } else {
+        setUploadMessage(`Upload failed: ${result.message || 'Unknown error'}`);
+      }
+    } catch (e: any) {
+      setUploadMessage(`Upload failed: ${e.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="calendar-tab">
+      <h3>Import Academic Calendar</h3>
+      <p>Upload a YAML file to import academic calendar events (semesters, holidays, etc.)</p>
+
+      <div className="form-group">
+        <label>Select YAML File:</label>
+        <input type="file" accept=".yaml,.yml" onChange={handleFileChange} />
+        {selectedFile && <p className="file-name">Selected: {selectedFile.name}</p>}
+        <span style={{ fontSize: 12, color: "#888", display: 'block', marginTop: 4 }}>Fields: date (yyyy-MM-dd), title, type</span>
+      </div>
+
+      {uploadMessage && (
+        <div className={`alert ${uploadMessage.includes('Imported') ? 'alert-success' : 'alert-error'}`} style={{ whiteSpace: 'pre-wrap' }}>
+          {uploadMessage}
+        </div>
+      )}
+
+      <button onClick={handleUpload} disabled={!selectedFile || uploading} className="upload-button">
+        {uploading ? 'Importing...' : 'Import Calendar'}
+      </button>
+
+      <div style={{ marginTop: 24 }}>
+        <strong>Current Events ({events.length})</strong>
+        <ul style={{ marginTop: 8, maxHeight: 300, overflowY: 'auto', border: '1px solid #eee', padding: 12, borderRadius: 8 }}>
+          {events.map((ev, i) => (
+            <li key={`${ev.date}-${ev.title}-${i}`} style={{ marginBottom: 4 }}>
+              <span style={{ fontWeight: 600, marginRight: 8 }}>[{ev.type}]</span>
+              <span style={{ marginRight: 8 }}>{ev.date}</span>
+              <span>{ev.title}</span>
+            </li>
+          ))}
+          {!events.length && <li>No events imported</li>}
+        </ul>
+      </div>
+
+      <LoadingModal isOpen={uploading} message="Importing academic calendar..." />
     </div>
   );
 };
 
 export default DataImport;
-

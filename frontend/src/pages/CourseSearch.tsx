@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import './CourseSearch.css'
 import { getBackendBase, EXTERNAL_URLS, DEFAULT_ITEMS_PER_PAGE } from '../constants'
+import LoadingModal from '../components/LoadingModal'
 
 /**
  * Course Search Page Component
@@ -55,6 +56,7 @@ function CourseSearch() {
   const [selectedTerm, setSelectedTerm] = useState<string>('')
   const [warningMessage, setWarningMessage] = useState<string>('')
   const [classesMap, setClassesMap] = useState<Record<string, ClassInfo[]>>({})
+  const [isLoading, setIsLoading] = useState(false)
   const supportedSubjects = ['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']
 
   /**
@@ -82,29 +84,29 @@ function CourseSearch() {
       const response = await fetch(`${backendBase}/api/scraping/terms`, {
         credentials: 'include'
       })
-      
+
       if (!response.ok) {
         console.error('Failed to fetch terms:', response.status)
         setAvailableTerms([])
         return
       }
-      
+
       const data = await response.json()
-      
+
       // Ensure data is an array
       if (!Array.isArray(data)) {
         console.error('Terms data is not an array:', data)
         setAvailableTerms([])
         return
       }
-      
+
       setAvailableTerms(data)
-      
+
       // Auto-select the first term if available
       if (data.length > 0) {
         setSelectedTerm(data[0].name)
       }
-      
+
       console.log('Fetched terms:', data.length)
     } catch (error) {
       console.error('Error fetching terms:', error)
@@ -121,6 +123,7 @@ function CourseSearch() {
       return
     }
 
+    setIsLoading(true)
     try {
       // Fetch ALL courses for the selected term (not limited to specific subjects)
       const response = await fetch(
@@ -129,23 +132,23 @@ function CourseSearch() {
           credentials: 'include'
         }
       )
-      
+
       if (!response.ok) {
         console.error('Failed to fetch courses:', response.status)
         setCourses([])
         return
       }
-      
+
       const allCourses = await response.json()
-      
+
       console.log('Total courses fetched:', allCourses.length)
-      
+
       if (allCourses.length === 0) {
         console.warn('No courses found for selected term.')
         setCourses([])
         return
       }
-      
+
       // Transform backend data to frontend format
       const transformedData = allCourses
         .map((course: any) => ({
@@ -154,8 +157,8 @@ function CourseSearch() {
           courseNumber: course.courseNumber,
           courseName: course.courseName,
           description: course.description || 'No description available',
-          credits: course.credits === course.maxCredits || course.maxCredits === null 
-            ? course.credits 
+          credits: course.credits === course.maxCredits || course.maxCredits === null
+            ? course.credits
             : `${course.credits}-${course.maxCredits}`,
           prerequisites: course.prerequisites || 'None',
           corequisites: course.corequisites || 'None',
@@ -171,11 +174,13 @@ function CourseSearch() {
           }
           return parseInt(a.courseNumber) - parseInt(b.courseNumber)
         })
-      
+
       console.log('Transformed courses:', transformedData.length)
       setCourses(transformedData)
     } catch (error) {
       console.error('Error fetching courses:', error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -227,7 +232,7 @@ function CourseSearch() {
       }
 
       const allClasses = await response.json()
-      
+
       // Filter classes by term if we have semester and year
       let filteredClasses = allClasses
       if (semester && year) {
@@ -270,12 +275,12 @@ function CourseSearch() {
   const handleSearch = (term: string) => {
     setSearchTerm(term)
     setCurrentPage(1)
-    
+
     // Check if subject is unsupported and show warning
     if (term.trim() !== '') {
       const upperValue = term.trim().toUpperCase()
       const isSupported = supportedSubjects.some(s => s === upperValue || upperValue.includes(s))
-      
+
       if (!isSupported && upperValue.length >= 2) {
         setWarningMessage(
           `Warning: "${term}" may not be a fully supported subject. ` +
@@ -328,24 +333,24 @@ function CourseSearch() {
           return false
         }
       }
-      
+
       // Course number filter (numbers only, e.g., 416, 202)
       if (filters.courseNumber && filters.courseNumber.trim() !== '') {
         if (!course.courseNumber.includes(filters.courseNumber)) {
           return false
         }
       }
-      
+
       // SBC filter
       if (filters.sbc && filters.sbc !== 'Any') {
         if (!course.sbcsSatisfied || !course.sbcsSatisfied.includes(filters.sbc)) {
-        return false
+          return false
         }
       }
-      
+
       return true
     })
-    
+
     setFilteredCourses(filtered)
   }, [filters, courses, searchTerm])
 
@@ -388,7 +393,7 @@ function CourseSearch() {
         {/* Filters Sidebar */}
         <div className="filters-sidebar">
           <h2>Filters</h2>
-          
+
           {/* Term Selection */}
           <div className="filter-group">
             <label htmlFor="term-select">Term:</label>
@@ -410,7 +415,7 @@ function CourseSearch() {
           <div className="filter-info">
             <p>Showing all courses from the database for the selected term</p>
           </div>
-          
+
           {/* Subject Search (Letters only) */}
           <div className="filter-group">
             <label htmlFor="search">Subject (Course Code):</label>
@@ -423,7 +428,7 @@ function CourseSearch() {
               maxLength={10}
             />
           </div>
-          
+
           {/* Course Number Filter (Numbers only) */}
           <div className="filter-group">
             <label htmlFor="courseNumber">Course Number:</label>
@@ -448,7 +453,7 @@ function CourseSearch() {
               maxLength={40}
             />
           </div>
-          
+
           <div className="filter-group">
             <label htmlFor="sbc">SBC:</label>
             <select
@@ -474,7 +479,7 @@ function CourseSearch() {
               <option value="WRT">WRT</option>
             </select>
           </div>
-          
+
           <div className="filter-stats">
             <div className="stat-item">
               <span className="stat-label">Total Courses:</span>
@@ -485,9 +490,9 @@ function CourseSearch() {
               <span className="stat-value">{filteredCourses.length}</span>
             </div>
           </div>
-          
+
           {/* Clear Filters Button */}
-          <button 
+          <button
             className="clear-filters-btn"
             onClick={() => {
               setFilters({ courseNumber: '', sbc: 'Any', instructor: '' })
@@ -520,7 +525,7 @@ function CourseSearch() {
               currentItems.map((course) => (
                 <div key={course.id} className="catalog-course-item">
                   {selectedCourse && selectedCourse.id === course.id ? (
-                    <div 
+                    <div
                       className="catalog-detail-card catalog-clickable"
                       onClick={handleBackToSearch}
                     >
@@ -530,7 +535,7 @@ function CourseSearch() {
                           {course.warning && (
                             <div className="catalog-warning-text">Simplified placement exam info</div>
                           )}
-            </div>
+                        </div>
                       </div>
                       <div className="catalog-detail-content">
                         {!supportedSubjects.includes(course.subject) && (
@@ -538,22 +543,22 @@ function CourseSearch() {
                             Warning: This subject ({course.subject}) is not fully supported. Some information may be marked as "unknown".
                           </div>
                         )}
-                        
+
                         <div className="catalog-detail-row">
                           <span className="catalog-detail-label">Title:</span>
                           <span className="catalog-detail-value">{course.courseName}</span>
                         </div>
-                        
+
                         <div className="catalog-detail-row">
                           <span className="catalog-detail-label">Credits:</span>
                           <span className="catalog-detail-value">
-                            {typeof course.credits === 'string' && course.credits.includes('-') 
-                              ? `${course.credits} credits` 
+                            {typeof course.credits === 'string' && course.credits.includes('-')
+                              ? `${course.credits} credits`
                               : `${course.credits} credit${course.credits !== 1 ? 's' : ''}`
                             }
                           </span>
                         </div>
-                        
+
                         {course.sbcsSatisfied && course.sbcsSatisfied !== 'None' && (
                           <div className="catalog-detail-row">
                             <span className="catalog-detail-label">SBC:</span>
@@ -562,14 +567,14 @@ function CourseSearch() {
                             </span>
                           </div>
                         )}
-                        
+
                         {course.description && course.description !== 'No description available' && (
                           <div className="catalog-detail-row">
                             <span className="catalog-detail-label">Description:</span>
                             <span className="catalog-detail-value catalog-description-text">{course.description}</span>
                           </div>
                         )}
-                        
+
                         {/* Capacity Information */}
                         {(() => {
                           const courseKey = `${course.subject}-${course.courseNumber}`
@@ -617,7 +622,7 @@ function CourseSearch() {
                           }
                           return null
                         })()}
-                        
+
                         {/* Requisites Section */}
                         <div className="catalog-requisites-section">
                           {course.prerequisites && course.prerequisites !== 'None' && (
@@ -653,10 +658,10 @@ function CourseSearch() {
                             </div>
                           )}
                         </div>
-                        
+
                         {/* External link to Classie-Evals */}
                         <div className="catalog-detail-row">
-                          <a 
+                          <a
                             href={`${EXTERNAL_URLS.CLASSIE_EVALS}/?SearchKeyword=${course.subject}${course.courseNumber}&SearchTerm=ALL`}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -669,7 +674,7 @@ function CourseSearch() {
                       </div>
                     </div>
                   ) : (
-                    <div 
+                    <div
                       className="catalog-result-card catalog-clickable"
                       onClick={() => handleCourseSelect(course)}
                     >
@@ -683,8 +688,8 @@ function CourseSearch() {
                       </div>
                       <div className="catalog-course-title">{course.courseName}</div>
                       <div className="catalog-course-schedule">
-                        {typeof course.credits === 'string' && course.credits.includes('-') 
-                          ? `${course.credits} credits` 
+                        {typeof course.credits === 'string' && course.credits.includes('-')
+                          ? `${course.credits} credits`
                           : `${course.credits} credit${course.credits !== 1 ? 's' : ''}`
                         }
                       </div>
@@ -705,7 +710,7 @@ function CourseSearch() {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="catalog-pagination">
-              <button 
+              <button
                 className="catalog-pagination-btn"
                 onClick={handlePrevPage}
                 disabled={currentPage === 1}
@@ -715,7 +720,7 @@ function CourseSearch() {
               <span className="catalog-pagination-info">
                 Page {currentPage} of {totalPages} ({filteredCourses.length} results)
               </span>
-              <button 
+              <button
                 className="catalog-pagination-btn"
                 onClick={handleNextPage}
                 disabled={currentPage === totalPages}
@@ -726,7 +731,8 @@ function CourseSearch() {
           )}
         </div>
       </div>
-    </div>
+      <LoadingModal isOpen={isLoading} message="Loading courses..." />
+    </div >
   )
 }
 

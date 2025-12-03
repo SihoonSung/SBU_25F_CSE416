@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './MajorMinorDeclaration.css';
 import { getCurrentUser } from '../utils/auth';
+import LoadingModal from '../components/LoadingModal';
 
 /**
  * Major/Minor Declaration Component
@@ -65,12 +66,12 @@ const MajorMinorDeclaration: React.FC = () => {
     const dObj = new Date(dateStr);
     return isNaN(dObj.getTime()) ? null : dObj;
   };
-  const [degreeRequirements, setDegreeRequirements] = useState<DegreeRequirement[]>([]);
+  // const [degreeRequirements, setDegreeRequirements] = useState<DegreeRequirement[]>([]);
   const [myDeclarations, setMyDeclarations] = useState<MajorMinorDeclaration[]>([]);
   // Current approved majors and minors from User table
   const [currentApprovedMajors, setCurrentApprovedMajors] = useState<string[]>([]);
   const [currentApprovedMinors, setCurrentApprovedMinors] = useState<string[]>([]);
-  
+
   // Load planned majors from localStorage
   // TP Used cursor to load planned majors from localStorage
   const loadPlannedMajorsFromStorage = () => {
@@ -104,7 +105,7 @@ const MajorMinorDeclaration: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [systemDate, setSystemDate] = useState<Date | null>(null);
-  
+
   // Form state
   const [showAddForm, setShowAddForm] = useState(false);
   const [showChangeForm, setShowChangeForm] = useState(false);
@@ -115,12 +116,12 @@ const MajorMinorDeclaration: React.FC = () => {
   const [selectedDeclarationType, setSelectedDeclarationType] = useState<'MAJOR' | 'MINOR'>('MAJOR');
   const [effectiveTerm, setEffectiveTerm] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Class Override (Time Conflict Waiver) state
   const [userId, setUserId] = useState<number | null>(null);
   const [showWaiverForm, setShowWaiverForm] = useState(false);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
-  const [availableClasses, setAvailableClasses] = useState<any[]>([]);
+  // const [availableClasses, setAvailableClasses] = useState<any[]>([]);
   const [selectedEnrolledClass, setSelectedEnrolledClass] = useState<number | null>(null);
   const [selectedConflictingClass, setSelectedConflictingClass] = useState<number | null>(null);
   const [waiverReason, setWaiverReason] = useState('');
@@ -144,13 +145,13 @@ const MajorMinorDeclaration: React.FC = () => {
     declarationBeginDate?: string;
     declarationEndDate?: string;
   }>>([]);
-  
+
   // Selected term's declaration dates
   const [selectedTermDeclarationDates, setSelectedTermDeclarationDates] = useState<{
     beginDate?: string;
     endDate?: string;
   } | null>(null);
-  
+
   // TP: Used cursor to fetch available terms from academic calendar
   const fetchAvailableTerms = async () => {
     try {
@@ -162,7 +163,7 @@ const MajorMinorDeclaration: React.FC = () => {
           'Pragma': 'no-cache'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.terms) {
@@ -174,23 +175,23 @@ const MajorMinorDeclaration: React.FC = () => {
       console.warn('Failed to fetch available terms:', err);
     }
   };
-  
+
   // TP: Used cursor to get available terms with declaration period info (inclusive of both start and end dates)
   const getAvailableTerms = () => {
     const currentDate = systemDate || new Date();
     // Normalize currentDate to midnight for date-only comparison
     const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-    
+
     return availableTerms.map(term => {
       // Start date: beginning of day (00:00:00) - inclusive
       // begin comes from previous term section (handled by backend)
       const beginDate: Date | null = term.declarationBeginDate ? new Date(term.declarationBeginDate + 'T00:00:00') : null;
       const beginDateOnly = beginDate ? new Date(beginDate.getFullYear(), beginDate.getMonth(), beginDate.getDate()) : null;
-      
+
       // End date: end of day (23:59:59.999) - inclusive
       const endDate = term.declarationEndDate ? new Date(term.declarationEndDate + 'T23:59:59.999') : null;
       const endDateOnly = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null;
-      
+
       let label = term.displayName;
       if (beginDate && endDate) {
         const beginStr = beginDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -203,12 +204,12 @@ const MajorMinorDeclaration: React.FC = () => {
         const endStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         label += ` (Until ${endStr})`;
       }
-      
+
       // Check if current date is within declaration period with one-sided bounds allowed
       const afterStart = beginDateOnly ? currentDateOnly >= beginDateOnly : true;
       const beforeEnd = endDateOnly ? currentDateOnly <= endDateOnly : true;
       const isWithinPeriod = afterStart && beforeEnd;
-      
+
       return {
         value: term.value,
         label,
@@ -227,7 +228,7 @@ const MajorMinorDeclaration: React.FC = () => {
     loadPlannedMajorsFromStorage();
     initializeUser();
   }, []);
-  
+
   // Update declaration dates when effective term changes
   useEffect(() => {
     if (effectiveTerm) {
@@ -236,7 +237,7 @@ const MajorMinorDeclaration: React.FC = () => {
       if (parts.length >= 2) {
         const semester = parts[0].charAt(0) + parts[0].slice(1).toLowerCase();
         const year = parseInt(parts[1]);
-        
+
         // Fetch declaration dates for this term
         fetch(`${backendBase}/api/major-minor-declarations/declaration-dates/${semester}/${year}`, {
           credentials: 'include'
@@ -329,7 +330,7 @@ const MajorMinorDeclaration: React.FC = () => {
     try {
       setLoading(true);
       console.log('Starting to fetch data...');
-      
+
       // Fetch system date from backend (parse as local date to avoid TZ rollback)
       try {
         const systemDateResponse = await fetch('/api/admin/system-date', {
@@ -340,7 +341,7 @@ const MajorMinorDeclaration: React.FC = () => {
             'Pragma': 'no-cache'
           }
         });
-        
+
         if (systemDateResponse.ok) {
           const systemDateData = await systemDateResponse.json();
           if (systemDateData.currentDate) {
@@ -352,7 +353,7 @@ const MajorMinorDeclaration: React.FC = () => {
       } catch (err) {
         console.warn('Failed to fetch system date, using local date:', err);
       }
-      
+
       // Fetch available subjects dynamically
       try {
         const subjectsResponse = await fetch('/api/major-minor-declarations/available-subjects', {
@@ -363,7 +364,7 @@ const MajorMinorDeclaration: React.FC = () => {
             'Pragma': 'no-cache'
           }
         });
-        
+
         if (subjectsResponse.ok) {
           const subjectsData = await subjectsResponse.json();
           if (subjectsData.success) {
@@ -376,7 +377,7 @@ const MajorMinorDeclaration: React.FC = () => {
         // Fallback to hardcoded subjects if API fails
         setAvailableSubjects(['BIO', 'PSY', 'CSE', 'ECO', 'AMS', 'POL']);
       }
-      
+
       // Fetch degree requirements
       try {
         const requirementsResponse = await fetch('/api/declarations/degree-requirements', {
@@ -387,18 +388,18 @@ const MajorMinorDeclaration: React.FC = () => {
             'Pragma': 'no-cache'
           }
         });
-        
+
         if (requirementsResponse.ok) {
           const requirementsData = await requirementsResponse.json();
           if (requirementsData.success) {
-            setDegreeRequirements(requirementsData.requirements || []);
+            // setDegreeRequirements(requirementsData.requirements || []);
             console.log('Degree requirements loaded:', requirementsData.requirements?.length || 0);
           }
         }
       } catch (err) {
         console.warn('Failed to fetch degree requirements:', err);
       }
-      
+
       // Fetch my declarations
       try {
         const declarationsResponse = await fetch('/api/major-minor-declarations/my-declarations', {
@@ -409,7 +410,7 @@ const MajorMinorDeclaration: React.FC = () => {
             'Pragma': 'no-cache'
           }
         });
-        
+
         if (declarationsResponse.ok) {
           const declarationsData = await declarationsResponse.json();
           if (declarationsData.success) {
@@ -420,7 +421,7 @@ const MajorMinorDeclaration: React.FC = () => {
       } catch (err) {
         console.warn('Failed to fetch my declarations:', err);
       }
-      
+
       // Fetch current approved majors and minors from User profile
       try {
         const profileResponse = await fetch('/api/profile/me/details', {
@@ -431,7 +432,7 @@ const MajorMinorDeclaration: React.FC = () => {
             'Pragma': 'no-cache'
           }
         });
-        
+
         if (profileResponse.ok) {
           const profileData = await profileResponse.json();
           if (profileData.majors) {
@@ -446,9 +447,9 @@ const MajorMinorDeclaration: React.FC = () => {
       } catch (err) {
         console.warn('Failed to fetch current approved majors/minors:', err);
       }
-      
+
       // Planned majors are now loaded from localStorage in useEffect
-      
+
       console.log('Data fetch completed');
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -461,7 +462,7 @@ const MajorMinorDeclaration: React.FC = () => {
   // TP Used cursor to handle declaration submission
   const handleSubmitDeclaration = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedSubject || !effectiveTerm) {
       setError('Please fill in all required fields.');
       return;
@@ -478,7 +479,7 @@ const MajorMinorDeclaration: React.FC = () => {
     // Check if current date is within the declaration period
     const currentDate = systemDate || new Date();
     const isWithinDeclarationPeriod = checkDeclarationPeriod(effectiveTerm, currentDate);
-    
+
     if (!isWithinDeclarationPeriod) {
       setError('Declaration period has ended. Please check the academic calendar for available terms.');
       return;
@@ -508,19 +509,19 @@ const MajorMinorDeclaration: React.FC = () => {
       if (data.success) {
         setSuccess('Declaration submitted successfully!');
         setShowAddForm(false);
-        
+
         // Reset form
         setSelectedSubject('');
         setSelectedDegreeType('BA');
         setSelectedDeclarationType('MAJOR');
         setEffectiveTerm('');
-        
+
         // Refresh data
         fetchData();
       } else {
         setError(data.error || 'Failed to submit declaration. Please try again.');
       }
-      
+
     } catch (err) {
       console.error('Error submitting declaration:', err);
       setError('Failed to submit declaration. Please try again.');
@@ -532,7 +533,7 @@ const MajorMinorDeclaration: React.FC = () => {
   // Handle change declaration submission
   const handleChangeDeclaration = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedSubject || !effectiveTerm || !selectedChangeFromSubject) {
       setError('Please fill in all required fields.');
       return;
@@ -541,7 +542,7 @@ const MajorMinorDeclaration: React.FC = () => {
     // Check if current date is within the declaration period
     const currentDate = systemDate || new Date();
     const isWithinDeclarationPeriod = checkDeclarationPeriod(effectiveTerm, currentDate);
-    
+
     if (!isWithinDeclarationPeriod) {
       setError('Declaration period has ended. Please check the academic calendar for available terms.');
       return;
@@ -572,20 +573,20 @@ const MajorMinorDeclaration: React.FC = () => {
       if (data.success) {
         setSuccess('Change request submitted successfully!');
         setShowChangeForm(false);
-        
+
         // Reset form
         setSelectedSubject('');
         setSelectedChangeFromSubject('');
         setSelectedDegreeType('BA');
         setSelectedDeclarationType('MAJOR');
         setEffectiveTerm('');
-        
+
         // Refresh data
         fetchData();
       } else {
         setError(data.error || 'Failed to submit change request. Please try again.');
       }
-      
+
     } catch (err) {
       console.error('Error submitting change request:', err);
       setError('Failed to submit change request. Please try again.');
@@ -597,7 +598,7 @@ const MajorMinorDeclaration: React.FC = () => {
   // TP Used cursor to handle planned major creation
   const handlePlanMajor = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedSubject) {
       setError('Please select a subject.');
       return;
@@ -624,11 +625,11 @@ const MajorMinorDeclaration: React.FC = () => {
 
       setSuccess('Major planned successfully!');
       setShowPlannedMajorForm(false);
-      
+
       // Reset form
       setSelectedSubject('');
       setSelectedDegreeType('BA');
-      
+
     } catch (err) {
       console.error('Error planning major:', err);
       setError('Failed to plan major. Please try again.');
@@ -651,12 +652,12 @@ const MajorMinorDeclaration: React.FC = () => {
       const updatedPlannedMajors = myPlannedMajors.filter(
         pm => !(pm.subjectCode === subjectCode && pm.degreeType === degreeType)
       );
-      
+
       setMyPlannedMajors(updatedPlannedMajors);
       savePlannedMajorsToStorage(updatedPlannedMajors);
 
       setSuccess('Major unplanned successfully!');
-      
+
     } catch (err) {
       console.error('Error unplanning major:', err);
       setError('Failed to unplan major. Please try again.');
@@ -684,7 +685,7 @@ const MajorMinorDeclaration: React.FC = () => {
       } else {
         setError(data.error || 'Failed to withdraw declaration. Please try again.');
       }
-      
+
     } catch (err) {
       console.error('Error withdrawing declaration:', err);
       setError('Failed to withdraw declaration. Please try again.');
@@ -698,7 +699,7 @@ const MajorMinorDeclaration: React.FC = () => {
       setAvailableDegreeTypes([]);
       return;
     }
-    
+
     try {
       const response = await fetch(`/api/major-minor-declarations/available-degree-types/${subjectCode}`, {
         credentials: 'include',
@@ -708,13 +709,13 @@ const MajorMinorDeclaration: React.FC = () => {
           'Pragma': 'no-cache'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
           const degreeTypes = data.degreeTypes.map((dt: any) => dt.toString());
           setAvailableDegreeTypes(degreeTypes);
-          
+
           // Set the first available degree type
           if (degreeTypes.length > 0) {
             setSelectedDegreeType(degreeTypes[0] as 'BA' | 'BS' | 'MINOR');
@@ -739,7 +740,7 @@ const MajorMinorDeclaration: React.FC = () => {
       }
     }
   };
-  
+
   // Load course requirements for selected subject and degree type
   // TP Used cursor to load course requirements for subject and degree type
   const loadCourseRequirements = async (subjectCode: string, degreeType: string) => {
@@ -747,7 +748,7 @@ const MajorMinorDeclaration: React.FC = () => {
       setCourseRequirements(null);
       return;
     }
-    
+
     try {
       const response = await fetch(`/api/major-minor-declarations/course-requirements/${subjectCode}/${degreeType}`, {
         credentials: 'include',
@@ -757,7 +758,7 @@ const MajorMinorDeclaration: React.FC = () => {
           'Pragma': 'no-cache'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -792,7 +793,7 @@ const MajorMinorDeclaration: React.FC = () => {
 
         const filteredEnrolled = Array.isArray(enrolledData) ? enrolledData.filter((cls: any) => {
           const clsYear = typeof cls.year === 'number' ? cls.year : parseInt(String(cls.year))
-          const clsSemester = cls.semester ? 
+          const clsSemester = cls.semester ?
             (String(cls.semester).charAt(0).toUpperCase() + String(cls.semester).slice(1).toLowerCase()) : null
           return clsYear === yearNum && clsSemester === normalizedSemester
         }) : []
@@ -807,14 +808,14 @@ const MajorMinorDeclaration: React.FC = () => {
 
       if (classesResponse.ok) {
         const classesData = await classesResponse.json()
-        setAvailableClasses(Array.isArray(classesData) ? classesData : [])
+        // setAvailableClasses(Array.isArray(classesData) ? classesData : [])
       } else {
-        setAvailableClasses([])
+        // setAvailableClasses([])
       }
     } catch (error) {
       console.error('Error loading classes for waiver:', error)
       setEnrolledClasses([])
-      setAvailableClasses([])
+      // setAvailableClasses([])
     } finally {
       setLoadingClasses(false)
     }
@@ -841,10 +842,10 @@ const MajorMinorDeclaration: React.FC = () => {
         // Filter by selected term
         const normalizedSemester = waiverTerm.semester.charAt(0).toUpperCase() + waiverTerm.semester.slice(1).toLowerCase();
         const yearNum = parseInt(waiverTerm.year);
-        
+
         const filtered = Array.isArray(data) ? data.filter((cls: any) => {
           const clsYear = typeof cls.year === 'number' ? cls.year : parseInt(String(cls.year));
-          const clsSemester = cls.semester ? 
+          const clsSemester = cls.semester ?
             (String(cls.semester).charAt(0).toUpperCase() + String(cls.semester).slice(1).toLowerCase()) : null;
           return clsYear === yearNum && clsSemester === normalizedSemester;
         }) : [];
@@ -955,10 +956,10 @@ const MajorMinorDeclaration: React.FC = () => {
   const checkDeclarationPeriod = (term: string, currentDate: Date): boolean => {
     // Normalize currentDate to midnight for date-only comparison
     const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-    
+
     let startDate: Date | null = null;
     let endDate: Date | null = null;
-    
+
     // Helper to parse date string safely (avoid timezone issues)
     const parseDateString = (dateStr: string): Date | null => {
       if (!dateStr) return null;
@@ -972,7 +973,7 @@ const MajorMinorDeclaration: React.FC = () => {
       }
       return new Date(dateStr);
     };
-    
+
     // First, try to get dates from selectedTermDeclarationDates (from API)
     if (selectedTermDeclarationDates?.beginDate) {
       startDate = parseDateString(selectedTermDeclarationDates.beginDate);
@@ -980,25 +981,25 @@ const MajorMinorDeclaration: React.FC = () => {
     if (selectedTermDeclarationDates?.endDate) {
       endDate = parseDateString(selectedTermDeclarationDates.endDate);
     }
-    
+
     // If not available from selectedTermDeclarationDates, try from available terms
     // Parse term to match correctly (handle "SPRING 2026", "Spring 2026", etc.)
     if ((!startDate || !endDate) && availableTerms.length > 0) {
       // Try exact match first
       let termInfo = availableTerms.find(t => t.value === term);
-      
+
       // If not found, parse term and match by semester and year
       if (!termInfo) {
         const parts = term.split(' ');
         if (parts.length >= 2) {
           const semester = parts[0].charAt(0) + parts[0].slice(1).toLowerCase();
           const year = parseInt(parts[1]);
-          termInfo = availableTerms.find(t => 
+          termInfo = availableTerms.find(t =>
             t.semester.toLowerCase() === semester.toLowerCase() && t.year === year
           );
         }
       }
-      
+
       if (termInfo) {
         if (!startDate && termInfo.declarationBeginDate) {
           startDate = parseDateString(termInfo.declarationBeginDate);
@@ -1008,13 +1009,13 @@ const MajorMinorDeclaration: React.FC = () => {
         }
       }
     }
-    
+
     if (!startDate && !endDate) {
       console.warn('Declaration period dates not available for term:', term, {
         selectedTermDeclarationDates,
-        availableTerms: availableTerms.map(t => ({ 
-          value: t.value, 
-          semester: t.semester, 
+        availableTerms: availableTerms.map(t => ({
+          value: t.value,
+          semester: t.semester,
           year: t.year,
           beginDate: t.declarationBeginDate,
           endDate: t.declarationEndDate
@@ -1022,16 +1023,16 @@ const MajorMinorDeclaration: React.FC = () => {
       });
       return false;
     }
-    
+
     // Normalize dates for comparison (nullable) - use local date components
     const startDateOnly = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null;
     const endDateOnly = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null;
-    
+
     // One-sided bounds allowed per registrar-style edge cases
     const afterStart = startDateOnly ? currentDateOnly >= startDateOnly : true;
     const beforeEnd = endDateOnly ? currentDateOnly <= endDateOnly : true;
     const result = afterStart && beforeEnd;
-    
+
     console.log('Checking declaration period:', {
       term,
       currentDate: currentDateOnly.toISOString().split('T')[0],
@@ -1077,8 +1078,8 @@ const MajorMinorDeclaration: React.FC = () => {
   };
 
   const getCurrentDeclarationsCount = (declarationType: 'MAJOR' | 'MINOR') => {
-    return myDeclarations.filter(decl => 
-      decl.declarationType === declarationType && 
+    return myDeclarations.filter(decl =>
+      decl.declarationType === declarationType &&
       (decl.status === 'APPROVED' || decl.status === 'PENDING')
     ).length;
   };
@@ -1089,13 +1090,7 @@ const MajorMinorDeclaration: React.FC = () => {
     return currentCount < maxAllowed;
   };
 
-  if (loading) {
-    return (
-      <div className="major-minor-declaration">
-        <div className="loading">Loading...</div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="major-minor-declaration">
@@ -1108,21 +1103,21 @@ const MajorMinorDeclaration: React.FC = () => {
         <h2>Declaration Policies</h2>
         <div className="policy-content">
           <p>
-            Students can declare up to 2 majors and 3 minors, consistent with the policies in the Undergraduate Bulletin, 
-            especially the Selecting an Academic Program section. Requests to declare a major or minor effective in a 
-            particular term can be submitted between the dates specified in the university's academic calendars and 
+            Students can declare up to 2 majors and 3 minors, consistent with the policies in the Undergraduate Bulletin,
+            especially the Selecting an Academic Program section. Requests to declare a major or minor effective in a
+            particular term can be submitted between the dates specified in the university's academic calendars and
             require approval from a department-level academic advisor.
           </p>
           <p>
-            <strong>Declaration Periods:</strong><br/>
+            <strong>Declaration Periods:</strong><br />
             {availableTerms.length > 0 ? (
               availableTerms.map(term => (
                 <span key={term.value}>
                   • <strong>{term.displayName}:</strong> {
-                    term.declarationBeginDate && term.declarationEndDate 
+                    term.declarationBeginDate && term.declarationEndDate
                       ? `${new Date(term.declarationBeginDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(term.declarationEndDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
                       : 'Dates TBD'
-                  }<br/>
+                  }<br />
                 </span>
               ))
             ) : (
@@ -1130,13 +1125,13 @@ const MajorMinorDeclaration: React.FC = () => {
             )}
           </p>
           <p>
-            Restricted majors and minors have course requirements or GPA requirements for admission; 
-            department-level academic advisors can waive these requirements. 
+            Restricted majors and minors have course requirements or GPA requirements for admission;
+            department-level academic advisors can waive these requirements.
           </p>
           <p>
-            <strong>CEAS Transfer Policy:</strong><br/>
-            Requests to transfer into CEAS (College of Engineering and Applied Sciences) by declaring an AOI or a major 
-            in CEAS without currently being an AOI or a major in CEAS requires approval of a CEAS academic advisor.<br/>
+            <strong>CEAS Transfer Policy:</strong><br />
+            Requests to transfer into CEAS (College of Engineering and Applied Sciences) by declaring an AOI or a major
+            in CEAS without currently being an AOI or a major in CEAS requires approval of a CEAS academic advisor.<br />
             <strong>CEAS Subjects:</strong> AMS, BME, CME, CIV, ECE, CSE, ESE, ESG, ISE, MEC, TSM
           </p>
         </div>
@@ -1165,8 +1160,8 @@ const MajorMinorDeclaration: React.FC = () => {
         <p className="section-description">
           Manage your major/minor declarations: change existing declarations or add new ones.
         </p>
-        
-        <div style={{display: 'flex', gap: '20px', marginTop: '10px'}}>
+
+        <div style={{ display: 'flex', gap: '20px', marginTop: '10px' }}>
           <div className="current-info">
             <strong>My Current Majors:</strong> {currentApprovedMajors.length > 0 ? currentApprovedMajors.join(', ') : 'None'}
           </div>
@@ -1181,7 +1176,7 @@ const MajorMinorDeclaration: React.FC = () => {
         <div className="declaration-form-section">
           <div className="section-header">
             <h2>Change Declaration</h2>
-            <button 
+            <button
               className="toggle-form-button"
               onClick={() => setShowChangeForm(!showChangeForm)}
             >
@@ -1212,7 +1207,7 @@ const MajorMinorDeclaration: React.FC = () => {
                     </small>
                   )}
                 </div>
-                
+
                 <div className="form-group">
                   <label>Declaration Type:</label>
                   <select
@@ -1243,7 +1238,7 @@ const MajorMinorDeclaration: React.FC = () => {
                     ))}
                   </select>
                 </div>
-                
+
                 <div className="form-group">
                   <label>Change To:</label>
                   <select
@@ -1291,8 +1286,8 @@ const MajorMinorDeclaration: React.FC = () => {
               )}
 
               <div className="form-actions">
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="submit-button"
                   disabled={submitting}
                 >
@@ -1308,7 +1303,7 @@ const MajorMinorDeclaration: React.FC = () => {
       <div className="declaration-form-section">
         <div className="section-header">
           <h2>Add New Declaration</h2>
-          <button 
+          <button
             className="toggle-form-button"
             onClick={() => setShowAddForm(!showAddForm)}
           >
@@ -1350,7 +1345,7 @@ const MajorMinorDeclaration: React.FC = () => {
                   </small>
                 )}
               </div>
-              
+
               <div className="form-group">
                 <label>Subject:</label>
                 <select
@@ -1408,8 +1403,8 @@ const MajorMinorDeclaration: React.FC = () => {
             </div>
 
             <div className="form-actions">
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="submit-button"
                 disabled={submitting || (!canDeclareMore('MAJOR') && !canDeclareMore('MINOR'))}
               >
@@ -1424,7 +1419,7 @@ const MajorMinorDeclaration: React.FC = () => {
       <div className="planned-majors-section">
         <div className="section-header">
           <h2>Planned Majors</h2>
-          <button 
+          <button
             className="toggle-form-button"
             onClick={() => setShowPlannedMajorForm(!showPlannedMajorForm)}
           >
@@ -1433,7 +1428,7 @@ const MajorMinorDeclaration: React.FC = () => {
         </div>
 
         <p className="section-description">
-          Plan majors to track admission and degree requirements. This is different from declaring a major - 
+          Plan majors to track admission and degree requirements. This is different from declaring a major -
           planning just shows you the status of requirements without formal declaration.
         </p>
 
@@ -1483,8 +1478,8 @@ const MajorMinorDeclaration: React.FC = () => {
             </div>
 
             <div className="form-actions">
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="submit-button"
                 disabled={submitting}
               >
@@ -1506,17 +1501,17 @@ const MajorMinorDeclaration: React.FC = () => {
                 <div key={plannedMajor.plannedMajorId} className="planned-major-card">
                   <div className="planned-major-header">
                     <h3>{plannedMajor.subjectCode} {plannedMajor.degreeType}</h3>
-                    <button 
+                    <button
                       className="unplan-button"
                       onClick={() => handleUnplanMajor(plannedMajor.subjectCode, plannedMajor.degreeType)}
                     >
                       Unplan
                     </button>
                   </div>
-                  
+
                   <div className="planned-major-details">
                     <p><strong>Planned:</strong> {new Date(plannedMajor.plannedAt).toLocaleDateString()}</p>
-                    
+
                     {plannedMajor.degreeRequirement && (
                       <div className="requirement-info">
                         <p><strong>Total Credits:</strong> {plannedMajor.degreeRequirement.totalCreditsRequired}</p>
@@ -1524,7 +1519,7 @@ const MajorMinorDeclaration: React.FC = () => {
                         {plannedMajor.degreeRequirement.gpaRequirement && (
                           <p><strong>GPA Requirement:</strong> {plannedMajor.degreeRequirement.gpaRequirement}</p>
                         )}
-                        
+
                         {plannedMajor.degreeRequirement.admissionRequirements && (
                           <div className="admission-info">
                             <h4>Admission Requirements:</h4>
@@ -1553,21 +1548,21 @@ const MajorMinorDeclaration: React.FC = () => {
                 <p><strong>GPA Requirement:</strong> {courseRequirements.gpaRequirement}</p>
               )}
             </div>
-            
+
             {courseRequirements.admissionRequirements && (
               <div className="admission-requirements">
                 <h4>Admission Requirements:</h4>
                 <ul>
-                  {Array.isArray(courseRequirements.admissionRequirements) 
+                  {Array.isArray(courseRequirements.admissionRequirements)
                     ? courseRequirements.admissionRequirements.map((req: string, index: number) => (
-                        <li key={index}>{req}</li>
-                      ))
+                      <li key={index}>{req}</li>
+                    ))
                     : <li>{courseRequirements.admissionRequirements}</li>
                   }
                 </ul>
               </div>
             )}
-            
+
             {courseRequirements.courseRequirements && (
               <div className="course-requirements">
                 <h4>Course Requirements:</h4>
@@ -1581,7 +1576,7 @@ const MajorMinorDeclaration: React.FC = () => {
                     </ul>
                   </div>
                 )}
-                
+
                 {courseRequirements.courseRequirements.elective_courses && (
                   <div className="elective-courses">
                     <h5>Elective Courses:</h5>
@@ -1593,7 +1588,7 @@ const MajorMinorDeclaration: React.FC = () => {
                     </ul>
                   </div>
                 )}
-                
+
                 {courseRequirements.courseRequirements.concentration_requirements && (
                   <div className="concentration-requirements">
                     <h5>Concentration Requirements:</h5>
@@ -1612,7 +1607,7 @@ const MajorMinorDeclaration: React.FC = () => {
                 )}
               </div>
             )}
-            
+
             {courseRequirements.sbcRequirements && (
               <div className="sbc-requirements">
                 <h4>SBC Requirements:</h4>
@@ -1749,7 +1744,7 @@ const MajorMinorDeclaration: React.FC = () => {
       <div className="my-declarations-section">
         <div className="section-header">
           <h2>Class Override Application</h2>
-          <button 
+          <button
             className="toggle-form-button"
             onClick={() => {
               setShowWaiverForm(!showWaiverForm);
@@ -1847,7 +1842,7 @@ const MajorMinorDeclaration: React.FC = () => {
         {showWaiverForm && (
           <div className="waiver-form-section">
             <p className="section-description">
-              Request a time conflict waiver to enroll in classes with overlapping schedules. 
+              Request a time conflict waiver to enroll in classes with overlapping schedules.
               Requires approval from both instructors and a department-level advisor.
             </p>
 
@@ -2052,6 +2047,14 @@ const MajorMinorDeclaration: React.FC = () => {
           </div>
         )}
       </div>
+      <LoadingModal
+        isOpen={loading || submitting || submittingWaiver}
+        message={
+          loading ? "Loading..." :
+            submitting ? "Submitting..." :
+              submittingWaiver ? "Submitting override request..." : ""
+        }
+      />
     </div>
   );
 };

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import './Dashboard.css'
 import { getBackendBase, getDefaultSemester, getDefaultYear, getCurrentSemester, getCurrentYear } from '../constants'
+import LoadingModal from '../components/LoadingModal'
 
 type Me = {
   userId: number
@@ -86,7 +87,7 @@ function Dashboard() {
         const meRes = await fetch(`${backendBase}/api/auth/me`, {
           method: 'GET',
           credentials: 'include', // Important
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
@@ -99,10 +100,10 @@ function Dashboard() {
           const data = await meRes.json()
           const user = data.user ?? null
           setMe(user)
-          
+
           // Normalize role (handle case-insensitive and array formats)
           const userRole = user?.role ? String(user.role).toUpperCase() : null
-          
+
           // Set current term based on current date (not API's latest term)
           const currentDateSemester = getCurrentSemester()
           const currentDateYear = getCurrentYear()
@@ -120,22 +121,22 @@ function Dashboard() {
             await fetchStudentCoursePlan(user.userId)
             await fetchAcademicEvents()
           }
-          
+
           // Fetch professor data if user is an instructor
           if (userRole === 'INSTRUCTOR' && user?.firstName && user?.lastName) {
             await fetchProfessorData(user)
           }
-          
+
           // Fetch advisor data if user is an advisor
           if (userRole === 'ADVISOR' && user?.userId) {
             await fetchAdvisorData(user.userId)
           }
-          
+
           // Fetch admin stats only for REGISTRAR/ADMIN roles
           if ((userRole === 'REGISTRAR' || userRole === 'ADMIN') && user) {
             await fetchAdminStats()
           }
-          
+
           // Check pending overrides if user is admin/registrar
           if ((userRole === 'REGISTRAR' || userRole === 'ADMIN') && user?.userId) {
             await checkPendingOverrides()
@@ -164,7 +165,7 @@ function Dashboard() {
       const response = await fetch(`${backendBase}/api/holds/check/${userId}`, {
         credentials: 'include'
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         if (data.hasActiveHolds && data.activeHolds && Array.isArray(data.activeHolds)) {
@@ -203,7 +204,7 @@ function Dashboard() {
             const waitingForAdvisor = w.advisorApproved === null || w.advisorApproved === undefined
             const waitingForInstructor = w.instructorApproved === null || w.instructorApproved === undefined
             const waitingForRegistrar = w.registrarApproved === null || w.registrarApproved === undefined
-            
+
             const isPending = isPendingStatus || waitingForAdvisor || waitingForInstructor || waitingForRegistrar
             return isPending
           })
@@ -258,7 +259,7 @@ function Dashboard() {
           headers: { 'Content-Type': 'application/json' }
         }
       )
-      
+
       if (response.ok) {
         const data = await response.json()
         // Only show alert if registration is explicitly available
@@ -301,7 +302,7 @@ function Dashboard() {
     const range = s.match(/(\d{1,2}:\d{2}\s*[AP]M)\s*[-–]\s*(\d{1,2}:\d{2}\s*[AP]M)/i)
     const single = s.match(/(\d{1,2}:\d{2})\s*([AP]M)/i)
     if (range) return { start: range[1].replace(/\s+/g, ''), end: range[2].replace(/\s+/g, '') }
-    if (single) return { start: (single[1]+single[2]).replace(/\s+/g, ''), end: null as any }
+    if (single) return { start: (single[1] + single[2]).replace(/\s+/g, ''), end: null as any }
     return { start: s, end: null as any }
   }
 
@@ -341,15 +342,15 @@ function Dashboard() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
       })
-      
+
       if (cartResponse.ok) {
         const cartData = await cartResponse.json()
         if (cartData.success && cartData.items) {
           const cartItems = cartData.items
           const conflictPairs = findConflictPairs(cartItems)
-          
+
           if (conflictPairs.length > 0) {
-            const conflictMessages = conflictPairs.map(([a, b]) => 
+            const conflictMessages = conflictPairs.map(([a, b]) =>
               `${a.code || `${a.department}${a.courseNum}.${a.section}`} and ${b.code || `${b.department}${b.courseNum}.${b.section}`}`
             )
             setTimeConflicts(conflictMessages)
@@ -375,10 +376,10 @@ function Dashboard() {
       const completedClassesResponse = await fetch(`${backendBase}/api/users/${userId}/classes/completed`, {
         credentials: 'include'
       })
-      
+
       if (completedClassesResponse.ok) {
         const completedClasses: Array<{ credits: number; grade: string | null; semester?: string; year?: number }> = await completedClassesResponse.json()
-        
+
         // Grade to GPA points mapping
         const gradePoints: Record<string, number> = {
           'A+': 4.0, 'A': 4.0, 'A-': 3.7,
@@ -388,42 +389,42 @@ function Dashboard() {
           'F': 0.0, 'W': 0.0, 'I': 0.0,
           'P': 0.0, 'NP': 0.0, 'S': 0.0, 'U': 0.0
         }
-        
+
         // Filter classes with valid grades (exclude pass/fail and incomplete)
         const gradedClasses = completedClasses.filter(cls => {
           const grade = cls.grade?.trim().toUpperCase()
-          return grade && 
-                 grade !== 'P' && 
-                 grade !== 'NP' && 
-                 grade !== 'S' && 
-                 grade !== 'U' && 
-                 grade !== 'W' && 
-                 grade !== 'I' &&
-                 gradePoints[grade] !== undefined
+          return grade &&
+            grade !== 'P' &&
+            grade !== 'NP' &&
+            grade !== 'S' &&
+            grade !== 'U' &&
+            grade !== 'W' &&
+            grade !== 'I' &&
+            gradePoints[grade] !== undefined
         })
-        
+
         // Calculate cumulative GPA: (sum of credits × grade points) / total credits
         let totalPoints = 0
         let totalCredits = 0
-        
+
         gradedClasses.forEach(cls => {
           const grade = cls.grade?.trim().toUpperCase() || ''
           const points = gradePoints[grade] || 0
           const credits = cls.credits || 0
-          
+
           totalPoints += points * credits
           totalCredits += credits
         })
-        
+
         // Calculate cumulative GPA
         const calculatedGpaValue = totalCredits > 0 ? totalPoints / totalCredits : null
         setCalculatedGpa(calculatedGpaValue)
-        
+
         // Calculate most recent term GPA (find the term with most recent year and semester)
         if (completedClasses.length > 0) {
           // Find the most recent term from completed classes
           const termMap = new Map<string, Array<{ credits: number; grade: string | null }>>()
-          
+
           completedClasses.forEach(cls => {
             if (cls.semester && cls.year) {
               const normalizedSemester = cls.semester.charAt(0).toUpperCase() + cls.semester.slice(1).toLowerCase()
@@ -434,51 +435,51 @@ function Dashboard() {
               termMap.get(termKey)!.push(cls)
             }
           })
-          
+
           // Find the most recent term (highest year, then Fall > Summer > Spring)
           let latestTermKey: string | null = null
           let latestYear = 0
           let latestSemesterOrder = 0
-          
+
           termMap.forEach((_, termKey) => {
             const [yearStr, semester] = termKey.split('-')
             const year = parseInt(yearStr)
             const semesterOrder = semester === 'Fall' ? 3 : semester === 'Summer' ? 2 : 1
-            
+
             if (year > latestYear || (year === latestYear && semesterOrder > latestSemesterOrder)) {
               latestYear = year
               latestSemesterOrder = semesterOrder
               latestTermKey = termKey
             }
           })
-          
+
           // Calculate GPA for the most recent term
           if (latestTermKey) {
             const latestTermClasses = termMap.get(latestTermKey)!
             const latestTermGraded = latestTermClasses.filter(cls => {
               const grade = cls.grade?.trim().toUpperCase()
-              return grade && 
-                     grade !== 'P' && 
-                     grade !== 'NP' && 
-                     grade !== 'S' && 
-                     grade !== 'U' && 
-                     grade !== 'W' && 
-                     grade !== 'I' &&
-                     gradePoints[grade] !== undefined
+              return grade &&
+                grade !== 'P' &&
+                grade !== 'NP' &&
+                grade !== 'S' &&
+                grade !== 'U' &&
+                grade !== 'W' &&
+                grade !== 'I' &&
+                gradePoints[grade] !== undefined
             })
-            
+
             let termPoints = 0
             let termCredits = 0
-            
+
             latestTermGraded.forEach(cls => {
               const grade = cls.grade?.trim().toUpperCase() || ''
               const points = gradePoints[grade] || 0
               const credits = cls.credits || 0
-              
+
               termPoints += points * credits
               termCredits += credits
             })
-            
+
             const termGpaValue = termCredits > 0 ? termPoints / termCredits : null
             setTermGpa(termGpaValue)
           } else {
@@ -487,7 +488,7 @@ function Dashboard() {
         } else {
           setTermGpa(null)
         }
-        
+
         // Set total credits (include all completed classes)
         const allCredits = completedClasses.reduce((sum, cls) => sum + (cls.credits || 0), 0)
         setCumulativeCredits(allCredits)
@@ -510,12 +511,12 @@ function Dashboard() {
     try {
       const termToUse = `${currentYear}-${currentSemester}`
       const termYearNum = currentYear
-      const normalizedSemester = currentSemester ? 
-        (currentSemester.charAt(0).toUpperCase() + currentSemester.slice(1).toLowerCase()) : 
+      const normalizedSemester = currentSemester ?
+        (currentSemester.charAt(0).toUpperCase() + currentSemester.slice(1).toLowerCase()) :
         null
-      
+
       console.log('[Dashboard] Fetching schedule for term:', termToUse, 'userId:', userId)
-      
+
       // First, try to get studentId from profile
       let studentId: string | null = null
       if (me?.studentId) {
@@ -537,7 +538,7 @@ function Dashboard() {
           // Continue with roster API
         }
       }
-      
+
       // Try profile schedule API first (like Profile.tsx)
       if (studentId && termYearNum && normalizedSemester) {
         try {
@@ -546,7 +547,7 @@ function Dashboard() {
           const scheduleResponse = await fetch(profileScheduleUrl, {
             credentials: 'include'
           })
-          
+
           if (scheduleResponse.ok) {
             const scheduleData = await scheduleResponse.json()
             console.log('[Dashboard] Profile schedule API response:', scheduleData)
@@ -563,7 +564,7 @@ function Dashboard() {
           // Fall through to roster API
         }
       }
-      
+
       // Fallback to roster API (like Profile.tsx)
       if (termYearNum && normalizedSemester) {
         try {
@@ -572,22 +573,22 @@ function Dashboard() {
           const rosterResponse = await fetch(rosterUrl, {
             credentials: 'include'
           })
-          
+
           if (rosterResponse.ok) {
             const rosterData = await rosterResponse.json()
             console.log('[Dashboard] Roster API response:', rosterData?.length || 0, 'items')
-            
+
             if (Array.isArray(rosterData) && rosterData.length > 0) {
               const filtered = rosterData.filter((item: any) => {
                 const itemYear = typeof item.year === 'number' ? item.year : parseInt(String(item.year))
-                const itemSemester = item.semester ? 
-                  (item.semester.charAt(0).toUpperCase() + item.semester.slice(1).toLowerCase()) : 
+                const itemSemester = item.semester ?
+                  (item.semester.charAt(0).toUpperCase() + item.semester.slice(1).toLowerCase()) :
                   null
                 return itemYear === termYearNum && itemSemester === normalizedSemester
               })
-              
+
               console.log('[Dashboard] Filtered roster data:', filtered.length, 'items for term')
-              
+
               if (filtered.length > 0) {
                 // Map to schedule format (like Profile.tsx)
                 const scheduleData = filtered.map((item: any) => ({
@@ -613,7 +614,7 @@ function Dashboard() {
           console.error('[Dashboard] Error fetching roster data for schedule:', error)
         }
       }
-      
+
       // If nothing found, set empty array
       console.log('[Dashboard] No schedule data found, setting empty array')
       setStudentSchedule([])
@@ -631,7 +632,7 @@ function Dashboard() {
       const response = await fetch(`${backendBase}/api/planner/${userId}`, {
         credentials: 'include'
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         if (data.plannedCourses && Array.isArray(data.plannedCourses)) {
@@ -644,7 +645,7 @@ function Dashboard() {
         const fallbackResponse = await fetch(`${backendBase}/api/users/${userId}/course-plan`, {
           credentials: 'include'
         })
-        
+
         if (fallbackResponse.ok) {
           const planData = await fallbackResponse.json()
           setStudentCoursePlan(Array.isArray(planData) ? planData : [])
@@ -665,7 +666,7 @@ function Dashboard() {
       const response = await fetch(`${backendBase}/api/admin/academic-calendar`, {
         credentials: 'include'
       })
-      
+
       if (response.ok) {
         const events = await response.json()
         setAcademicEvents(Array.isArray(events) ? events : [])
@@ -710,7 +711,7 @@ function Dashboard() {
       const declarationsResponse = await fetch(`${backendBase}/api/major-minor-declarations/pending`, {
         credentials: 'include'
       })
-      
+
       if (declarationsResponse.ok) {
         const data = await declarationsResponse.json()
         if (data.success && Array.isArray(data.declarations)) {
@@ -747,10 +748,10 @@ function Dashboard() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
       })
-      
+
       let pendingCount = 0
       let recentWaivers: any[] = []
-      
+
       if (waiversResponse.ok) {
         const waivers = await waiversResponse.json()
         if (Array.isArray(waivers)) {
@@ -767,21 +768,21 @@ function Dashboard() {
             .slice(0, 10) // Limit to 10 most recent
         }
       }
-      
+
       // Check pending declarations
       const declarationsResponse = await fetch(`${backendBase}/api/declarations/pending`, {
         method: 'GET',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
       })
-      
+
       if (declarationsResponse.ok) {
         const declarationsData = await declarationsResponse.json()
         if (declarationsData.success && declarationsData.declarations) {
           pendingCount += Array.isArray(declarationsData.declarations) ? declarationsData.declarations.length : 0
         }
       }
-      
+
       setPendingOverrides(pendingCount)
       setRecentOverrides(recentWaivers)
     } catch (error) {
@@ -796,18 +797,18 @@ function Dashboard() {
   const fetchProfessorData = async (user: any) => {
     try {
       const instructorName = `${user.firstName} ${user.lastName}`.trim()
-      
+
       // Fetch teaching classes
       const classesResponse = await fetch(`${backendBase}/api/classes/instructor/${encodeURIComponent(instructorName)}`, {
         method: 'GET',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
       })
-      
+
       if (classesResponse.ok) {
         const classes = await classesResponse.json()
         setTeachingClasses(classes || [])
-        
+
         // Fetch enrollment stats for each class
         const statsPromises = classes.map(async (cls: any) => {
           try {
@@ -816,7 +817,7 @@ function Dashboard() {
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' }
             })
-            
+
             if (statsResponse.ok) {
               return await statsResponse.json()
             }
@@ -825,10 +826,10 @@ function Dashboard() {
             return null
           }
         })
-        
+
         const stats = await Promise.all(statsPromises)
         setClassStats(stats.filter((s: any) => s !== null))
-        
+
         // Count students without grades
         let pendingCount = 0
         for (const cls of classes) {
@@ -838,7 +839,7 @@ function Dashboard() {
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' }
             })
-            
+
             if (rosterResponse.ok) {
               const roster = await rosterResponse.json()
               pendingCount += (roster || []).filter((student: any) => !student.grade && student.status === 'ENROLLED').length
@@ -849,7 +850,7 @@ function Dashboard() {
         }
         setPendingGrades(pendingCount)
       }
-      
+
       // Fetch pending waivers for instructor
       if (user.userId) {
         try {
@@ -858,7 +859,7 @@ function Dashboard() {
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' }
           })
-          
+
           if (waiversResponse.ok) {
             const waivers = await waiversResponse.json()
             setPendingWaivers((waivers || []).length)
@@ -882,13 +883,13 @@ function Dashboard() {
         method: 'GET',
         credentials: 'include'
       })
-      
+
       if (userStatsResponse.ok) {
         const stats = await userStatsResponse.json()
         setUserStats(stats)
       } else {
-        setUserStats({ 
-          totalUsers: 0, 
+        setUserStats({
+          totalUsers: 0,
           activeUsers: 0,
           students: 0,
           instructors: 0,
@@ -903,7 +904,7 @@ function Dashboard() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
       })
-      
+
       if (dbStatusResponse.ok) {
         const dbStatus = await dbStatusResponse.json()
         setDbStats(dbStatus)
@@ -914,14 +915,14 @@ function Dashboard() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
       })
-      
+
       if (scrapingStatsResponse.ok) {
         const stats = await scrapingStatsResponse.json()
         setScrapingStats(stats)
       }
     } catch (error) {
-      setUserStats({ 
-        totalUsers: 0, 
+      setUserStats({
+        totalUsers: 0,
         activeUsers: 0,
         students: 0,
         instructors: 0,
@@ -940,7 +941,7 @@ function Dashboard() {
       const termsResponse = await fetch(`${backendBase}/api/scraping/terms`, {
         credentials: 'include'
       })
-      
+
       let classes: Array<{ term: string; courseCount: number }> = []
       if (termsResponse.ok) {
         const terms = await termsResponse.json()
@@ -974,7 +975,7 @@ function Dashboard() {
       const degreeReqsResponse = await fetch(`${backendBase}/api/degree-requirements`, {
         credentials: 'include'
       })
-      
+
       let degreeReqs: Array<{ subject: string; version: string }> = []
       if (degreeReqsResponse.ok) {
         const data = await degreeReqsResponse.json()
@@ -1002,14 +1003,7 @@ function Dashboard() {
   }
 
   if (isLoading) {
-    return (
-      <div className="dashboard">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Logging in...</p>
-        </div>
-      </div>
-    )
+    return <LoadingModal isOpen={true} message="Loading dashboard..." />
   }
 
   const role = String(me?.role || '').toUpperCase()
@@ -1027,744 +1021,744 @@ function Dashboard() {
       {/* Main Content */}
       <div className="dashboard-content">
         {isInstructor ? (
-        <>
-          {/* Professor Dashboard */}
-          <div className="left-column">
-            {/* Pending Items Alerts */}
-            {pendingGrades > 0 && (
-              <div className="alert-box alert-warning">
-                <div className="alert-icon"></div>
-                <div className="alert-text">
-                  <span className="alert-title">Grades Pending:</span> You have {pendingGrades} student{pendingGrades > 1 ? 's' : ''} awaiting grade input.
+          <>
+            {/* Professor Dashboard */}
+            <div className="left-column">
+              {/* Pending Items Alerts */}
+              {pendingGrades > 0 && (
+                <div className="alert-box alert-warning">
+                  <div className="alert-icon"></div>
+                  <div className="alert-text">
+                    <span className="alert-title">Grades Pending:</span> You have {pendingGrades} student{pendingGrades > 1 ? 's' : ''} awaiting grade input.
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {pendingWaivers > 0 && (
-              <div className="alert-box alert-warning">
-                <div className="alert-icon"></div>
-                <div className="alert-text">
-                  <span className="alert-title">Override Requests:</span> {pendingWaivers} pending override request{pendingWaivers > 1 ? 's' : ''} require{pendingWaivers === 1 ? 's' : ''} your review.
+              {pendingWaivers > 0 && (
+                <div className="alert-box alert-warning">
+                  <div className="alert-icon"></div>
+                  <div className="alert-text">
+                    <span className="alert-title">Override Requests:</span> {pendingWaivers} pending override request{pendingWaivers > 1 ? 's' : ''} require{pendingWaivers === 1 ? 's' : ''} your review.
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Quick Stats */}
-            <div className="stats-container">
-              <div className="stat-card">
-                <div className="stat-label">Teaching Classes</div>
-                <div className="stat-value">{teachingClasses.length}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Total Students</div>
-                <div className="stat-value">
-                  {classStats.reduce((sum, stat) => sum + (stat.activeEnrollments || 0), 0)}
+              {/* Quick Stats */}
+              <div className="stats-container">
+                <div className="stat-card">
+                  <div className="stat-label">Teaching Classes</div>
+                  <div className="stat-value">{teachingClasses.length}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Total Students</div>
+                  <div className="stat-value">
+                    {classStats.reduce((sum, stat) => sum + (stat.activeEnrollments || 0), 0)}
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Grades Pending</div>
+                  <div className="stat-value">{pendingGrades}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Pending Overrides</div>
+                  <div className="stat-value">{pendingWaivers}</div>
                 </div>
               </div>
-              <div className="stat-card">
-                <div className="stat-label">Grades Pending</div>
-                <div className="stat-value">{pendingGrades}</div>
+
+              {/* Teaching Classes */}
+              <div className="reminder-card">
+                <div className="reminder-title">My Classes</div>
+                <div className="reminder-content">
+                  {teachingClasses.length === 0 ? (
+                    <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      No classes assigned.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {teachingClasses.slice(0, 5).map((cls: any) => {
+                        const stats = classStats.find((s: any) => s.classId === cls.classId)
+                        return (
+                          <div
+                            key={cls.classId}
+                            className="course-btn"
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              padding: '0.75rem 1rem',
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => navigate(`/roster?classId=${cls.classId}`)}
+                          >
+                            <div style={{ fontWeight: 600 }}>
+                              {cls.department} {cls.courseNum}.{cls.section} - {cls.title}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                              {cls.semester} {cls.year} • {stats ? `${stats.activeEnrollments || 0}/${stats.maxCapacity || 'N/A'} students` : 'No stats'}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {teachingClasses.length > 5 && (
+                        <button
+                          className="course-btn"
+                          onClick={() => navigate('/roster')}
+                          style={{ width: '100%', textAlign: 'center', padding: '0.75rem 1rem' }}
+                        >
+                          View All Classes ({teachingClasses.length})
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="stat-card">
-                <div className="stat-label">Pending Overrides</div>
-                <div className="stat-value">{pendingWaivers}</div>
+
+              {/* Quick Actions */}
+              <div className="reminder-card">
+                <div className="reminder-title">Quick Actions</div>
+                <div className="reminder-content">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <button
+                      className="course-btn"
+                      onClick={() => navigate('/roster')}
+                      style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                    >
+                      View Class Rosters
+                    </button>
+                    <button
+                      className="course-btn"
+                      onClick={() => navigate('/grades')}
+                      style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                    >
+                      Enter Grades
+                    </button>
+                    <button
+                      className="course-btn"
+                      onClick={() => navigate('/advisor-approval')}
+                      style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                    >
+                      Registration Overrides
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Teaching Classes */}
-            <div className="reminder-card">
-              <div className="reminder-title">My Classes</div>
-              <div className="reminder-content">
+            {/* Right Column */}
+            <div className="right-column">
+              {/* Class Enrollment Overview */}
+              <div className="schedule-section">
+                <div className="section-header">
+                  <h2>Class Enrollment Overview</h2>
+                  <h3>{currentSemester} {currentYear}</h3>
+                </div>
                 {teachingClasses.length === 0 ? (
-                  <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    No classes assigned.
+                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    No classes assigned for this semester.
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {teachingClasses.slice(0, 5).map((cls: any) => {
-                      const stats = classStats.find((s: any) => s.classId === cls.classId)
-                      return (
-                        <div 
-                          key={cls.classId} 
-                          className="course-btn"
-                          style={{ 
-                            width: '100%', 
-                            textAlign: 'left', 
-                            padding: '0.75rem 1rem',
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => navigate(`/roster?classId=${cls.classId}`)}
-                        >
-                          <div style={{ fontWeight: 600 }}>
-                            {cls.department} {cls.courseNum}.{cls.section} - {cls.title}
-                          </div>
-                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                            {cls.semester} {cls.year} • {stats ? `${stats.activeEnrollments || 0}/${stats.maxCapacity || 'N/A'} students` : 'No stats'}
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {teachingClasses.length > 5 && (
-                      <button 
-                        className="course-btn" 
-                        onClick={() => navigate('/roster')}
-                        style={{ width: '100%', textAlign: 'center', padding: '0.75rem 1rem' }}
-                      >
-                        View All Classes ({teachingClasses.length})
-                      </button>
-                    )}
-                  </div>
+                  <table className="schedule-table">
+                    <thead>
+                      <tr>
+                        <th className="time-header">Class</th>
+                        <th className="day-header">Students</th>
+                        <th className="day-header">Capacity</th>
+                        <th className="day-header">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teachingClasses.map((cls: any) => {
+                        const stats = classStats.find((s: any) => s.classId === cls.classId)
+                        const enrollment = stats?.activeEnrollments || 0
+                        const capacity = stats?.maxCapacity || cls.maxCapacity || 'N/A'
+                        const isFull = stats?.isFull || false
+
+                        return (
+                          <tr key={cls.classId}>
+                            <td className="time-cell">
+                              <div style={{ fontWeight: 600 }}>{cls.department} {cls.courseNum}.{cls.section}</div>
+                              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cls.title}</div>
+                            </td>
+                            <td className="course-cell">{enrollment}</td>
+                            <td className="course-cell">{capacity}</td>
+                            <td className="course-cell">
+                              <span style={{
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.8rem',
+                                backgroundColor: isFull ? '#fee' : '#dfd',
+                                color: isFull ? '#c33' : '#363'
+                              }}>
+                                {isFull ? 'Full' : 'Open'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </div>
+          </>
+        ) : isAdvisor ? (
+          <>
+            {/* Advisor Dashboard */}
+            <div className="left-column">
+              {/* Pending Items Alerts */}
+              {pendingDeclarations > 0 && (
+                <div className="alert-box alert-warning">
+                  <div className="alert-icon"></div>
+                  <div className="alert-text">
+                    <span className="alert-title">Declarations Pending:</span> You have {pendingDeclarations} declaration{pendingDeclarations > 1 ? 's' : ''} awaiting your review.
+                  </div>
+                </div>
+              )}
 
-            {/* Quick Actions */}
-            <div className="reminder-card">
-              <div className="reminder-title">Quick Actions</div>
-              <div className="reminder-content">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <button 
-                    className="course-btn" 
-                    onClick={() => navigate('/roster')}
-                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
-                  >
-                    View Class Rosters
-                  </button>
-                  <button 
-                    className="course-btn" 
-                    onClick={() => navigate('/grades')}
-                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
-                  >
-                    Enter Grades
-                  </button>
-                  <button 
-                    className="course-btn" 
-                    onClick={() => navigate('/advisor-approval')}
-                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
-                  >
-                    Registration Overrides
-                  </button>
+              {advisorPendingWaivers > 0 && (
+                <div className="alert-box alert-warning">
+                  <div className="alert-icon"></div>
+                  <div className="alert-text">
+                    <span className="alert-title">Override Requests:</span> You have {advisorPendingWaivers} override request{advisorPendingWaivers > 1 ? 's' : ''} awaiting your review.
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Stats */}
+              <div className="stats-container">
+                <div className="stat-card">
+                  <div className="stat-label">Pending Declarations</div>
+                  <div className="stat-value">{pendingDeclarations}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Pending Overrides</div>
+                  <div className="stat-value">{advisorPendingWaivers}</div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="reminder-card">
+                <div className="reminder-title">Quick Actions</div>
+                <div className="reminder-content">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <button
+                      className="course-btn"
+                      onClick={() => navigate('/advisor-approval')}
+                      style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                    >
+                      Review Declarations & Overrides
+                    </button>
+                    <button
+                      className="course-btn"
+                      onClick={() => navigate('/degree-audit')}
+                      style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                    >
+                      View Student Degree Audit
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Right Column */}
-          <div className="right-column">
-            {/* Class Enrollment Overview */}
-            <div className="schedule-section">
-              <div className="section-header">
-                <h2>Class Enrollment Overview</h2>
-                <h3>{currentSemester} {currentYear}</h3>
-              </div>
-              {teachingClasses.length === 0 ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  No classes assigned for this semester.
+            {/* Right Column */}
+            <div className="right-column">
+              <div className="schedule-section">
+                <div className="section-header">
+                  <h2>Recent Activity</h2>
+                  <h3>Last 7 days</h3>
                 </div>
-              ) : (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  No recent activity to display.
+                </div>
+              </div>
+            </div>
+          </>
+        ) : !isRegistrar ? (
+          <>
+            {/* Left Column */}
+            <div className="left-column">
+              {/* Registration Hold Alert - Show if there are active holds */}
+              {activeHolds.length > 0 && (
+                <div className="alert-box alert-error">
+                  <div className="alert-icon"></div>
+                  <div className="alert-text">
+                    <span className="alert-title">Registration Blocked:</span> You have {activeHolds.length} active hold{activeHolds.length > 1 ? 's' : ''} that prevent registration:
+                    <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
+                      {activeHolds.map((hold: any, index: number) => (
+                        <li key={index} style={{ marginTop: '0.25rem' }}>
+                          <strong>{hold.holdType}:</strong> {hold.reason || 'No reason provided'}
+                        </li>
+                      ))}
+                    </ul>
+                    <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                      Please resolve these holds before registering for classes.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Registration Eligibility Alert - Only show if registration is open */}
+              {registrationEligibility && registrationEligibility.canRegister && (
+                <div className="alert-box alert-success">
+                  <div className="alert-icon"></div>
+                  <div className="alert-text">
+                    <span className="alert-title">Registration Open:</span> You can register for {currentSemester} {currentYear}.
+                    {registrationEligibility.schedule && registrationEligibility.schedule.endDate && (
+                      <span> Registration ends {new Date(registrationEligibility.schedule.endDate).toLocaleDateString()}.</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Time Conflict Alert - Only show if there are actual conflicts */}
+              {timeConflicts.length > 0 && (
+                <div className="alert-box alert-warning">
+                  <div className="alert-icon"></div>
+                  <div className="alert-text">
+                    <span className="alert-title">Time Conflicts Detected:</span> {`Time conflicts detected: ${timeConflicts.join(', ')}. Please resolve before submitting.`}
+                  </div>
+                </div>
+              )}
+
+              {/* Student Pending Waivers Alert */}
+              {studentPendingWaivers > 0 && (
+                <div className="alert-box alert-warning">
+                  <div className="alert-icon"></div>
+                  <div className="alert-text">
+                    <span className="alert-title">Pending Override Requests:</span> You have {studentPendingWaivers} override request{studentPendingWaivers > 1 ? 's' : ''} awaiting review.
+                  </div>
+                </div>
+              )}
+
+              {/* Student Pending Declarations Alert */}
+              {studentPendingDeclarations > 0 && (
+                <div className="alert-box alert-warning">
+                  <div className="alert-icon"></div>
+                  <div className="alert-text">
+                    <span className="alert-title">Pending Declarations:</span> You have {studentPendingDeclarations} declaration{studentPendingDeclarations > 1 ? 's' : ''} awaiting review.
+                  </div>
+                </div>
+              )}
+
+              {/* Statistics Cards */}
+              <div className="stats-container">
+                <div className="stat-card">
+                  <div className="stat-label">GPA</div>
+                  <div className="stat-value">{calculatedGpa !== null ? calculatedGpa.toFixed(2) : '—'}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Term</div>
+                  <div className="stat-value">{termGpa !== null ? termGpa.toFixed(2) : '—'}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Cumulative Credits</div>
+                  <div className="stat-value">{cumulativeCredits > 0 ? cumulativeCredits : '—'}</div>
+                </div>
+              </div>
+
+              {/* Overall Progress */}
+              <div className="progress-section">
+                <div className="progress-header">
+                  <div className="progress-label">Overall Progress</div>
+                  <div className="progress-text">{overallProgress}%</div>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{ width: `${overallProgress}%` }}></div>
+                </div>
+              </div>
+
+              {/* Reminder Card */}
+              <div className="reminder-card">
+                <div className="reminder-title">Reminder</div>
+                <div className="reminder-content">
+                  {academicEvents.length > 0 ? (
+                    academicEvents
+                      .filter((event: any) => {
+                        if (!event.date) return false
+                        const eventDate = new Date(event.date)
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const daysDiff = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                        return daysDiff >= 0 && daysDiff <= 30 // Show events in next 30 days
+                      })
+                      .sort((a: any, b: any) => {
+                        const dateA = new Date(a.date).getTime()
+                        const dateB = new Date(b.date).getTime()
+                        return dateA - dateB
+                      })
+                      .slice(0, 2)
+                      .map((event: any, idx: number) => {
+                        const eventDate = new Date(event.date)
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const daysDiff = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                        return (
+                          <div key={idx}>
+                            {daysDiff === 0 ? 'Today: ' : daysDiff === 1 ? 'Tomorrow: ' : `${daysDiff} days left: `}
+                            {event.description || event.eventName || 'Academic event'}
+                          </div>
+                        )
+                      })
+                  ) : (
+                    <div>No upcoming events.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="right-column">
+              {/* Course Schedule */}
+              <div className="schedule-section">
+                <div className="section-header">
+                  <h2>Current Classes</h2>
+                  <h3>{currentSemester} {currentYear}</h3>
+                </div>
+
+                {studentSchedule.length > 0 ? (
+                  <div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {studentSchedule.map((course: any, idx: number) => {
+                        const courseCode = `${course.subject || course.department || ''}${course.courseNum || ''}`
+                        const scheduleStr = combineSchedules(course)
+                        const location = course.location || ''
+                        const instructor = course.instructor || ''
+                        const title = course.title || ''
+
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              padding: '1rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '8px',
+                              backgroundColor: '#fff'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                              <div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                                  {courseCode}
+                                  {course.section && <span style={{ fontSize: '0.9rem', fontWeight: 'normal', color: '#666' }}> - Section {course.section}</span>}
+                                </div>
+                                {title && (
+                                  <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.25rem' }}>
+                                    {title}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem', color: '#555' }}>
+                              {scheduleStr && (
+                                <div>
+                                  <strong>Schedule:</strong> {scheduleStr}
+                                </div>
+                              )}
+                              {location && (
+                                <div>
+                                  <strong>Location:</strong> {location}
+                                </div>
+                              )}
+                              {instructor && (
+                                <div>
+                                  <strong>Instructor:</strong> {instructor}
+                                </div>
+                              )}
+                              {course.credits && (
+                                <div>
+                                  <strong>Credits:</strong> {course.credits}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    No classes scheduled for {currentSemester} {currentYear}
+                  </div>
+                )}
+              </div>
+
+              {/* Planner */}
+              <div className="planner-section">
+                <div className="section-header">
+                  <h2>Planner</h2>
+                </div>
+                <div className="planner-container">
+                  {studentCoursePlan.length > 0 ? (
+                    (() => {
+                      // Group courses by semester and year
+                      const planByTerm: { [key: string]: any[] } = {}
+                      studentCoursePlan.forEach((course: any) => {
+                        const semester = course.semester || currentSemester
+                        const year = course.year || currentYear
+                        const termKey = `${semester} ${year}`
+                        if (!planByTerm[termKey]) planByTerm[termKey] = []
+                        planByTerm[termKey].push(course)
+                      })
+
+                      // Sort terms chronologically
+                      const sortedTerms = Object.keys(planByTerm).sort((a, b) => {
+                        const [semA, yearA] = a.split(' ')
+                        const [semB, yearB] = b.split(' ')
+                        const yearNumA = parseInt(yearA)
+                        const yearNumB = parseInt(yearB)
+                        if (yearNumA !== yearNumB) return yearNumA - yearNumB
+                        const semOrder: { [key: string]: number } = { 'Spring': 0, 'Summer': 1, 'Fall': 2 }
+                        return (semOrder[semA] || 0) - (semOrder[semB] || 0)
+                      })
+
+                      return (
+                        <div className="planner-columns">
+                          {sortedTerms.slice(0, 3).map((term, idx) => (
+                            <div key={idx} className="planner-column">
+                              <div className="planner-semester">{term}</div>
+                              <div className="course-buttons">
+                                {planByTerm[term].map((course: any, courseIdx: number) => {
+                                  const courseCode = `${course.department || ''} ${course.courseNum || course.courseNumber || ''}`.trim()
+                                  return (
+                                    <button key={courseIdx} className="course-btn">
+                                      {courseCode}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                          {sortedTerms.length === 0 && (
+                            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                              No courses planned
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()
+                  ) : (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      No courses planned
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Admin/Registrar Dashboard */}
+            <div className="left-column">
+              {/* System Alerts - Only show if there are actual pending overrides */}
+              {pendingOverrides > 0 && (
+                <div className="alert-box">
+                  <div className="alert-icon"></div>
+                  <div className="alert-text">
+                    <span className="alert-title">System notice:</span> {pendingOverrides} pending override{pendingOverrides > 1 ? 's' : ''} require{pendingOverrides === 1 ? 's' : ''} review.
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Stats - Real Data */}
+              <div className="stats-container">
+                <div className="stat-card">
+                  <div className="stat-label">Total Users</div>
+                  <div className="stat-value">{userStats?.totalUsers ?? 0}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Active Users</div>
+                  <div className="stat-value">{userStats?.activeUsers ?? 0}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Students</div>
+                  <div className="stat-value">{userStats?.students ?? 0}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Instructors</div>
+                  <div className="stat-value">{userStats?.instructors ?? 0}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Advisors</div>
+                  <div className="stat-value">{userStats?.advisors ?? 0}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Registrars</div>
+                  <div className="stat-value">{userStats?.registrars ?? 0}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Pending Overrides</div>
+                  <div className="stat-value">{pendingOverrides > 0 ? pendingOverrides : 0}</div>
+                </div>
+              </div>
+
+              {/* Database Status */}
+              {dbStats && (
+                <div className="progress-section">
+                  <div className="progress-header">
+                    <div className="progress-label">Database Status</div>
+                    <div className="progress-text">{dbStats.status === 'OK' ? 'OK' : 'ERROR'}</div>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: dbStats.status === 'OK' ? '100%' : '50%' }}></div>
+                  </div>
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                    {dbStats.totalTerms ?? 0} terms • {dbStats.totalCourses ?? 0} courses
+                  </div>
+                </div>
+              )}
+
+              {/* Course Statistics */}
+              {scrapingStats && (
+                <div className="progress-section">
+                  <div className="progress-header">
+                    <div className="progress-label">Course Data</div>
+                    <div className="progress-text">{scrapingStats.totalCourses ?? 0}</div>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: `${((scrapingStats.scrapedTerms ?? 0) / Math.max(scrapingStats.totalTerms ?? 1, 1)) * 100}%` }}></div>
+                  </div>
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                    {scrapingStats.scrapedTerms ?? 0} / {scrapingStats.totalTerms ?? 0} terms scraped
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Actions - Replaced Quick Links */}
+              <div className="reminder-card">
+                <div className="reminder-title">Quick Actions</div>
+                <div className="reminder-content">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <button
+                      className="course-btn"
+                      onClick={() => navigate('/user-management')}
+                      style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                    >
+                      Manage Users
+                    </button>
+                    <button
+                      className="course-btn"
+                      onClick={() => navigate('/data-import')}
+                      style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                    >
+                      Import Data
+                    </button>
+                    <button
+                      className="course-btn"
+                      onClick={() => navigate('/degree-requirements')}
+                      style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                    >
+                      View Degree Requirements
+                    </button>
+                    <button
+                      className="course-btn"
+                      onClick={() => navigate('/pdf-upload')}
+                      style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
+                    >
+                      Manage Classes & Capacities
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right column: Recent items */}
+            <div className="right-column">
+              <div className="schedule-section">
+                <div className="section-header">
+                  <h2>Recent Overrides</h2>
+                  <h3>Last 7 days</h3>
+                </div>
                 <table className="schedule-table">
                   <thead>
                     <tr>
-                      <th className="time-header">Class</th>
-                      <th className="day-header">Students</th>
-                      <th className="day-header">Capacity</th>
+                      <th className="time-header">Student</th>
+                      <th className="day-header">Type</th>
+                      <th className="day-header">Course</th>
                       <th className="day-header">Status</th>
+                      <th className="day-header">Date</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {teachingClasses.map((cls: any) => {
-                      const stats = classStats.find((s: any) => s.classId === cls.classId)
-                      const enrollment = stats?.activeEnrollments || 0
-                      const capacity = stats?.maxCapacity || cls.maxCapacity || 'N/A'
-                      const isFull = stats?.isFull || false
-                      
-                      return (
-                        <tr key={cls.classId}>
-                          <td className="time-cell">
-                            <div style={{ fontWeight: 600 }}>{cls.department} {cls.courseNum}.{cls.section}</div>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cls.title}</div>
-                          </td>
-                          <td className="course-cell">{enrollment}</td>
-                          <td className="course-cell">{capacity}</td>
-                          <td className="course-cell">
-                            <span style={{
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '4px',
-                              fontSize: '0.8rem',
-                              backgroundColor: isFull ? '#fee' : '#dfd',
-                              color: isFull ? '#c33' : '#363'
-                            }}>
-                              {isFull ? 'Full' : 'Open'}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </>
-        ) : isAdvisor ? (
-        <>
-          {/* Advisor Dashboard */}
-          <div className="left-column">
-            {/* Pending Items Alerts */}
-            {pendingDeclarations > 0 && (
-              <div className="alert-box alert-warning">
-                <div className="alert-icon"></div>
-                <div className="alert-text">
-                  <span className="alert-title">Declarations Pending:</span> You have {pendingDeclarations} declaration{pendingDeclarations > 1 ? 's' : ''} awaiting your review.
-                </div>
-              </div>
-            )}
-
-            {advisorPendingWaivers > 0 && (
-              <div className="alert-box alert-warning">
-                <div className="alert-icon"></div>
-                <div className="alert-text">
-                  <span className="alert-title">Override Requests:</span> You have {advisorPendingWaivers} override request{advisorPendingWaivers > 1 ? 's' : ''} awaiting your review.
-                </div>
-              </div>
-            )}
-
-            {/* Quick Stats */}
-            <div className="stats-container">
-              <div className="stat-card">
-                <div className="stat-label">Pending Declarations</div>
-                <div className="stat-value">{pendingDeclarations}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Pending Overrides</div>
-                <div className="stat-value">{advisorPendingWaivers}</div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="reminder-card">
-              <div className="reminder-title">Quick Actions</div>
-              <div className="reminder-content">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <button 
-                    className="course-btn" 
-                    onClick={() => navigate('/advisor-approval')}
-                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
-                  >
-                    Review Declarations & Overrides
-                  </button>
-                  <button 
-                    className="course-btn" 
-                    onClick={() => navigate('/degree-audit')}
-                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
-                  >
-                    View Student Degree Audit
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column */}
-          <div className="right-column">
-            <div className="schedule-section">
-              <div className="section-header">
-                <h2>Recent Activity</h2>
-                <h3>Last 7 days</h3>
-              </div>
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                No recent activity to display.
-              </div>
-            </div>
-          </div>
-        </>
-        ) : !isRegistrar ? (
-        <>
-        {/* Left Column */}
-        <div className="left-column">
-          {/* Registration Hold Alert - Show if there are active holds */}
-          {activeHolds.length > 0 && (
-            <div className="alert-box alert-error">
-              <div className="alert-icon"></div>
-              <div className="alert-text">
-                <span className="alert-title">Registration Blocked:</span> You have {activeHolds.length} active hold{activeHolds.length > 1 ? 's' : ''} that prevent registration:
-                <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
-                  {activeHolds.map((hold: any, index: number) => (
-                    <li key={index} style={{ marginTop: '0.25rem' }}>
-                      <strong>{hold.holdType}:</strong> {hold.reason || 'No reason provided'}
-                    </li>
-                  ))}
-                </ul>
-                <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-                  Please resolve these holds before registering for classes.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Registration Eligibility Alert - Only show if registration is open */}
-          {registrationEligibility && registrationEligibility.canRegister && (
-            <div className="alert-box alert-success">
-              <div className="alert-icon"></div>
-              <div className="alert-text">
-                <span className="alert-title">Registration Open:</span> You can register for {currentSemester} {currentYear}.
-                {registrationEligibility.schedule && registrationEligibility.schedule.endDate && (
-                  <span> Registration ends {new Date(registrationEligibility.schedule.endDate).toLocaleDateString()}.</span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Time Conflict Alert - Only show if there are actual conflicts */}
-          {timeConflicts.length > 0 && (
-            <div className="alert-box alert-warning">
-              <div className="alert-icon"></div>
-              <div className="alert-text">
-                <span className="alert-title">Time Conflicts Detected:</span> {`Time conflicts detected: ${timeConflicts.join(', ')}. Please resolve before submitting.`}
-              </div>
-            </div>
-          )}
-
-          {/* Student Pending Waivers Alert */}
-          {studentPendingWaivers > 0 && (
-            <div className="alert-box alert-warning">
-              <div className="alert-icon"></div>
-              <div className="alert-text">
-                <span className="alert-title">Pending Override Requests:</span> You have {studentPendingWaivers} override request{studentPendingWaivers > 1 ? 's' : ''} awaiting review.
-              </div>
-            </div>
-          )}
-
-          {/* Student Pending Declarations Alert */}
-          {studentPendingDeclarations > 0 && (
-            <div className="alert-box alert-warning">
-              <div className="alert-icon"></div>
-              <div className="alert-text">
-                <span className="alert-title">Pending Declarations:</span> You have {studentPendingDeclarations} declaration{studentPendingDeclarations > 1 ? 's' : ''} awaiting review.
-              </div>
-            </div>
-          )}
-
-          {/* Statistics Cards */}
-          <div className="stats-container">
-            <div className="stat-card">
-              <div className="stat-label">GPA</div>
-              <div className="stat-value">{calculatedGpa !== null ? calculatedGpa.toFixed(2) : '—'}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Term</div>
-              <div className="stat-value">{termGpa !== null ? termGpa.toFixed(2) : '—'}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Cumulative Credits</div>
-              <div className="stat-value">{cumulativeCredits > 0 ? cumulativeCredits : '—'}</div>
-            </div>
-          </div>
-
-          {/* Overall Progress */}
-          <div className="progress-section">
-            <div className="progress-header">
-              <div className="progress-label">Overall Progress</div>
-              <div className="progress-text">{overallProgress}%</div>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${overallProgress}%` }}></div>
-            </div>
-          </div>
-
-          {/* Reminder Card */}
-          <div className="reminder-card">
-            <div className="reminder-title">Reminder</div>
-            <div className="reminder-content">
-              {academicEvents.length > 0 ? (
-                academicEvents
-                  .filter((event: any) => {
-                    if (!event.date) return false
-                    const eventDate = new Date(event.date)
-                    const today = new Date()
-                    today.setHours(0, 0, 0, 0)
-                    const daysDiff = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-                    return daysDiff >= 0 && daysDiff <= 30 // Show events in next 30 days
-                  })
-                  .sort((a: any, b: any) => {
-                    const dateA = new Date(a.date).getTime()
-                    const dateB = new Date(b.date).getTime()
-                    return dateA - dateB
-                  })
-                  .slice(0, 2)
-                  .map((event: any, idx: number) => {
-                    const eventDate = new Date(event.date)
-                    const today = new Date()
-                    today.setHours(0, 0, 0, 0)
-                    const daysDiff = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-                    return (
-                      <div key={idx}>
-                        {daysDiff === 0 ? 'Today: ' : daysDiff === 1 ? 'Tomorrow: ' : `${daysDiff} days left: `}
-                        {event.description || event.eventName || 'Academic event'}
-                      </div>
-                    )
-                  })
-              ) : (
-                <div>No upcoming events.</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column */}
-        <div className="right-column">
-          {/* Course Schedule */}
-          <div className="schedule-section">
-            <div className="section-header">
-              <h2>Current Classes</h2>
-              <h3>{currentSemester} {currentYear}</h3>
-            </div>
-
-            {studentSchedule.length > 0 ? (
-              <div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {studentSchedule.map((course: any, idx: number) => {
-                    const courseCode = `${course.subject || course.department || ''}${course.courseNum || ''}`
-                    const scheduleStr = combineSchedules(course)
-                    const location = course.location || ''
-                    const instructor = course.instructor || ''
-                    const title = course.title || ''
-                    
-                    return (
-                      <div 
-                        key={idx}
-                        style={{
-                          padding: '1rem',
-                          border: '1px solid #ddd',
-                          borderRadius: '8px',
-                          backgroundColor: '#fff'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                          <div>
-                            <div style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
-                              {courseCode}
-                              {course.section && <span style={{ fontSize: '0.9rem', fontWeight: 'normal', color: '#666' }}> - Section {course.section}</span>}
-                            </div>
-                            {title && (
-                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.25rem' }}>
-                                {title}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem', color: '#555' }}>
-                          {scheduleStr && (
-                            <div>
-                              <strong>Schedule:</strong> {scheduleStr}
-                            </div>
-                          )}
-                          {location && (
-                            <div>
-                              <strong>Location:</strong> {location}
-                            </div>
-                          )}
-                          {instructor && (
-                            <div>
-                              <strong>Instructor:</strong> {instructor}
-                            </div>
-                          )}
-                          {course.credits && (
-                            <div>
-                              <strong>Credits:</strong> {course.credits}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                No classes scheduled for {currentSemester} {currentYear}
-              </div>
-            )}
-          </div>
-
-          {/* Planner */}
-          <div className="planner-section">
-            <div className="section-header">
-              <h2>Planner</h2>
-            </div>
-            <div className="planner-container">
-              {studentCoursePlan.length > 0 ? (
-                (() => {
-                  // Group courses by semester and year
-                  const planByTerm: { [key: string]: any[] } = {}
-                  studentCoursePlan.forEach((course: any) => {
-                    const semester = course.semester || currentSemester
-                    const year = course.year || currentYear
-                    const termKey = `${semester} ${year}`
-                    if (!planByTerm[termKey]) planByTerm[termKey] = []
-                    planByTerm[termKey].push(course)
-                  })
-                  
-                  // Sort terms chronologically
-                  const sortedTerms = Object.keys(planByTerm).sort((a, b) => {
-                    const [semA, yearA] = a.split(' ')
-                    const [semB, yearB] = b.split(' ')
-                    const yearNumA = parseInt(yearA)
-                    const yearNumB = parseInt(yearB)
-                    if (yearNumA !== yearNumB) return yearNumA - yearNumB
-                    const semOrder: { [key: string]: number } = { 'Spring': 0, 'Summer': 1, 'Fall': 2 }
-                    return (semOrder[semA] || 0) - (semOrder[semB] || 0)
-                  })
-                  
-                  return (
-                    <div className="planner-columns">
-                      {sortedTerms.slice(0, 3).map((term, idx) => (
-                        <div key={idx} className="planner-column">
-                          <div className="planner-semester">{term}</div>
-                          <div className="course-buttons">
-                            {planByTerm[term].map((course: any, courseIdx: number) => {
-                              const courseCode = `${course.department || ''} ${course.courseNum || course.courseNumber || ''}`.trim()
-                              return (
-                                <button key={courseIdx} className="course-btn">
-                                  {courseCode}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                      {sortedTerms.length === 0 && (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                          No courses planned
-                        </div>
-                      )}
-                    </div>
-                  )
-                })()
-              ) : (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  No courses planned
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        </>
-        ) : (
-        <>
-          {/* Admin/Registrar Dashboard */}
-          <div className="left-column">
-            {/* System Alerts - Only show if there are actual pending overrides */}
-            {pendingOverrides > 0 && (
-              <div className="alert-box">
-                <div className="alert-icon"></div>
-                <div className="alert-text">
-                  <span className="alert-title">System notice:</span> {pendingOverrides} pending override{pendingOverrides > 1 ? 's' : ''} require{pendingOverrides === 1 ? 's' : ''} review.
-                </div>
-              </div>
-            )}
-
-            {/* Quick Stats - Real Data */}
-            <div className="stats-container">
-              <div className="stat-card">
-                <div className="stat-label">Total Users</div>
-                <div className="stat-value">{userStats?.totalUsers ?? 0}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Active Users</div>
-                <div className="stat-value">{userStats?.activeUsers ?? 0}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Students</div>
-                <div className="stat-value">{userStats?.students ?? 0}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Instructors</div>
-                <div className="stat-value">{userStats?.instructors ?? 0}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Advisors</div>
-                <div className="stat-value">{userStats?.advisors ?? 0}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Registrars</div>
-                <div className="stat-value">{userStats?.registrars ?? 0}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Pending Overrides</div>
-                <div className="stat-value">{pendingOverrides > 0 ? pendingOverrides : 0}</div>
-              </div>
-            </div>
-
-            {/* Database Status */}
-            {dbStats && (
-              <div className="progress-section">
-                <div className="progress-header">
-                  <div className="progress-label">Database Status</div>
-                  <div className="progress-text">{dbStats.status === 'OK' ? 'OK' : 'ERROR'}</div>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: dbStats.status === 'OK' ? '100%' : '50%' }}></div>
-                </div>
-                <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                  {dbStats.totalTerms ?? 0} terms • {dbStats.totalCourses ?? 0} courses
-                </div>
-              </div>
-            )}
-
-            {/* Course Statistics */}
-            {scrapingStats && (
-              <div className="progress-section">
-                <div className="progress-header">
-                  <div className="progress-label">Course Data</div>
-                  <div className="progress-text">{scrapingStats.totalCourses ?? 0}</div>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${((scrapingStats.scrapedTerms ?? 0) / Math.max(scrapingStats.totalTerms ?? 1, 1)) * 100}%` }}></div>
-                </div>
-                <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                  {scrapingStats.scrapedTerms ?? 0} / {scrapingStats.totalTerms ?? 0} terms scraped
-                </div>
-              </div>
-            )}
-
-            {/* Quick Actions - Replaced Quick Links */}
-            <div className="reminder-card">
-              <div className="reminder-title">Quick Actions</div>
-              <div className="reminder-content">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <button 
-                    className="course-btn" 
-                    onClick={() => navigate('/user-management')}
-                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
-                  >
-                    Manage Users
-                  </button>
-                  <button 
-                    className="course-btn" 
-                    onClick={() => navigate('/data-import')}
-                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
-                  >
-                    Import Data
-                  </button>
-                  <button 
-                    className="course-btn" 
-                    onClick={() => navigate('/degree-requirements')}
-                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
-                  >
-                    View Degree Requirements
-                  </button>
-                  <button 
-                    className="course-btn" 
-                    onClick={() => navigate('/pdf-upload')}
-                    style={{ width: '100%', textAlign: 'left', padding: '0.75rem 1rem' }}
-                  >
-                    Manage Classes & Capacities
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right column: Recent items */}
-          <div className="right-column">
-            <div className="schedule-section">
-              <div className="section-header">
-                <h2>Recent Overrides</h2>
-                <h3>Last 7 days</h3>
-              </div>
-              <table className="schedule-table">
-                <thead>
-                  <tr>
-                    <th className="time-header">Student</th>
-                    <th className="day-header">Type</th>
-                    <th className="day-header">Course</th>
-                    <th className="day-header">Status</th>
-                    <th className="day-header">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentOverrides.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="course-cell" style={{ textAlign: 'center', color: '#666' }}>
-                        No recent override requests
-                      </td>
-                    </tr>
-                  ) : (
-                    recentOverrides.map((waiver: any) => (
-                      <tr key={waiver.waiverId}>
-                        <td className="time-cell">{waiver.student?.studentId || waiver.studentId || 'N/A'}</td>
-                        <td className="course-cell">Time Conflict</td>
-                        <td className="course-cell">
-                          {waiver.enrolledClass?.department}{waiver.enrolledClass?.courseNum} / {waiver.conflictingClass?.department}{waiver.conflictingClass?.courseNum}
-                        </td>
-                        <td className="course-cell">
-                          <span style={{
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.875rem',
-                            fontWeight: '500',
-                            backgroundColor: waiver.status === 'APPROVED' ? '#d1fae5' : 
-                                           waiver.status === 'REJECTED' ? '#fee2e2' : '#fef3c7',
-                            color: waiver.status === 'APPROVED' ? '#065f46' :
-                                   waiver.status === 'REJECTED' ? '#991b1b' : '#92400e'
-                          }}>
-                            {waiver.status || 'PENDING'}
-                          </span>
-                        </td>
-                        <td className="course-cell">
-                          {waiver.createdAt ? new Date(waiver.createdAt).toLocaleDateString() : 'N/A'}
+                    {recentOverrides.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="course-cell" style={{ textAlign: 'center', color: '#666' }}>
+                          No recent override requests
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="planner-section">
-              <div className="section-header">
-                <h2>Recent Imports</h2>
+                    ) : (
+                      recentOverrides.map((waiver: any) => (
+                        <tr key={waiver.waiverId}>
+                          <td className="time-cell">{waiver.student?.studentId || waiver.studentId || 'N/A'}</td>
+                          <td className="course-cell">Time Conflict</td>
+                          <td className="course-cell">
+                            {waiver.enrolledClass?.department}{waiver.enrolledClass?.courseNum} / {waiver.conflictingClass?.department}{waiver.conflictingClass?.courseNum}
+                          </td>
+                          <td className="course-cell">
+                            <span style={{
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              backgroundColor: waiver.status === 'APPROVED' ? '#d1fae5' :
+                                waiver.status === 'REJECTED' ? '#fee2e2' : '#fef3c7',
+                              color: waiver.status === 'APPROVED' ? '#065f46' :
+                                waiver.status === 'REJECTED' ? '#991b1b' : '#92400e'
+                            }}>
+                              {waiver.status || 'PENDING'}
+                            </span>
+                          </td>
+                          <td className="course-cell">
+                            {waiver.createdAt ? new Date(waiver.createdAt).toLocaleDateString() : 'N/A'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-              <div className="planner-container">
-                <div className="planner-columns">
-                  <div className="planner-column">
-                    <div className="planner-semester">Classes</div>
-                    <div className="course-buttons">
-                      {recentImports.classes.length > 0 ? (
-                        recentImports.classes.map((item, idx) => (
-                          <button key={idx} className="course-btn">
-                            {item.term} • {item.courseCount} courses
-                          </button>
-                        ))
-                      ) : (
-                        <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                          No class imports
-                        </div>
-                      )}
+
+              <div className="planner-section">
+                <div className="section-header">
+                  <h2>Recent Imports</h2>
+                </div>
+                <div className="planner-container">
+                  <div className="planner-columns">
+                    <div className="planner-column">
+                      <div className="planner-semester">Classes</div>
+                      <div className="course-buttons">
+                        {recentImports.classes.length > 0 ? (
+                          recentImports.classes.map((item, idx) => (
+                            <button key={idx} className="course-btn">
+                              {item.term} • {item.courseCount} courses
+                            </button>
+                          ))
+                        ) : (
+                          <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            No class imports
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="planner-column">
-                    <div className="planner-semester">Degree Reqs</div>
-                    <div className="course-buttons">
-                      {recentImports.degreeReqs.length > 0 ? (
-                        recentImports.degreeReqs.map((item, idx) => (
-                          <button key={idx} className="course-btn">
-                            {item.subject} • v{item.version}
-                          </button>
-                        ))
-                      ) : (
-                        <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                          No degree requirements
-                        </div>
-                      )}
+                    <div className="planner-column">
+                      <div className="planner-semester">Degree Reqs</div>
+                      <div className="course-buttons">
+                        {recentImports.degreeReqs.length > 0 ? (
+                          recentImports.degreeReqs.map((item, idx) => (
+                            <button key={idx} className="course-btn">
+                              {item.subject} • v{item.version}
+                            </button>
+                          ))
+                        ) : (
+                          <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            No degree requirements
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </>
+          </>
         )}
       </div>
     </div>

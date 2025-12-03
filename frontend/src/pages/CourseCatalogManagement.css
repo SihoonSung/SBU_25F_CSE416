@@ -168,72 +168,257 @@
 }
 
 .page-info {
-  color: var(--text-secondary);
-  font-weight: 500;
-  font-size: 0.9rem;
-}
+  /* Course Catalog Management Styles */
 
-/* Responsive Design */
-@media (max-width: 768px) {
   .course-catalog-management {
-    padding: 1.5rem;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 3rem;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-page);
+    min-height: 100vh;
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
   }
 
   .page-header h1 {
-    font-size: 2rem;
+    font-family: 'Outfit', sans-serif;
+    font-size: 3rem;
+    font-weight: 700;
+    align-items: center;
+    margin-bottom: 1.5rem;
   }
 
-  .scraping-section,
-  .results-section {
-    padding: 1.5rem;
+  .results-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
   }
 
-  .action-buttons {
-    flex-direction: column;
-  }
-
-  .scrape-button,
-  .view-button,
-  .reset-button {
-    width: 100%;
-  }
-
-  .results-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
+  /* Subjects Grid */
   .subjects-grid {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
   }
 
-  .courses-table {
-    font-size: 0.85rem;
+  .subject-card {
+    background: var(--bg-subtle);
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
   }
 
-  .courses-table th,
-  .courses-table td {
-    padding: 0.75rem 0.5rem;
-  }
-
+  /* Table Styles */
   .catalog-table-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-  }
-}
-
-@media (max-width: 480px) {
-  .subjects-grid {
-    grid-template-columns: 1fr 1fr;
+    margin-bottom: 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
   }
 
+  .courses-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+  }
+
+  .courses-table th {
+    background-color: var(--bg-subtle);
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .courses-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    vertical-align: top;
+  }
+
+  .courses-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .courses-table tr:hover {
+    background-color: var(--bg-subtle);
+  }
+
+  /* Cell Specific Styles */
+  .number-cell {
+    font-weight: 600;
+    color: var(--color-primary);
+    width: 100px;
+  }
+
+  .name-cell {
+    font-weight: 500;
+    min-width: 200px;
+  }
+
+  .credits-cell {
+    text-align: center;
+    width: 80px;
+    color: var(--text-secondary);
+  }
+
+  .prereq-cell {
+    min-width: 200px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .sbc-cell {
+    min-width: 120px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .warning-cell {
+    text-align: center;
+    width: 80px;
+  }
+
+  .warning-icon {
+    font-size: 1.2rem;
+    color: var(--warning-text);
+    cursor: help;
+  }
+
+  .no-warning {
+    color: var(--success-text);
+    font-weight: bold;
+  }
+
+  /* Pagination */
   .pagination {
-    flex-direction: column;
-    gap: 0.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
   }
 
   .page-button {
-    width: 100%;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-subtle);
+    background-color: var(--bg-elevated);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
   }
-}
+
+  .page-button:hover:not(:disabled) {
+    background-color: var(--bg-subtle);
+    border-color: var(--border-default);
+  }
+
+  .page-button:disabled {
+    background-color: var(--bg-subtle);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .page-info {
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.9rem;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .course-catalog-management {
+      padding: 1.5rem;
+    }
+
+    .page-header h1 {
+      font-size: 2rem;
+    }
+
+    .scraping-section,
+    .results-section {
+      padding: 1.5rem;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+    }
+
+    .scrape-button,
+    .view-button,
+    .reset-button {
+      width: 100%;
+    }
+
+    .results-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .subjects-grid {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+
+    .courses-table {
+      font-size: 0.85rem;
+    }
+
+    .courses-table th,
+    .courses-table td {
+      padding: 0.75rem 0.5rem;
+    }
+
+    .catalog-table-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Fix for Add Other Subjects section */
+    .add-subject-container {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+    }
+
+    .add-subject-input {
+      width: 100%;
+    }
+
+    .add-subject-btn {
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .subjects-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .pagination {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .page-button {
+      width: 100%;
+    }
+  }

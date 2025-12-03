@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import './Grades.css';
 import { getCurrentUser } from '../utils/auth';
+import LoadingModal from '../components/LoadingModal';
 
 /**
  * Grades Component
@@ -44,7 +45,9 @@ const Grades: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [editingGrades, setEditingGrades] = useState<{[key: number]: string}>({});
+  const [editingGrades, setEditingGrades] = useState<{ [key: number]: string }>({});
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('');
 
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 
@@ -80,7 +83,7 @@ const Grades: React.FC = () => {
       if (!currentUser) return;
 
       const instructorName = `${currentUser.firstName} ${currentUser.lastName}`.trim();
-      
+
       const response = await fetch(`${backendBase}/api/classes/instructor/${encodeURIComponent(instructorName)}`, {
         credentials: 'include'
       });
@@ -112,9 +115,9 @@ const Grades: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setRoster(data || []);
-        
+
         // Initialize editing grades with current grades
-        const grades: {[key: number]: string} = {};
+        const grades: { [key: number]: string } = {};
         data.forEach((student: RosterStudent) => {
           grades[student.userId] = student.grade || '';
         });
@@ -133,7 +136,7 @@ const Grades: React.FC = () => {
   };
 
   const handleGradeChange = (userId: number, grade: string) => {
-    setEditingGrades({...editingGrades, [userId]: grade});
+    setEditingGrades({ ...editingGrades, [userId]: grade });
   };
 
   const handleSaveGrade = async (classId: number, studentId: number, grade: string) => {
@@ -141,6 +144,9 @@ const Grades: React.FC = () => {
       setError('User information not available');
       return;
     }
+
+    setIsProcessing(true);
+    setProcessingMessage('Saving grade...');
 
     try {
       const response = await fetch(`${backendBase}/api/roster/class/${classId}/student/${studentId}/grade`, {
@@ -170,24 +176,14 @@ const Grades: React.FC = () => {
       console.error('Error saving grade:', error);
       setError('Error saving grade');
       setSuccess(null);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString();
-    } catch {
-      return dateString;
-    }
-  };
 
-  if (loading) {
-    return (
-      <div className="grades-page">
-        <div className="loading">Loading classes...</div>
-      </div>
-    );
-  }
+
+
 
   return (
     <div className="grades-page">
@@ -248,9 +244,7 @@ const Grades: React.FC = () => {
                 </p>
               </div>
 
-              {rosterLoading ? (
-                <div className="loading">Loading roster...</div>
-              ) : roster.length === 0 ? (
+              {roster.length === 0 ? (
                 <div className="no-roster">
                   <p>No students enrolled in this class.</p>
                 </div>
@@ -272,7 +266,7 @@ const Grades: React.FC = () => {
                         // Check if grade is already saved and not "I" (Incomplete)
                         const hasSavedGrade = student.grade && student.grade.trim() !== '' && student.grade.trim().toUpperCase() !== 'I'
                         const canEdit = !hasSavedGrade || (student.grade && student.grade.trim().toUpperCase() === 'I')
-                        
+
                         return (
                           <tr key={student.rosterId}>
                             <td>{student.firstName} {student.lastName}</td>
@@ -335,6 +329,14 @@ const Grades: React.FC = () => {
           )}
         </div>
       </div>
+      <LoadingModal
+        isOpen={loading || rosterLoading || isProcessing}
+        message={
+          loading ? "Loading classes..." :
+            rosterLoading ? "Loading roster..." :
+              processingMessage
+        }
+      />
     </div>
   );
 };

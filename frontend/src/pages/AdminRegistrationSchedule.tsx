@@ -15,6 +15,7 @@ import {
   getDefaultYear,
   API_ENDPOINTS,
 } from "../constants";
+import LoadingModal from "../components/LoadingModal";
 
 type ScheduleRow = {
   scheduleId: number;
@@ -54,6 +55,8 @@ export default function AdminRegistrationSchedule() {
   // Table
   const [rows, setRows] = useState<ScheduleRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState("");
   const [errorMsg, setErrorMsg] = useState<string>("");
 
   // Form
@@ -213,6 +216,11 @@ export default function AdminRegistrationSchedule() {
       description: orNull(form.description),
     };
 
+
+
+    setIsProcessing(true);
+    setProcessingMessage(editingId === null ? "Creating schedule..." : "Updating schedule...");
+
     try {
       const url =
         editingId === null
@@ -237,6 +245,8 @@ export default function AdminRegistrationSchedule() {
       resetForm();
     } catch (e: any) {
       toast(e?.message || "Save failed");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -253,6 +263,8 @@ export default function AdminRegistrationSchedule() {
 
   const onDelete = async (row: ScheduleRow) => {
     if (!window.confirm("Delete this schedule?")) return;
+    setIsProcessing(true);
+    setProcessingMessage("Deleting schedule...");
     try {
       const res = await fetch(
         `${backendBase}${API_ENDPOINTS.ADMIN_REGISTRATION_SCHEDULES}/${row.scheduleId}`,
@@ -266,6 +278,8 @@ export default function AdminRegistrationSchedule() {
       await fetchSchedules();
     } catch (e: any) {
       toast(e?.message || "Delete failed");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -417,7 +431,6 @@ export default function AdminRegistrationSchedule() {
       <section className="rs-card">
         <div className="rs-card-header">
           <h2>Registration Schedules for {termLabel}</h2>
-          {loading && <span className="rs-hint">Loading…</span>}
           {errorMsg && <span className="rs-error">{errorMsg}</span>}
         </div>
 
@@ -469,6 +482,7 @@ export default function AdminRegistrationSchedule() {
           </div>
         )}
       </section>
+      <LoadingModal isOpen={loading || isProcessing} message={loading ? "Loading schedules..." : processingMessage} />
     </div>
   );
 }
