@@ -1,8 +1,8 @@
 registrars:
 - SBU_ID: 100000000
-  first_name: jason
-  last_name: yoon
-  email: jason831444@gmail.com
+  first_name: sihoon
+  last_name: sung
+  email: sihoonsung@stonybrook.edu
 
 academic_advisors:
 - SBU_ID: 100000001

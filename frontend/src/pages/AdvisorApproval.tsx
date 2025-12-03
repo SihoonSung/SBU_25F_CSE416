@@ -75,7 +75,7 @@ const AdvisorApproval: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
 
   // User role
-  const [userRole, setUserRole] = useState<'ADVISOR' | 'INSTRUCTOR' | null>(null);
+  const [userRole, setUserRole] = useState<'ADVISOR' | 'INSTRUCTOR' | 'REGISTRAR' | null>(null);
 
   // Filter states
   const [selectedStatus, setSelectedStatus] = useState<'PENDING' | 'ALL'>('PENDING');
@@ -105,7 +105,7 @@ const AdvisorApproval: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (userRole === 'ADVISOR') {
+    if (userRole === 'ADVISOR' || userRole === 'REGISTRAR') {
       fetchDeclarations();
       fetchAdvisorWaivers();
     } else if (userRole === 'INSTRUCTOR') {
@@ -134,6 +134,9 @@ const AdvisorApproval: React.FC = () => {
         } else if (role.toUpperCase() === 'ADVISOR') {
           setUserRole('ADVISOR');
           determineAdvisorType(userData);
+        } else if (role.toUpperCase() === 'REGISTRAR' || role.toUpperCase() === 'ADMIN') {
+          setUserRole('REGISTRAR');
+          setAdvisorType('UNIVERSITY'); // Registrars can view all declarations
         }
       } else {
         setLoading(false);
@@ -159,6 +162,11 @@ const AdvisorApproval: React.FC = () => {
 
   const canApproveDeclaration = (declaration: MajorMinorDeclaration): boolean => {
     const ceasSubjects = ['AMS', 'BME', 'CME', 'CIV', 'ECE', 'CSE', 'ESE', 'ESG', 'ISE', 'MEC', 'TSM']; // CEAS subjects
+
+    // Registrars can approve all declarations
+    if (userRole === 'REGISTRAR') {
+      return true;
+    }
 
     if (advisorType === 'UNIVERSITY') {
       return true; // University advisors can approve all
@@ -823,12 +831,12 @@ const AdvisorApproval: React.FC = () => {
     );
   }
 
-  // Advisor View - Declarations
+  // Advisor/Registrar View - Declarations
   return (
     <div className="advisor-approval">
       <div className="page-header">
-        <h1>Advisor Approval</h1>
-        <p>Review and approve major/minor declarations</p>
+        <h1>{userRole === 'REGISTRAR' ? 'Declaration Review' : 'Advisor Approval'}</h1>
+        <p>Review and approve major/minor declarations{userRole === 'REGISTRAR' ? ' and time conflict waivers' : ''}</p>
       </div>
 
       {error && (

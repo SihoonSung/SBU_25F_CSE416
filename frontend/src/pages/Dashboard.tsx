@@ -172,11 +172,11 @@ function Dashboard() {
   const [timeConflicts, setTimeConflicts] = useState<string[]>([])
   const [activeHolds, setActiveHolds] = useState<Hold[]>([])
   const [pendingOverrides, setPendingOverrides] = useState<number>(0)
-  const [userStats] = useState<UserStats | null>(null)
-  const [dbStats] = useState<DbStats | null>(null)
-  const [scrapingStats] = useState<ScrapingStats | null>(null)
-  const [teachingClasses] = useState<TeachingClass[]>([])
-  const [classStats] = useState<ClassStat[]>([])
+  const [userStats, setUserStats] = useState<UserStats | null>(null)
+  const [dbStats, setDbStats] = useState<DbStats | null>(null)
+  const [scrapingStats, setScrapingStats] = useState<ScrapingStats | null>(null)
+  const [teachingClasses, setTeachingClasses] = useState<TeachingClass[]>([])
+  const [classStats, setClassStats] = useState<ClassStat[]>([])
 
   const [recentOverrides, setRecentOverrides] = useState<Waiver[]>([])
   const [pendingDeclarations, setPendingDeclarations] = useState<number>(0)
@@ -949,20 +949,189 @@ function Dashboard() {
    * Fetch professor data (teaching classes, stats, pending items)
    */
   const fetchProfessorData = async (user: Me) => {
-    // Placeholder for professor data fetching logic
-    // This function was empty in the original code, so keeping it as a placeholder.
-    // If there's actual logic to add, it would go here.
-    console.log('Fetching professor data for:', user?.fullName);
+    if (!user?.fullName && !user?.firstName || !user?.lastName) {
+      setTeachingClasses([]);
+      setClassStats([]);
+      return;
+    }
+
+    try {
+      // Build instructor name - try fullName first, then firstName + lastName
+      const instructorName = user.fullName || `${user.firstName} ${user.lastName}`.trim();
+      
+      // Fetch classes taught by this instructor
+      const classesResponse = await fetch(`${backendBase}/api/classes/instructor/${encodeURIComponent(instructorName)}`, {
+        credentials: 'include'
+      });
+
+      let classes: TeachingClass[] = [];
+      if (classesResponse.ok) {
+        const classData = await classesResponse.json();
+        if (Array.isArray(classData)) {
+          // Filter for current semester/year
+          const currentSem = getCurrentSemester();
+          const currentYr = getCurrentYear();
+          
+          classes = classData
+            .filter((cls: any) => cls.semester === currentSem && cls.year === currentYr)
+            .map((cls: any) => ({
+              id: cls.classId || cls.id,
+              classId: cls.classId || cls.id,
+              code: `${cls.department || ''} ${cls.courseNum || ''}`.trim(),
+              title: cls.title || '',
+              department: cls.department || '',
+              courseNum: cls.courseNum || 0,
+              section: cls.section || '',
+              semester: cls.semester || currentSem,
+              year: cls.year || currentYr,
+              maxCapacity: cls.maxCapacity || 0
+            }));
+        }
+      }
+
+      setTeachingClasses(classes);
+
+      // Fetch statistics for each class
+      if (classes.length > 0) {
+        const statsPromises = classes.map(async (cls: TeachingClass) => {
+          try {
+            const statsResponse = await fetch(`${backendBase}/api/roster/stats/${cls.classId}`, {
+              credentials: 'include'
+            });
+            if (statsResponse.ok) {
+              const statsData = await statsResponse.json();
+              return {
+                id: cls.id,
+                code: cls.code,
+                enrollment: statsData.activeEnrollments || 0,
+                activeEnrollments: statsData.activeEnrollments || 0,
+                maxCapacity: statsData.maxCapacity || cls.maxCapacity || 0,
+                isFull: statsData.isFull || false
+              };
+            }
+            return {
+              id: cls.id,
+              code: cls.code,
+              enrollment: 0,
+              activeEnrollments: 0,
+              maxCapacity: cls.maxCapacity || 0,
+              isFull: false
+            };
+          } catch {
+            return {
+              id: cls.id,
+              code: cls.code,
+              enrollment: 0,
+              activeEnrollments: 0,
+              maxCapacity: cls.maxCapacity || 0,
+              isFull: false
+            };
+          }
+        });
+        const stats = await Promise.all(statsPromises);
+        setClassStats(stats);
+      } else {
+        setClassStats([]);
+      }
+    } catch (error) {
+      console.error('Error fetching professor data:', error);
+      setTeachingClasses([]);
+      setClassStats([]);
+    }
   };
 
   /**
    * Fetch admin statistics (for admin/registrar)
    */
   const fetchAdminStats = async () => {
-    // Placeholder for admin stats fetching logic
-    // This function was empty in the original code, so keeping it as a placeholder.
-    // If there's actual logic to add, it would go here.
-    console.log('Fetching admin stats');
+    try {
+      // Fetch user statistics
+      const userStatsResponse = await fetch(`${backendBase}/api/users/statistics`, {
+        credentials: 'include'
+      });
+      
+      if (userStatsResponse.ok) {
+        const userData = await userStatsResponse.json();
+        setUserStats({
+          totalUsers: userData.totalUsers || 0,
+          activeUsers: userData.activeUsers || 0,
+          students: userData.students || 0,
+          instructors: userData.instructors || 0,
+          advisors: userData.advisors || 0,
+          registrars: userData.registrars || 0
+        });
+      } else {
+        setUserStats({
+          totalUsers: 0,
+          activeUsers: 0,
+          students: 0,
+          instructors: 0,
+          advisors: 0,
+          registrars: 0
+        });
+      }
+
+      // Fetch database status
+      const dbStatusResponse = await fetch(`${backendBase}/api/scraping/db-status`, {
+        credentials: 'include'
+      });
+      
+      if (dbStatusResponse.ok) {
+        const dbData = await dbStatusResponse.json();
+        setDbStats({
+          status: dbData.status || 'ERROR',
+          totalTerms: dbData.totalTerms || 0,
+          totalCourses: dbData.totalCourses || 0
+        });
+      } else {
+        setDbStats({
+          status: 'ERROR',
+          totalTerms: 0,
+          totalCourses: 0
+        });
+      }
+
+      // Fetch scraping statistics
+      const scrapingStatsResponse = await fetch(`${backendBase}/api/scraping/stats`, {
+        credentials: 'include'
+      });
+      
+      if (scrapingStatsResponse.ok) {
+        const scrapingData = await scrapingStatsResponse.json();
+        setScrapingStats({
+          totalCourses: scrapingData.totalCourses || 0,
+          totalTerms: scrapingData.totalTerms || 0,
+          scrapedTerms: scrapingData.scrapedTerms || 0
+        });
+      } else {
+        setScrapingStats({
+          totalCourses: 0,
+          totalTerms: 0,
+          scrapedTerms: 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching admin stats:', error);
+      // Set defaults on error
+      setUserStats({
+        totalUsers: 0,
+        activeUsers: 0,
+        students: 0,
+        instructors: 0,
+        advisors: 0,
+        registrars: 0
+      });
+      setDbStats({
+        status: 'ERROR',
+        totalTerms: 0,
+        totalCourses: 0
+      });
+      setScrapingStats({
+        totalCourses: 0,
+        totalTerms: 0,
+        scrapedTerms: 0
+      });
+    }
   };
 
   /**
