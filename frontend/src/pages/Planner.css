@@ -209,6 +209,10 @@ textarea {
   color: var(--text-primary);
   margin-bottom: 10px;
   text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
 .term-total {
@@ -249,6 +253,44 @@ textarea {
 .pill-credits {
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.pill-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  font-weight: 300;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  transition: all 0.2s ease;
+}
+
+.pill-remove:hover {
+  background: #dc3545;
+  color: #fff;
+  transform: scale(1.1);
+}
+
+.pill-warning-icon {
+  margin-right: 8px;
+  font-size: 1rem;
+  cursor: help;
+}
+
+.pill.non-required {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+.pill.has-warning {
+  border-left: 3px solid #ffc107;
 }
 
 /* Validation Report Styles */
@@ -605,6 +647,77 @@ textarea {
 .degree-status-section {
   border-left: 4px solid #007bff;
   padding-left: 1rem;
+}
+
+/* Edit Plan Styles */
+.term-edit-btn,
+.term-cancel-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-page);
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.term-edit-btn:hover {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.term-edit-btn:disabled,
+.term-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.term-cancel-btn {
+  background: var(--bg-elevated);
+}
+
+.term-cancel-btn:hover {
+  background: #dc3545;
+  color: #fff;
+  border-color: #dc3545;
+}
+
+.term-edit-panel {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-page);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.edit-input-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.add-course-btn {
+  padding: 6px 16px;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.add-course-btn:hover:not(:disabled) {
+  background: var(--color-primary-light);
+}
+
+.add-course-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 @media (max-width: 1100px) {

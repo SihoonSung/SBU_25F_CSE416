@@ -120,6 +120,10 @@ export default function Planner() {
   
   // Workload limits for each semester
   const [workloadLimits, setWorkloadLimits] = useState<{ [term: string]: number }>({});
+  
+  // Edit mode state for each semester
+  const [editingTerm, setEditingTerm] = useState<string | null>(null);
+  const [newCourseCode, setNewCourseCode] = useState<{ [term: string]: string }>({});
 
   // --- Initialization ---
   useEffect(() => {
@@ -576,14 +580,124 @@ export default function Planner() {
     }
   }
 
-  const removeCourse = (term: string, courseCode: string) => {
-    setPlan(prev => {
-      const newPlan = { ...prev };
-      if (newPlan[term]) {
-        newPlan[term] = newPlan[term].filter(c => c.code !== courseCode);
+  const removeCourse = async (term: string, courseCode: string) => {
+    if (!userId) return;
+    
+    // Find the course to get its ID
+    const course = plan[term]?.find(c => c.code === courseCode);
+    if (!course || !course.id) {
+      // If no ID, just remove from local state (for unsaved courses)
+      setPlan(prev => {
+        const newPlan = { ...prev };
+        if (newPlan[term]) {
+          newPlan[term] = newPlan[term].filter(c => c.code !== courseCode);
+        }
+        return newPlan;
+      });
+      return;
+    }
+
+    try {
+      setBusy(true);
+      const res = await fetch(`${BASE}/api/planner/${userId}/${course.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Failed to remove course: ${errText}`);
       }
-      return newPlan;
-    });
+
+      // Refresh plan from backend
+      await fetchCurrentPlan(userId);
+      setSuccessMsg('Course removed successfully!');
+    } catch (e: any) {
+      console.error('Remove course error:', e);
+      setErrorMsg('Failed to remove course: ' + e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const addCourseToSemester = async (term: string) => {
+    if (!userId) return;
+    
+    const courseCode = newCourseCode[term]?.trim();
+    if (!courseCode) {
+      setErrorMsg('Please enter a course code');
+      return;
+    }
+
+    // Parse course code (e.g., "CSE 320" -> department: "CSE", courseNum: 320)
+    const parts = courseCode.split(/\s+/);
+    if (parts.length < 2) {
+      setErrorMsg('Invalid course code format. Use format: "DEPARTMENT NUMBER" (e.g., "CSE 320")');
+      return;
+    }
+
+    const department = parts[0].toUpperCase();
+    const courseNum = parseInt(parts[1]);
+    if (isNaN(courseNum)) {
+      setErrorMsg('Invalid course number');
+      return;
+    }
+
+    // Parse term (e.g., "Spring 2026" -> semester: "Spring", year: 2026)
+    const termParts = term.split(' ');
+    if (termParts.length < 2) {
+      setErrorMsg('Invalid term format');
+      return;
+    }
+    const semester = termParts[0];
+    const year = parseInt(termParts[1]);
+    if (isNaN(year)) {
+      setErrorMsg('Invalid year');
+      return;
+    }
+
+    try {
+      setBusy(true);
+      setErrorMsg(null);
+      
+      const payload = {
+        department: department,
+        courseNum: courseNum,
+        semester: semester,
+        year: year
+      };
+
+      const res = await fetch(`${BASE}/api/planner/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        let errorMessage = errText;
+        try {
+          const errJson = JSON.parse(errText);
+          errorMessage = errJson.message || errJson.error || errText;
+        } catch {
+          // Not JSON, use as is
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Clear input
+      setNewCourseCode(prev => ({ ...prev, [term]: '' }));
+      
+      // Refresh plan from backend
+      await fetchCurrentPlan(userId);
+      setSuccessMsg('Course added successfully!');
+    } catch (e: any) {
+      console.error('Add course error:', e);
+      setErrorMsg('Failed to add course: ' + e.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   // --- Render Helpers ---
@@ -752,15 +866,73 @@ export default function Planner() {
     </div>
   )
 
-  const col = (term: string) => (
-    <div className="term-col" key={term}>
-      <div className="term-header">{term}</div>
-      <div className="pill-list">
-        {plan[term]?.map(c => <Pill key={c.code} term={term} c={c} />)}
+  const col = (term: string) => {
+    const isEditing = editingTerm === term;
+    
+    return (
+      <div className="term-col" key={term}>
+        <div className="term-header">
+          <span>{term}</span>
+          {!isEditing ? (
+            <button 
+              className="term-edit-btn" 
+              onClick={() => setEditingTerm(term)}
+              disabled={busy}
+            >
+              Edit
+            </button>
+          ) : (
+            <button 
+              className="term-cancel-btn" 
+              onClick={() => {
+                setEditingTerm(null);
+                setNewCourseCode(prev => ({ ...prev, [term]: '' }));
+              }}
+              disabled={busy}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+        <div className="pill-list">
+          {plan[term]?.map(c => <Pill key={c.code} term={term} c={c} />)}
+        </div>
+        {isEditing && (
+          <div className="term-edit-panel">
+            <div className="edit-input-group">
+              <input
+                type="text"
+                placeholder="Course code (e.g., CSE 320)"
+                value={newCourseCode[term] || ''}
+                onChange={e => setNewCourseCode(prev => ({ ...prev, [term]: e.target.value }))}
+                onKeyPress={e => {
+                  if (e.key === 'Enter') {
+                    addCourseToSemester(term);
+                  }
+                }}
+                disabled={busy}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  marginRight: '8px'
+                }}
+              />
+              <button
+                className="add-course-btn"
+                onClick={() => addCourseToSemester(term)}
+                disabled={busy || !newCourseCode[term]?.trim()}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="term-total">Total: {totalByTerm[term] || 0}</div>
       </div>
-      <div className="term-total">Total: {totalByTerm[term] || 0}</div>
-    </div>
-  )
+    );
+  }
 
   const updateSbcScore = (i: number, v: number) => {
     setOptions(o => ({
