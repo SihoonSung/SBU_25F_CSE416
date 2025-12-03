@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './MajorMinorDeclaration.css';
 import { getCurrentUser } from '../utils/auth';
 import LoadingModal from '../components/LoadingModal';
@@ -52,7 +53,9 @@ interface PlannedMajor {
 }
 
 const MajorMinorDeclaration: React.FC = () => {
+  const navigate = useNavigate();
   const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+  const [userRole, setUserRole] = useState<string | null>(null);
   // Helper to parse YYYY-MM-DD as local date (avoid timezone shifting)
   const parseYmdLocal = (dateStr?: string | null): Date | null => {
     if (!dateStr) return null;
@@ -223,11 +226,39 @@ const MajorMinorDeclaration: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchData();
-    fetchAvailableTerms();
-    loadPlannedMajorsFromStorage();
-    initializeUser();
+    checkUserRole();
   }, []);
+
+  useEffect(() => {
+    // Redirect advisors to advisor approval page
+    if (userRole === 'ADVISOR' || userRole === 'REGISTRAR' || userRole === 'ADMIN') {
+      navigate('/advisor-approval', { replace: true });
+      return;
+    }
+    
+    // Only fetch data if user is a student
+    if (userRole === 'STUDENT' || userRole === null) {
+      fetchData();
+      fetchAvailableTerms();
+      loadPlannedMajorsFromStorage();
+      initializeUser();
+    }
+  }, [userRole, navigate]);
+
+  const checkUserRole = async () => {
+    try {
+      const userData = await getCurrentUser();
+      if (userData.user?.role) {
+        const role = String(userData.user.role).toUpperCase();
+        setUserRole(role);
+      } else {
+        setUserRole(null);
+      }
+    } catch (error) {
+      console.error('Error checking user role:', error);
+      setUserRole(null);
+    }
+  };
 
   // Update declaration dates when effective term changes
   useEffect(() => {

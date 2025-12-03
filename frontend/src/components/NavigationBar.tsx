@@ -140,10 +140,12 @@ function NavigationBar() {
             className="icon-button" 
             aria-label="Notifications" 
             onClick={() => {
-              // Navigate to approval page for registrars/admins and instructors, declaration page for students
+              // Navigate to approval page for registrars/admins, instructors, and advisors, declaration page for students
               if (role === 'registrar') {
                 navigate('/advisor-approval');
               } else if (role === 'professor') {
+                navigate('/advisor-approval');
+              } else if (role === 'academic_advisor') {
                 navigate('/advisor-approval');
               } else {
                 navigate('/major-minor-declaration');
@@ -154,6 +156,8 @@ function NavigationBar() {
                 ? 'Review Declarations & Overrides' 
                 : role === 'professor' 
                 ? 'Review Override Requests' 
+                : role === 'academic_advisor'
+                ? 'Review Declarations & Overrides'
                 : 'Alerts & Overrides'
             }
           >
