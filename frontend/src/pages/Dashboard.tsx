@@ -172,9 +172,9 @@ function Dashboard() {
   const [timeConflicts, setTimeConflicts] = useState<string[]>([])
   const [activeHolds, setActiveHolds] = useState<Hold[]>([])
   const [pendingOverrides, setPendingOverrides] = useState<number>(0)
-  const [userStats] = useState<UserStats | null>(null)
-  const [dbStats] = useState<DbStats | null>(null)
-  const [scrapingStats] = useState<ScrapingStats | null>(null)
+  const [userStats, setUserStats] = useState<UserStats | null>(null)
+  const [dbStats, setDbStats] = useState<DbStats | null>(null)
+  const [scrapingStats, setScrapingStats] = useState<ScrapingStats | null>(null)
   const [teachingClasses] = useState<TeachingClass[]>([])
   const [classStats] = useState<ClassStat[]>([])
 
@@ -959,10 +959,94 @@ function Dashboard() {
    * Fetch admin statistics (for admin/registrar)
    */
   const fetchAdminStats = async () => {
-    // Placeholder for admin stats fetching logic
-    // This function was empty in the original code, so keeping it as a placeholder.
-    // If there's actual logic to add, it would go here.
-    console.log('Fetching admin stats');
+    try {
+      // Fetch user statistics
+      const userStatsResponse = await fetch(`${backendBase}/api/users/statistics`, {
+        credentials: 'include'
+      });
+      
+      if (userStatsResponse.ok) {
+        const userData = await userStatsResponse.json();
+        setUserStats({
+          totalUsers: userData.totalUsers || 0,
+          activeUsers: userData.activeUsers || 0,
+          students: userData.students || 0,
+          instructors: userData.instructors || 0,
+          advisors: userData.advisors || 0,
+          registrars: userData.registrars || 0
+        });
+      } else {
+        setUserStats({
+          totalUsers: 0,
+          activeUsers: 0,
+          students: 0,
+          instructors: 0,
+          advisors: 0,
+          registrars: 0
+        });
+      }
+
+      // Fetch database status
+      const dbStatusResponse = await fetch(`${backendBase}/api/scraping/db-status`, {
+        credentials: 'include'
+      });
+      
+      if (dbStatusResponse.ok) {
+        const dbData = await dbStatusResponse.json();
+        setDbStats({
+          status: dbData.status || 'ERROR',
+          totalTerms: dbData.totalTerms || 0,
+          totalCourses: dbData.totalCourses || 0
+        });
+      } else {
+        setDbStats({
+          status: 'ERROR',
+          totalTerms: 0,
+          totalCourses: 0
+        });
+      }
+
+      // Fetch scraping statistics
+      const scrapingStatsResponse = await fetch(`${backendBase}/api/scraping/stats`, {
+        credentials: 'include'
+      });
+      
+      if (scrapingStatsResponse.ok) {
+        const scrapingData = await scrapingStatsResponse.json();
+        setScrapingStats({
+          totalCourses: scrapingData.totalCourses || 0,
+          totalTerms: scrapingData.totalTerms || 0,
+          scrapedTerms: scrapingData.scrapedTerms || 0
+        });
+      } else {
+        setScrapingStats({
+          totalCourses: 0,
+          totalTerms: 0,
+          scrapedTerms: 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching admin stats:', error);
+      // Set defaults on error
+      setUserStats({
+        totalUsers: 0,
+        activeUsers: 0,
+        students: 0,
+        instructors: 0,
+        advisors: 0,
+        registrars: 0
+      });
+      setDbStats({
+        status: 'ERROR',
+        totalTerms: 0,
+        totalCourses: 0
+      });
+      setScrapingStats({
+        totalCourses: 0,
+        totalTerms: 0,
+        scrapedTerms: 0
+      });
+    }
   };
 
   /**

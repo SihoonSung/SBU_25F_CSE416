@@ -43,6 +43,9 @@ class DegreeRequirementStatusServiceTest {
         @Mock
         private CourseRepository courseRepository;
 
+        @Mock
+        private edu.sbu.cse416.sam_system.repository.UserTransferCoursesRepository userTransferCoursesRepository;
+
         @InjectMocks
         private DegreeRequirementStatusService degreeRequirementStatusService;
 
@@ -73,6 +76,10 @@ class DegreeRequirementStatusServiceTest {
 
                 // Create test user classes
                 testUserClasses = new ArrayList<>();
+
+                // Mock transfer courses repository
+                when(userTransferCoursesRepository.findWithSbuequivalentsByUserId(anyLong()))
+                                .thenReturn(Collections.emptyList());
         }
 
         /**
