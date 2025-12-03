@@ -175,8 +175,8 @@ function Dashboard() {
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [dbStats, setDbStats] = useState<DbStats | null>(null)
   const [scrapingStats, setScrapingStats] = useState<ScrapingStats | null>(null)
-  const [teachingClasses] = useState<TeachingClass[]>([])
-  const [classStats] = useState<ClassStat[]>([])
+  const [teachingClasses, setTeachingClasses] = useState<TeachingClass[]>([])
+  const [classStats, setClassStats] = useState<ClassStat[]>([])
 
   const [recentOverrides, setRecentOverrides] = useState<Waiver[]>([])
   const [pendingDeclarations, setPendingDeclarations] = useState<number>(0)
@@ -949,10 +949,95 @@ function Dashboard() {
    * Fetch professor data (teaching classes, stats, pending items)
    */
   const fetchProfessorData = async (user: Me) => {
-    // Placeholder for professor data fetching logic
-    // This function was empty in the original code, so keeping it as a placeholder.
-    // If there's actual logic to add, it would go here.
-    console.log('Fetching professor data for:', user?.fullName);
+    if (!user?.fullName && !user?.firstName || !user?.lastName) {
+      setTeachingClasses([]);
+      setClassStats([]);
+      return;
+    }
+
+    try {
+      // Build instructor name - try fullName first, then firstName + lastName
+      const instructorName = user.fullName || `${user.firstName} ${user.lastName}`.trim();
+      
+      // Fetch classes taught by this instructor
+      const classesResponse = await fetch(`${backendBase}/api/classes/instructor/${encodeURIComponent(instructorName)}`, {
+        credentials: 'include'
+      });
+
+      let classes: TeachingClass[] = [];
+      if (classesResponse.ok) {
+        const classData = await classesResponse.json();
+        if (Array.isArray(classData)) {
+          // Filter for current semester/year
+          const currentSem = getCurrentSemester();
+          const currentYr = getCurrentYear();
+          
+          classes = classData
+            .filter((cls: any) => cls.semester === currentSem && cls.year === currentYr)
+            .map((cls: any) => ({
+              id: cls.classId || cls.id,
+              classId: cls.classId || cls.id,
+              code: `${cls.department || ''} ${cls.courseNum || ''}`.trim(),
+              title: cls.title || '',
+              department: cls.department || '',
+              courseNum: cls.courseNum || 0,
+              section: cls.section || '',
+              semester: cls.semester || currentSem,
+              year: cls.year || currentYr,
+              maxCapacity: cls.maxCapacity || 0
+            }));
+        }
+      }
+
+      setTeachingClasses(classes);
+
+      // Fetch statistics for each class
+      if (classes.length > 0) {
+        const statsPromises = classes.map(async (cls: TeachingClass) => {
+          try {
+            const statsResponse = await fetch(`${backendBase}/api/roster/stats/${cls.classId}`, {
+              credentials: 'include'
+            });
+            if (statsResponse.ok) {
+              const statsData = await statsResponse.json();
+              return {
+                id: cls.id,
+                code: cls.code,
+                enrollment: statsData.activeEnrollments || 0,
+                activeEnrollments: statsData.activeEnrollments || 0,
+                maxCapacity: statsData.maxCapacity || cls.maxCapacity || 0,
+                isFull: statsData.isFull || false
+              };
+            }
+            return {
+              id: cls.id,
+              code: cls.code,
+              enrollment: 0,
+              activeEnrollments: 0,
+              maxCapacity: cls.maxCapacity || 0,
+              isFull: false
+            };
+          } catch {
+            return {
+              id: cls.id,
+              code: cls.code,
+              enrollment: 0,
+              activeEnrollments: 0,
+              maxCapacity: cls.maxCapacity || 0,
+              isFull: false
+            };
+          }
+        });
+        const stats = await Promise.all(statsPromises);
+        setClassStats(stats);
+      } else {
+        setClassStats([]);
+      }
+    } catch (error) {
+      console.error('Error fetching professor data:', error);
+      setTeachingClasses([]);
+      setClassStats([]);
+    }
   };
 
   /**
