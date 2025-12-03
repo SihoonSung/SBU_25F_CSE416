@@ -202,8 +202,8 @@ export default function Planner() {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
 
-    let nextSem = currentMonth < 8 ? "Fall" : "Spring";
-    let nextYear = currentMonth < 8 ? currentYear : currentYear + 1;
+    const nextSem = currentMonth < 8 ? "Fall" : "Spring";
+    const nextYear = currentMonth < 8 ? currentYear : currentYear + 1;
 
     let finalSem = nextSem;
     let finalYear = nextYear;

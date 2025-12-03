@@ -597,7 +597,7 @@ const AdvisorApproval: React.FC = () => {
   };
 
   const getFilteredWaivers = () => {
-    let filtered = selectedStatus === 'PENDING' ? pendingWaivers : allWaivers;
+    const filtered = selectedStatus === 'PENDING' ? pendingWaivers : allWaivers;
     return filtered;
   };
 

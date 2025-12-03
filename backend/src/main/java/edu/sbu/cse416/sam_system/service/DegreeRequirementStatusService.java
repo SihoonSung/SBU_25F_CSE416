@@ -2341,9 +2341,7 @@ public class DegreeRequirementStatusService {
         }
 
         return pendingCourses;
-    }<<<<<<<HEAD
-
-    =======
+    }
 
     /**
      * Check if grade meets minimum requirement.
@@ -2353,8 +2351,6 @@ public class DegreeRequirementStatusService {
      * - Numeric grades (1-9) = Placement exam levels (counts for course
      * requirements)
      */
-    >>>>>>>5f 93518f f735415cb59d4110c99b2d60bdbeebd5
-
     private boolean isGradeSufficientForRequirement(String actualGrade, String requiredGrade) {
         if (actualGrade == null || requiredGrade == null) {
             return false;
@@ -2362,9 +2358,6 @@ public class DegreeRequirementStatusService {
 
         actualGrade = actualGrade.trim().toUpperCase();
         requiredGrade = requiredGrade.trim().toUpperCase();
-<<<<<<< HEAD
-
-=======
         
         // Handle transfer credit 'T' - counts for course requirements and SBC (equivalent to C or higher)
         if (actualGrade.equals("T")) {
@@ -2401,7 +2394,6 @@ public class DegreeRequirementStatusService {
             }
         }
         
->>>>>>> 5f93518ff735415cb59d4110c99b2d60bdbeebd5
         Map<String, Double> gradePoints = new HashMap<>();
         gradePoints.put("A", 4.0);
         gradePoints.put("A-", 3.7);

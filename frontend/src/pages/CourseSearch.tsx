@@ -325,7 +325,7 @@ function CourseSearch() {
    * Apply filters and search to courses
    */
   useEffect(() => {
-    let filtered = courses.filter(course => {
+    const filtered = courses.filter(course => {
       // Subject filter (Course Code - letters only, e.g., CSE, BIO)
       if (searchTerm.trim() !== '') {
         const search = searchTerm.toUpperCase()
