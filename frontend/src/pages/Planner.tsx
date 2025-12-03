@@ -1,7 +1,6 @@
 /*
  * TP: Updated Planner.tsx
- * - Fix: Manual Add now supports "Force Add" by specifying a semester.
- * - Usage: "CODE|CREDITS|SEMESTER YEAR" (e.g., "CSE 373|3|Spring 2026")
+ * - Edit Plan feature: Each semester can be edited individually to add/remove courses.
  * - Retains previous validations and UI updates.
  */
 
@@ -67,13 +66,6 @@ type ValidationReport = {
   }>;
 }
 
-// Helper for manual parsing
-type ManualCourseInput = {
-  code: string;
-  credits: number;
-  term?: string; // Optional forced term
-}
-
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
 export default function Planner() {
@@ -96,15 +88,6 @@ export default function Planner() {
   const [options, setOptions] = useState({
     preferredCourses: '',
     avoidCourses: '',
-    sbcPrefs: [
-      { area: 'ARTS', score: 3 },
-      { area: 'GLO', score: 3 },
-      { area: 'LANG', score: 3 },
-      { area: 'SBS', score: 3 },
-      { area: 'TECH', score: 3 },
-      { area: 'USA', score: 3 },
-      { area: 'WRT', score: 3 },
-    ] as Array<{ area: string; score: number }>,
     daysToPrefer: 'None',
     modality: 'Any',
     preferredTimes: [] as Array<{ day: string; time: string }>,
@@ -112,8 +95,6 @@ export default function Planner() {
     preferMorning: false,
     onlineOnly: false,
   })
-
-  const [manualCourses, setManualCourses] = useState<string>('')
   const [plan, setPlan] = useState<{ [term: string]: Course[] }>({})
   const [warnings, setWarnings] = useState<string[]>([]);
 
@@ -283,18 +264,6 @@ export default function Planner() {
     ), [plan]
   )
 
-  // ✅ Updated: Handles "Code|Credits|Term" format
-  const parseManual = (text: string): ManualCourseInput[] => {
-    return text.split(',').map(s => s.trim()).filter(Boolean).map(line => {
-      const parts = line.split('|').map(x => x?.trim())
-      const code = (parts[0] || '').replace(/\s+/g, ' ')
-      const credits = Number(parts[1] || 3) || 3
-      const term = parts[2] || undefined; // e.g. "Spring 2026"
-
-      return { code, credits, term }
-    })
-  }
-
   const generateWorkloadLimits = (targetSem: string, targetYear: number) => {
     const limits: { [key: string]: number } = {};
     const now = new Date();
@@ -349,12 +318,7 @@ export default function Planner() {
     try {
       const avoidList = options.avoidCourses.split(',').map(s => s.trim()).filter(Boolean);
       const prefList = options.preferredCourses.split(',').map(s => s.trim()).filter(Boolean);
-
-      // Parse manual courses
-      const manualInputList = parseManual(manualCourses);
-      // Only send code to backend as preference
-      const manualCodes = manualInputList.map(m => m.code);
-      const combinedPref = [...new Set([...prefList, ...manualCodes])];
+      const combinedPref = [...new Set([...prefList])];
 
       // Use user-defined workload limits if available, otherwise generate defaults
       const workloads = Object.keys(workloadLimits).length > 0
@@ -406,29 +370,6 @@ export default function Planner() {
         });
       }
 
-      // 2. ✅ Force Add Manual Courses (if specified with term)
-      manualInputList.forEach(m => {
-        if (m.term) {
-          const termKey = m.term; // e.g., "Spring 2026"
-          if (!newPlan[termKey]) newPlan[termKey] = [];
-
-          // Check duplicates
-          const exists = newPlan[termKey].some(c => c.code === m.code);
-          if (!exists) {
-            const parts = m.code.split(' ');
-            newPlan[termKey].push({
-              department: parts[0] || 'MANUAL',
-              courseNum: parseInt(parts[1]) || 0,
-              code: m.code,
-              title: m.code,
-              credits: m.credits,
-              tags: ['Force-Added'],
-              isNonRequired: true, // Assume non-required until validated
-              prereqWarnings: []
-            });
-          }
-        }
-      });
 
       if (Object.keys(newPlan).length === 0 && data.totalCredits === 0) {
         setWarnings(prev => [...prev, 'No courses were planned.']);
@@ -939,14 +880,6 @@ export default function Planner() {
     );
   }
 
-  const updateSbcScore = (i: number, v: number) => {
-    setOptions(o => ({
-      ...o,
-      sbcPrefs: o.sbcPrefs.map((p, idx) =>
-        idx === i ? { ...p, score: v } : p
-      ),
-    }))
-  }
 
   // --- Main Render ---
   return (
@@ -1034,28 +967,10 @@ export default function Planner() {
             <span>Avoid Courses</span>
             <input placeholder="CSE 353" value={options.avoidCourses} onChange={e => setOptions({ ...options, avoidCourses: e.target.value })} />
           </label>
-          <div className="subsection">
-            <div className="sub-title">SBC Priorities (1-5)</div>
-            <div className="sbc-grid">
-              {options.sbcPrefs.map((p, i) => (
-                <div key={p.area} className="sbc-row">
-                  <span>{p.area}</span>
-                  <select value={p.score} onChange={e => updateSbcScore(i, Number(e.target.value))}>
-                    {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         <div className="card">
-          <div className="card-title">Manual Add</div>
-          <p style={{ fontSize: '0.8em', color: '#666', marginBottom: '5px' }}>
-            Format: <code>CODE|CREDITS</code> (auto-place) or <code>CODE|CREDITS|TERM YEAR</code> (force-add)
-          </p>
-          <textarea placeholder="e.g., CSE 373|3|Spring 2026, CSE 327|3" value={manualCourses} onChange={e => setManualCourses(e.target.value)} />
-          <button className="apply-btn" onClick={handleGenerate} disabled={busy || !userId}>
+          <button className="apply-btn" onClick={handleGenerate} disabled={busy || !userId} style={{ width: '100%' }}>
             {busy ? 'Generating...' : 'Generate Plan'}
           </button>
         </div>
