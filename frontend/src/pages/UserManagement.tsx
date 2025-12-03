@@ -71,12 +71,40 @@ const UserManagement: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setUsers(data);
+        console.log('Fetched users:', data.length, 'users');
+        // Transform backend User objects to frontend User interface
+        const transformedUsers = data.map((user: any) => ({
+          userId: user.userId,
+          email: user.email,
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          fullName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
+          role: user.role,
+          isActive: user.isActive !== undefined ? user.isActive : true,
+          studentId: user.studentId,
+          major: user.major,
+          gpa: user.gpa,
+          graduationYear: user.graduationYear,
+          department: user.department,
+          officeLocation: user.officeLocation,
+          createdAt: user.createdAt,
+          lastLogin: user.lastLogin
+        }));
+        console.log('Transformed users:', transformedUsers.length);
+        setUsers(transformedUsers);
       } else {
-        console.error('Failed to fetch users');
+        const errorText = await response.text();
+        console.error('Failed to fetch users:', response.status, errorText);
+        if (response.status === 403) {
+          console.error('Access denied: You need REGISTRAR or university-level advisor role to view users');
+          setImportMessage('Error: Access denied. You need REGISTRAR or university-level advisor role to view users.');
+        } else {
+          setImportMessage(`Error fetching users: ${response.status} ${response.statusText}`);
+        }
       }
     } catch (error) {
       console.error('Error fetching users:', error);
+      setImportMessage('Error: Failed to fetch users. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }

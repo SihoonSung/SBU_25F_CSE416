@@ -468,6 +468,9 @@ public class UserService {
             
             // Process transfer_courses
             if (userData.containsKey("transfer_courses")) {
+                // Delete existing transfer courses first to avoid duplicates
+                userTransferCoursesRepository.deleteByUserId(user.getUserId());
+                
                 Object transferCoursesObj = userData.get("transfer_courses");
                 if (transferCoursesObj != null && transferCoursesObj instanceof List) {
                     @SuppressWarnings("unchecked")

@@ -34,7 +34,8 @@ public class DegreeRequirementStatusService {
 
     @Autowired
     private edu.sbu.cse416.sam_system.repository.CourseRepository courseRepository;
-
+    @Autowired
+    private edu.sbu.cse416.sam_system.repository.UserTransferCoursesRepository userTransferCoursesRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -66,6 +67,12 @@ public class DegreeRequirementStatusService {
         if (additionalClasses != null && !additionalClasses.isEmpty()) {
             allUserClasses.addAll(additionalClasses);
         }
+
+        // Get transfer courses with SBU equivalents and convert to UserClasses format
+        List<UserTransferCourses> transferCourses = userTransferCoursesRepository
+                .findWithSbuequivalentsByUserId(student.getUserId());
+        List<UserClasses> transferClasses = convertTransferCoursesToUserClasses(student, transferCourses);
+        allUserClasses.addAll(transferClasses);
 
         // Separate classes by grade status:
         List<UserClasses> completedClasses = allUserClasses.stream()
@@ -146,6 +153,50 @@ public class DegreeRequirementStatusService {
             synthetic.add(uc);
         }
         return synthetic;
+    }
+
+    /**
+     * Convert transfer courses with SBU equivalents to UserClasses format for
+     * degree audit
+     * Only includes transfer courses that have SBU equivalents (department and
+     * courseNum)
+     * and satisfy grade requirements (C or higher by default)
+     */
+    private List<UserClasses> convertTransferCoursesToUserClasses(User student,
+            List<UserTransferCourses> transferCourses) {
+        if (transferCourses == null || transferCourses.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<UserClasses> converted = new ArrayList<>();
+        for (UserTransferCourses transferCourse : transferCourses) {
+            // Only include transfer courses with SBU equivalents
+            if (transferCourse.getDepartment() == null || transferCourse.getCourseNum() == null) {
+                continue;
+            }
+
+            // Check if grade is sufficient (C or higher by default, same logic as regular
+            // classes)
+            String grade = transferCourse.getGrade();
+            if (grade != null && !grade.trim().isEmpty() && !grade.equals("I")) {
+                // Only include if grade is sufficient (C or higher)
+                if (isGradeSufficientForRequirement(grade, "C")) {
+                    UserClasses uc = new UserClasses();
+                    uc.setUser(student);
+                    uc.setClassId(null); // Transfer courses have no class ID
+                    uc.setDepartment(transferCourse.getDepartment());
+                    uc.setCourseNum(transferCourse.getCourseNum());
+                    uc.setSection(null);
+                    uc.setSemester(null); // Transfer courses don't have semester
+                    uc.setYear(null); // Transfer courses don't have year
+                    uc.setCredits(transferCourse.getCredits());
+                    uc.setGpnc(null);
+                    uc.setGrade(grade);
+                    converted.add(uc);
+                }
+            }
+        }
+        return converted;
     }
 
     private List<Map<String, Object>> parseMajorsOrMinors(String subjectsJson, String degreesJson,
@@ -2290,7 +2341,19 @@ public class DegreeRequirementStatusService {
         }
 
         return pendingCourses;
-    }
+    }<<<<<<<HEAD
+
+    =======
+
+    /**
+     * Check if grade meets minimum requirement.
+     * Handles special grades:
+     * - 'T' = Transfer credit (credit granted, counts for course requirements and
+     * SBC, equivalent to C or higher)
+     * - Numeric grades (1-9) = Placement exam levels (counts for course
+     * requirements)
+     */
+    >>>>>>>5f 93518f f735415cb59d4110c99b2d60bdbeebd5
 
     private boolean isGradeSufficientForRequirement(String actualGrade, String requiredGrade) {
         if (actualGrade == null || requiredGrade == null) {
@@ -2299,7 +2362,46 @@ public class DegreeRequirementStatusService {
 
         actualGrade = actualGrade.trim().toUpperCase();
         requiredGrade = requiredGrade.trim().toUpperCase();
+<<<<<<< HEAD
 
+=======
+        
+        // Handle transfer credit 'T' - counts for course requirements and SBC (equivalent to C or higher)
+        if (actualGrade.equals("T")) {
+            // 'T' is equivalent to C or higher, so it satisfies any requirement that needs C or higher
+            // For requirements higher than C (e.g., B), 'T' may not satisfy, but typically transfer credits
+            // are accepted for course requirements regardless of the specific grade requirement
+            // We'll treat 'T' as equivalent to C (2.0), which satisfies C or higher requirements
+            Map<String, Double> gradePoints = new HashMap<>();
+            gradePoints.put("A", 4.0);
+            gradePoints.put("A-", 3.7);
+            gradePoints.put("B+", 3.3);
+            gradePoints.put("B", 3.0);
+            gradePoints.put("B-", 2.7);
+            gradePoints.put("C+", 2.3);
+            gradePoints.put("C", 2.0);
+            gradePoints.put("C-", 1.7);
+            gradePoints.put("D+", 1.3);
+            gradePoints.put("D", 1.0);
+            gradePoints.put("D-", 0.7);
+            gradePoints.put("F", 0.0);
+            
+            Double requiredPoints = gradePoints.get(requiredGrade);
+            if (requiredPoints != null) {
+                // 'T' is equivalent to C (2.0), so it satisfies C or lower requirements
+                return 2.0 >= requiredPoints;
+            }
+            // If requiredGrade is not a standard letter grade, try numeric comparison
+            try {
+                double requiredNumeric = Double.parseDouble(requiredGrade);
+                return 2.0 >= requiredNumeric; // 'T' = 2.0 (C)
+            } catch (NumberFormatException e) {
+                // If we can't parse requiredGrade, default to true (T counts for requirements)
+                return true;
+            }
+        }
+        
+>>>>>>> 5f93518ff735415cb59d4110c99b2d60bdbeebd5
         Map<String, Double> gradePoints = new HashMap<>();
         gradePoints.put("A", 4.0);
         gradePoints.put("A-", 3.7);
@@ -2324,6 +2426,11 @@ public class DegreeRequirementStatusService {
         try {
             double actualNumeric = Double.parseDouble(actualGrade);
             double requiredNumeric = Double.parseDouble(requiredGrade);
+            // Handle placement exam grades (1-9) - they count for course requirements
+            if (actualNumeric >= 1 && actualNumeric <= 9 && actualGrade.length() == 1) {
+                // Placement exam - counts for course requirements (equivalent to C or higher)
+                return 2.0 >= requiredNumeric;
+            }
             return actualNumeric >= requiredNumeric;
         } catch (NumberFormatException e) {
             return false;

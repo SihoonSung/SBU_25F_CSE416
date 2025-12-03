@@ -1,7 +1,9 @@
 package edu.sbu.cse416.sam_system.service;
 
 import edu.sbu.cse416.sam_system.entity.UserClasses;
+import edu.sbu.cse416.sam_system.entity.UserTransferCourses;
 import edu.sbu.cse416.sam_system.repository.UserClassesRepository;
+import edu.sbu.cse416.sam_system.repository.UserTransferCoursesRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +23,9 @@ public class PrerequisitesValidationService {
 
     @Autowired
     private UserClassesRepository userClassesRepository;
+    
+    @Autowired
+    private UserTransferCoursesRepository userTransferCoursesRepository;
 
     /**
      * Validate if user meets prerequisites for a course
@@ -42,8 +47,12 @@ public class PrerequisitesValidationService {
         // Get user's current semester classes (for counting in-progress credits)
         List<UserClasses> allUserClasses = userClassesRepository.findByUserId(userId);
         
+        // Get user's transfer courses with SBU equivalents (for prerequisite checking)
+        List<UserTransferCourses> transferCourses = userTransferCoursesRepository.findWithSbuequivalentsByUserId(userId);
+        
         System.out.println("    [PREREQ VALIDATION] User has " + userClasses.size() + " completed classes");
         System.out.println("    [PREREQ VALIDATION] User has " + allUserClasses.size() + " total classes (including in-progress)");
+        System.out.println("    [PREREQ VALIDATION] User has " + transferCourses.size() + " transfer courses with SBU equivalents");
 
         // Parse prerequisites string
         // Format: "BIO 351; C or higher in BIO 205 or BIO 207"
@@ -56,7 +65,7 @@ public class PrerequisitesValidationService {
             
             System.out.println("    [PREREQ VALIDATION] Checking group: " + group);
             
-            if (!checkPrerequisiteGroup(userClasses, group, allUserClasses)) {
+            if (!checkPrerequisiteGroup(userClasses, transferCourses, group, allUserClasses, userId)) {
                 System.out.println("    [PREREQ VALIDATION] FAILED - Group not satisfied: " + group);
                 return false;
             }
@@ -82,7 +91,12 @@ public class PrerequisitesValidationService {
 
         // Get user's completed classes
         List<UserClasses> userClasses = userClassesRepository.findCompletedClassesByUserId(userId);
+        
+        // Get user's transfer courses with SBU equivalents (for antirequisite checking)
+        List<UserTransferCourses> transferCourses = userTransferCoursesRepository.findWithSbuequivalentsByUserId(userId);
+        
         System.out.println("    [ANTIREQ VALIDATION] User has " + userClasses.size() + " completed classes");
+        System.out.println("    [ANTIREQ VALIDATION] User has " + transferCourses.size() + " transfer courses with SBU equivalents");
 
         // Parse antirequisites string
         // Format: "CSE 114; CSE 216" - if user has taken ANY of these, cannot take the course
@@ -94,7 +108,7 @@ public class PrerequisitesValidationService {
             
             System.out.println("    [ANTIREQ VALIDATION] Checking antirequisite: " + group);
             
-            if (checkAntirequisiteConflict(userClasses, group)) {
+            if (checkAntirequisiteConflict(userClasses, transferCourses, group)) {
                 System.out.println("    [ANTIREQ VALIDATION] CONFLICT - User has taken antirequisite: " + group);
                 return false;
             }
@@ -125,7 +139,12 @@ public class PrerequisitesValidationService {
 
         // Get user's completed classes (past)
         List<UserClasses> userClasses = userClassesRepository.findCompletedClassesByUserId(userId);
+        
+        // Get user's transfer courses with SBU equivalents (for corequisite checking - completed courses)
+        List<UserTransferCourses> transferCourses = userTransferCoursesRepository.findWithSbuequivalentsByUserId(userId);
+        
         System.out.println("    [COREQ VALIDATION] User has " + userClasses.size() + " completed classes");
+        System.out.println("    [COREQ VALIDATION] User has " + transferCourses.size() + " transfer courses with SBU equivalents");
 
         // Get user's current semester classes
         List<UserClasses> currentSemesterClasses = userClassesRepository.findByUserIdAndSemesterAndYear(userId, currentSemester, currentYear);
@@ -141,7 +160,7 @@ public class PrerequisitesValidationService {
             
             System.out.println("    [COREQ VALIDATION] Checking corequisite: " + group);
             
-            if (!checkCorequisiteRequirement(userClasses, currentSemesterClasses, group, prerequisites)) {
+            if (!checkCorequisiteRequirement(userClasses, transferCourses, currentSemesterClasses, group, prerequisites)) {
                 System.out.println("    [COREQ VALIDATION] FAILED - Corequisite not met: " + group);
                 return false;
             }
@@ -154,37 +173,39 @@ public class PrerequisitesValidationService {
     /**
      * Check if a single prerequisite group is satisfied
      * @param userClasses User's completed classes
+     * @param transferCourses User's transfer courses with SBU equivalents
      * @param group Prerequisite group (e.g., "BIO 351" or "C or higher in BIO 205 or BIO 207")
      * @param allUserClasses All user's classes (including in-progress) for standing calculation
+     * @param userId User ID for transfer course credit calculation
      * @return true if group is satisfied
      */
-    private boolean checkPrerequisiteGroup(List<UserClasses> userClasses, String group, List<UserClasses> allUserClasses) {
+    private boolean checkPrerequisiteGroup(List<UserClasses> userClasses, List<UserTransferCourses> transferCourses, String group, List<UserClasses> allUserClasses, Long userId) {
         // Handle class standing requirements like "U3 standing", "Junior standing"
         if (group.toLowerCase().contains("standing")) {
-            return checkStandingRequirement(allUserClasses, group);
+            return checkStandingRequirement(allUserClasses, userId, group);
         }
         
         // Handle grade requirements like "C or higher in BIO 205 or BIO 207" or "MAT 125 or higher"
         // Check for patterns: "or higher in", "c or higher", or "X or higher" (where X is a course code)
         String lowerGroup = group.toLowerCase();
         if (lowerGroup.contains("or higher in") || lowerGroup.contains("c or higher")) {
-            return checkGradeRequirement(userClasses, group);
+            return checkGradeRequirement(userClasses, transferCourses, group);
         }
         
         // Check for "X or higher" pattern where X is a course code (e.g., "MAT 125 or higher")
         // This pattern means the course must be taken with a passing grade (C or higher)
         if (lowerGroup.matches(".*\\b([a-z]{2,4})\\s+\\d{3,4}\\s+or\\s+higher\\b.*")) {
-            return checkGradeRequirement(userClasses, group);
+            return checkGradeRequirement(userClasses, transferCourses, group);
         }
         
         // Handle simple course requirements like "BIO 351"
-        return checkSimpleCourseRequirement(userClasses, group);
+        return checkSimpleCourseRequirement(userClasses, transferCourses, group);
     }
 
     /**
      * Check grade requirements like "C or higher in BIO 205 or BIO 207"
      */
-    private boolean checkGradeRequirement(List<UserClasses> userClasses, String group) {
+    private boolean checkGradeRequirement(List<UserClasses> userClasses, List<UserTransferCourses> transferCourses, String group) {
         System.out.println("    [PREREQ VALIDATION] Checking grade requirement: " + group);
         
         // Extract courses from "C or higher in BIO 205 or BIO 207"
@@ -206,8 +227,8 @@ public class PrerequisitesValidationService {
             
             System.out.println("    [PREREQ VALIDATION] Looking for course: " + department + " " + courseNum);
             
-            // Check if user has taken this course with C or higher grade
-            if (hasTakenCourseWithGrade(userClasses, department, courseNum)) {
+            // Check if user has taken this course with C or higher grade (from regular classes or transfer courses)
+            if (hasTakenCourseWithGrade(userClasses, transferCourses, department, courseNum)) {
                 System.out.println("    [PREREQ VALIDATION] Found valid grade in " + department + " " + courseNum);
                 return true;
             }
@@ -219,10 +240,10 @@ public class PrerequisitesValidationService {
     
     /**
      * Check class standing requirement (e.g., "U3 standing", "Junior standing")
-     * Class standing is calculated from ALL credits (including in-progress courses)
+     * Class standing is calculated from ALL credits (including in-progress courses and transfer courses)
      * U1: 0-23 credits, U2: 24-56, U3: 57-84, U4: 85+
      */
-    private boolean checkStandingRequirement(List<UserClasses> allUserClasses, String group) {
+    private boolean checkStandingRequirement(List<UserClasses> allUserClasses, Long userId, String group) {
         System.out.println("    [PREREQ VALIDATION] Checking standing requirement: " + group);
         
         // Calculate total credits (including in-progress courses)
@@ -230,6 +251,18 @@ public class PrerequisitesValidationService {
         for (UserClasses userClass : allUserClasses) {
             if (userClass.getCredits() != null) {
                 totalCredits += userClass.getCredits();
+            }
+        }
+        
+        // Also include transfer course credits
+        if (userId != null) {
+            List<UserTransferCourses> allTransferCourses = userTransferCoursesRepository.findByUserId(userId);
+            if (allTransferCourses != null) {
+                for (UserTransferCourses transferCourse : allTransferCourses) {
+                    if (transferCourse.getCredits() != null) {
+                        totalCredits += transferCourse.getCredits();
+                    }
+                }
             }
         }
         
@@ -281,7 +314,7 @@ public class PrerequisitesValidationService {
      * Current logic: If "or" keyword is present, treat as OR (any one is enough).
      * Otherwise, if multiple courses are listed, check if ALL are required.
      */
-    private boolean checkSimpleCourseRequirement(List<UserClasses> userClasses, String group) {
+    private boolean checkSimpleCourseRequirement(List<UserClasses> userClasses, List<UserTransferCourses> transferCourses, String group) {
         System.out.println("    [PREREQ VALIDATION] Checking simple course requirement: " + group);
         
         // Extract all course codes from group
@@ -314,7 +347,7 @@ public class PrerequisitesValidationService {
                     String courseNum = parts[1];
                     System.out.println("    [PREREQ VALIDATION] Looking for course: " + department + " " + courseNum);
                     
-                    if (hasTakenCourse(userClasses, department, courseNum)) {
+                    if (hasTakenCourse(userClasses, transferCourses, department, courseNum)) {
                         System.out.println("    [PREREQ VALIDATION] Found course: " + department + " " + courseNum);
                         return true;
                     }
@@ -333,7 +366,7 @@ public class PrerequisitesValidationService {
                     String courseNum = parts[1];
                     System.out.println("    [PREREQ VALIDATION] Looking for course: " + department + " " + courseNum);
                     
-                    if (!hasTakenCourse(userClasses, department, courseNum)) {
+                    if (!hasTakenCourse(userClasses, transferCourses, department, courseNum)) {
                         System.out.println("    [PREREQ VALIDATION] Missing required course: " + department + " " + courseNum);
                         return false;
                     }
@@ -347,10 +380,11 @@ public class PrerequisitesValidationService {
     /**
      * Check if user has taken an antirequisite course
      * @param userClasses User's completed classes
+     * @param transferCourses User's transfer courses with SBU equivalents
      * @param group Antirequisite group (e.g., "CSE 114")
      * @return true if conflict exists (user has taken the course), false otherwise
      */
-    private boolean checkAntirequisiteConflict(List<UserClasses> userClasses, String group) {
+    private boolean checkAntirequisiteConflict(List<UserClasses> userClasses, List<UserTransferCourses> transferCourses, String group) {
         System.out.println("    [ANTIREQ VALIDATION] Checking antirequisite conflict: " + group);
         
         // Extract course code from group
@@ -372,7 +406,7 @@ public class PrerequisitesValidationService {
             
             System.out.println("    [ANTIREQ VALIDATION] Looking for antirequisite: " + department + " " + courseNum);
             
-            if (hasTakenCourse(userClasses, department, courseNum)) {
+            if (hasTakenCourse(userClasses, transferCourses, department, courseNum)) {
                 System.out.println("    [ANTIREQ VALIDATION] CONFLICT FOUND - User has taken: " + department + " " + courseNum);
                 return true; // Conflict found
             }
@@ -384,12 +418,13 @@ public class PrerequisitesValidationService {
     /**
      * Check if user meets a corequisite requirement
      * @param userClasses User's completed classes (past)
+     * @param transferCourses User's transfer courses with SBU equivalents
      * @param currentSemesterClasses User's current semester classes
      * @param group Corequisite group (e.g., "CSE 114")
      * @param prerequisites Prerequisites string to check for overlap
      * @return true if corequisite is met, false otherwise
      */
-    private boolean checkCorequisiteRequirement(List<UserClasses> userClasses, List<UserClasses> currentSemesterClasses, String group, String prerequisites) {
+    private boolean checkCorequisiteRequirement(List<UserClasses> userClasses, List<UserTransferCourses> transferCourses, List<UserClasses> currentSemesterClasses, String group, String prerequisites) {
         System.out.println("    [COREQ VALIDATION] Checking corequisite requirement: " + group);
         
         // Check for range patterns like "MUS 161 through 187"
@@ -414,7 +449,7 @@ public class PrerequisitesValidationService {
                 }
             }
             
-            // Also check if this course is in prerequisites and already taken
+            // Also check if this course is in prerequisites and already taken (from regular classes or transfer courses)
             if (prerequisites != null && prerequisites.toLowerCase().contains(department.toLowerCase())) {
                 for (UserClasses userClass : userClasses) {
                     if (userClass.getDepartment().equals(department)) {
@@ -422,6 +457,17 @@ public class PrerequisitesValidationService {
                         if (courseNum >= startCourse && courseNum <= endCourse) {
                             System.out.println("    [COREQ VALIDATION] Found prerequisite in range (past): " + department + " " + courseNum);
                             return true; // Found a course in the range as prerequisite
+                        }
+                    }
+                }
+                // Check transfer courses
+                for (UserTransferCourses transferCourse : transferCourses) {
+                    if (transferCourse.getDepartment() != null && transferCourse.getDepartment().equals(department) &&
+                        transferCourse.getCourseNum() != null) {
+                        int courseNum = transferCourse.getCourseNum();
+                        if (courseNum >= startCourse && courseNum <= endCourse) {
+                            System.out.println("    [COREQ VALIDATION] Found prerequisite in range (transfer course): " + department + " " + courseNum);
+                            return true; // Found a transfer course in the range as prerequisite
                         }
                     }
                 }
@@ -455,8 +501,8 @@ public class PrerequisitesValidationService {
             if (prerequisites != null && prerequisites.toLowerCase().contains(courseCode.toLowerCase())) {
                 System.out.println("    [COREQ VALIDATION] Course " + courseCode + " is also in prerequisites - checking if already taken");
                 
-                // Check if user has already taken this course (any grade)
-                if (hasTakenCourse(userClasses, department, courseNum)) {
+                // Check if user has already taken this course (any grade) from regular classes or transfer courses
+                if (hasTakenCourse(userClasses, transferCourses, department, courseNum)) {
                     System.out.println("    [COREQ VALIDATION] Found prerequisite completion: " + courseCode);
                     return true; // Already taken as prerequisite
                 }
@@ -466,8 +512,8 @@ public class PrerequisitesValidationService {
             } else {
                 System.out.println("    [COREQ VALIDATION] Course " + courseCode + " is pure corequisite - checking if taken in current semester");
                 
-                // Check if user has taken this course in current semester
-                if (hasTakenCourse(currentSemesterClasses, department, courseNum)) {
+                // Check if user has taken this course in current semester (transfer courses are not current semester)
+                if (hasTakenCourse(currentSemesterClasses, new ArrayList<>(), department, courseNum)) {
                     System.out.println("    [COREQ VALIDATION] Found corequisite completion (current semester): " + courseCode);
                     return true; // Already taken in current semester
                 }
@@ -479,49 +525,87 @@ public class PrerequisitesValidationService {
     }
     
     /**
-     * Helper method to check if user has taken a specific course
+     * Helper method to check if user has taken a specific course (from regular classes or transfer courses)
      * @param userClasses List of user's classes to check
+     * @param transferCourses List of user's transfer courses with SBU equivalents
      * @param department Course department
      * @param courseNum Course number
      * @return true if user has taken the course, false otherwise
      */
-    private boolean hasTakenCourse(List<UserClasses> userClasses, String department, String courseNum) {
+    private boolean hasTakenCourse(List<UserClasses> userClasses, List<UserTransferCourses> transferCourses, String department, String courseNum) {
+        // Check regular classes
         for (UserClasses userClass : userClasses) {
-            if (userClass.getDepartment().equals(department) && 
-                userClass.getCourseNum().toString().equals(courseNum)) {
+            if (userClass.getDepartment() != null && userClass.getDepartment().equals(department) && 
+                userClass.getCourseNum() != null && userClass.getCourseNum().toString().equals(courseNum)) {
                 return true;
             }
         }
+        
+        // Check transfer courses with SBU equivalents
+        for (UserTransferCourses transferCourse : transferCourses) {
+            if (transferCourse.getDepartment() != null && transferCourse.getDepartment().equals(department) &&
+                transferCourse.getCourseNum() != null && transferCourse.getCourseNum().toString().equals(courseNum)) {
+                return true;
+            }
+        }
+        
         return false;
     }
     
     /**
-     * Helper method to check if user has taken a specific course with C or higher grade
+     * Helper method to check if user has taken a specific course with C or higher grade (from regular classes or transfer courses)
      * @param userClasses List of user's classes to check
+     * @param transferCourses List of user's transfer courses with SBU equivalents
      * @param department Course department
      * @param courseNum Course number
      * @return true if user has taken the course with sufficient grade, false otherwise
      */
-    private boolean hasTakenCourseWithGrade(List<UserClasses> userClasses, String department, String courseNum) {
+    private boolean hasTakenCourseWithGrade(List<UserClasses> userClasses, List<UserTransferCourses> transferCourses, String department, String courseNum) {
+        // Check regular classes
         for (UserClasses userClass : userClasses) {
-            if (userClass.getDepartment().equals(department) && 
-                userClass.getCourseNum().toString().equals(courseNum)) {
+            if (userClass.getDepartment() != null && userClass.getDepartment().equals(department) && 
+                userClass.getCourseNum() != null && userClass.getCourseNum().toString().equals(courseNum)) {
                 String grade = userClass.getGrade();
                 if (grade != null && isGradeSufficient(grade)) {
                     return true;
                 }
             }
         }
+        
+        // Check transfer courses with SBU equivalents
+        for (UserTransferCourses transferCourse : transferCourses) {
+            if (transferCourse.getDepartment() != null && transferCourse.getDepartment().equals(department) &&
+                transferCourse.getCourseNum() != null && transferCourse.getCourseNum().toString().equals(courseNum)) {
+                String grade = transferCourse.getGrade();
+                if (grade != null) {
+                    boolean sufficient = isGradeSufficient(grade);
+                    System.out.println("    [PREREQ VALIDATION] Transfer course grade check: " + department + " " + courseNum + 
+                                     " grade=" + grade + " sufficient=" + sufficient);
+                    if (sufficient) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
         return false;
     }
 
     /**
      * Check if grade is sufficient (C or higher)
+     * Also handles special cases:
+     * - 'T' = Transfer credit (credit granted, counts for prerequisites)
+     * - Numeric grades (e.g., "9") = Placement exam levels (counts for prerequisites, credits = 0)
      */
     private boolean isGradeSufficient(String grade) {
         if (grade == null) return false;
         
         grade = grade.trim().toUpperCase();
+        
+        // Handle transfer credit - 'T' means credit granted, counts for prerequisites
+        if (grade.equals("T")) {
+            return true;
+        }
         
         // Handle letter grades - C or higher
         if (grade.equals("A") || grade.equals("A+") || grade.equals("A-") ||
@@ -535,9 +619,17 @@ public class PrerequisitesValidationService {
             return false;
         }
         
-        // Handle numeric grades (assuming 4.0 scale)
+        // Handle numeric grades - could be:
+        // 1. Placement exam levels (e.g., "9" for Math Proctored Placement Level 9) - counts for prerequisites
+        // 2. Numeric grade on 4.0 scale
         try {
             double numericGrade = Double.parseDouble(grade);
+            // If it's a single digit (1-9), it's likely a placement exam level
+            // Placement exams count for prerequisites even though credits = 0
+            if (numericGrade >= 1 && numericGrade <= 9 && grade.length() == 1) {
+                return true; // Placement exam level - counts for prerequisites
+            }
+            // Otherwise, treat as numeric grade on 4.0 scale
             return numericGrade >= 2.0; // C or higher (2.0 = C)
         } catch (NumberFormatException e) {
             return false;
