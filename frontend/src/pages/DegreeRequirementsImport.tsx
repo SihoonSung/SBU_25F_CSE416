@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import './DegreeRequirementsImport.css';
+import LoadingModal from '../components/LoadingModal';
 
 /**
  * Degree Requirements Import Component
@@ -25,8 +26,8 @@ const DegreeRequirementsImport: React.FC = () => {
 
   const handleFileSelect = (selectedFile: File) => {
     // Validate file type
-    if (!selectedFile.name.toLowerCase().endsWith('.yaml') && 
-        !selectedFile.name.toLowerCase().endsWith('.yml')) {
+    if (!selectedFile.name.toLowerCase().endsWith('.yaml') &&
+      !selectedFile.name.toLowerCase().endsWith('.yml')) {
       setResult({
         success: false,
         message: '',
@@ -70,7 +71,7 @@ const DegreeRequirementsImport: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     const droppedFile = e.dataTransfer.files?.[0];
     if (droppedFile) {
       handleFileSelect(droppedFile);
@@ -213,7 +214,7 @@ minor_requirements:
               <li><strong>minor_requirements</strong>: List of minor degree requirements</li>
             </ul>
           </div>
-          
+
           <div className="instruction-item">
             <h3>Required Fields</h3>
             <p>Each requirement must include:</p>
@@ -224,7 +225,7 @@ minor_requirements:
               <li><strong>is_restricted</strong>: Whether program requires approval</li>
             </ul>
           </div>
-          
+
           <div className="instruction-item">
             <h3>Optional Fields</h3>
             <p>Additional information you can include:</p>
@@ -236,7 +237,7 @@ minor_requirements:
             </ul>
           </div>
         </div>
-        
+
         <div className="sample-file-section">
           <button className="download-sample-button" onClick={downloadSampleFile}>
             Download Sample YAML File
@@ -247,8 +248,8 @@ minor_requirements:
       {/* File Upload */}
       <div className="upload-section">
         <h2>Upload YAML File</h2>
-        
-        <div 
+
+        <div
           className={`file-drop-zone ${dragActive ? 'drag-active' : ''} ${file ? 'file-selected' : ''}`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -287,16 +288,16 @@ minor_requirements:
         </div>
 
         <div className="upload-actions">
-          <button 
+          <button
             className="upload-button"
             onClick={handleUpload}
             disabled={!file || uploading}
           >
             {uploading ? 'Uploading...' : 'Upload File'}
           </button>
-          
+
           {file && (
-            <button 
+            <button
               className="clear-button"
               onClick={handleClear}
               disabled={uploading}
@@ -311,7 +312,7 @@ minor_requirements:
       {result && (
         <div className="results-section">
           <h2>Import Results</h2>
-          
+
           {result.success ? (
             <div className="result-success">
               <div className="result-header">
@@ -319,7 +320,7 @@ minor_requirements:
                 <h3>Import Successful!</h3>
               </div>
               <p>{result.message}</p>
-              
+
               {result.requirements && result.requirements.length > 0 && (
                 <div className="imported-requirements">
                   <h4>Imported Requirements:</h4>
@@ -347,6 +348,7 @@ minor_requirements:
           )}
         </div>
       )}
+      <LoadingModal isOpen={uploading} message="Uploading requirements..." />
     </div>
   );
 };

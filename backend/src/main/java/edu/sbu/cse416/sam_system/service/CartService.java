@@ -554,21 +554,22 @@ public class CartService {
             }
             
             // Check for duplicate classes already registered in UserClasses
+            // Check by department and courseNum (not by classId) to prevent re-registration of the same course
             List<String> duplicateClasses = new ArrayList<>();
             for (CartEntity cartItem : cartItems) {
                 if (cartItem.getStatus().equals("Added")) {
                     ClassEntity classEntity = cartItem.getClassEntity();
                     
-                    // Check if this class is already registered in UserClasses for the same semester/year
-                    boolean alreadyRegistered = userClassesRepository.existsByUserIdAndClassId(userId, classEntity.getClassId());
+                    // Check if user has already taken this course (by department and courseNum, regardless of section or term)
+                    boolean alreadyTaken = userClassesRepository.existsByUserIdAndDepartmentAndCourseNum(
+                        userId, 
+                        classEntity.getDepartment(), 
+                        classEntity.getCourseNum());
                     
-                    if (alreadyRegistered) {
-                        duplicateClasses.add(String.format("%s %s (Section %s) - %s %d", 
+                    if (alreadyTaken) {
+                        duplicateClasses.add(String.format("%s %s - You have already taken this course", 
                             classEntity.getDepartment(), 
-                            classEntity.getCourseNum(),
-                            classEntity.getSection(),
-                            classEntity.getSemester(), 
-                            classEntity.getYear()));
+                            classEntity.getCourseNum()));
                     }
                 }
             }

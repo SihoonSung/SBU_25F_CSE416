@@ -7,19 +7,20 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import './Planner.css'
+import LoadingModal from '../components/LoadingModal'
 
 // --- Types ---
 
-type Course = { 
+type Course = {
   id?: number;
   department: string;
   courseNum: number;
-  code: string; 
-  title: string; 
+  code: string;
+  title: string;
   credits: number;
-  tags?: string[]; 
-  isNonRequired?: boolean;    
-  prereqWarnings?: string[];  
+  tags?: string[];
+  isNonRequired?: boolean;
+  prereqWarnings?: string[];
 }
 
 type PlannerCourseDto = {
@@ -38,8 +39,8 @@ type AutoPlannerResponse = {
   proposedPlan: PlannerCourseDto[];
   warnings: string[];
   totalCredits: number;
-  nonRequiredCourses: string[]; 
-  degreeRequirementForecast: any; 
+  nonRequiredCourses: string[];
+  degreeRequirementForecast: any;
 }
 
 type ValidationReport = {
@@ -54,7 +55,7 @@ type ValidationReport = {
     missingCorequisites?: string[];
     violatedAntirequisites?: string[];
   }>;
-  degreeRequirementStatus: any[]; 
+  degreeRequirementStatus: any[];
   nonRequiredClasses: Array<{
     course: string;
     courseName?: string;
@@ -68,9 +69,9 @@ type ValidationReport = {
 
 // Helper for manual parsing
 type ManualCourseInput = {
-    code: string;
-    credits: number;
-    term?: string; // Optional forced term
+  code: string;
+  credits: number;
+  term?: string; // Optional forced term
 }
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
@@ -78,18 +79,19 @@ const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 export default function Planner() {
   // --- State ---
   const [userId, setUserId] = useState<number | null>(null);
-  const [currentCredits, setCurrentCredits] = useState<number>(0); 
+  const [currentCredits, setCurrentCredits] = useState<number>(0);
   const [busy, setBusy] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [targetGraduation, setTargetGraduation] = useState({
-    semester: 'Spring', 
-    year: '2029',       
+    semester: 'Spring',
+    year: '2029',
   })
 
-  const TOTAL_CREDITS_REQUIRED = 120; 
-  const AVG_CREDITS_PER_SEM = 15;     
+  const TOTAL_CREDITS_REQUIRED = 120;
+  const AVG_CREDITS_PER_SEM = 15;
 
   const [options, setOptions] = useState({
     preferredCourses: '',
@@ -102,10 +104,10 @@ export default function Planner() {
       { area: 'TECH', score: 3 },
       { area: 'USA', score: 3 },
       { area: 'WRT', score: 3 },
-    ] as Array<{area:string; score:number}>,
+    ] as Array<{ area: string; score: number }>,
     daysToPrefer: 'None',
     modality: 'Any',
-    preferredTimes: [] as Array<{day:string; time:string}>,
+    preferredTimes: [] as Array<{ day: string; time: string }>,
     preferDays: [] as string[],
     preferMorning: false,
     onlineOnly: false,
@@ -114,10 +116,10 @@ export default function Planner() {
   const [manualCourses, setManualCourses] = useState<string>('')
   const [plan, setPlan] = useState<{ [term: string]: Course[] }>({})
   const [warnings, setWarnings] = useState<string[]>([]);
-  
-  const [degreeStatus, setDegreeStatus] = useState<any>(null); 
+
+  const [degreeStatus, setDegreeStatus] = useState<any>(null);
   const [validationResult, setValidationResult] = useState<ValidationReport | null>(null);
-  
+
   // Workload limits for each semester
   const [workloadLimits, setWorkloadLimits] = useState<{ [term: string]: number }>({});
   
@@ -132,19 +134,19 @@ export default function Planner() {
         const profileRes = await fetch(`${BASE}/api/profile/me`, { credentials: 'include' });
         if (!profileRes.ok) throw new Error("Please log in first.");
         const profile = await profileRes.json();
-        
-        const uid = profile.id; 
-        const sid = profile.studentId; 
+
+        const uid = profile.id;
+        const sid = profile.studentId;
         setUserId(uid);
 
         const gpaRes = await fetch(`${BASE}/api/profile/student-id/${sid}/gpa`, { credentials: 'include' });
-        if(gpaRes.ok) {
-            const gpaData = await gpaRes.json();
-            const credits = gpaData.cumulative?.credits || 0;
-            setCurrentCredits(credits); 
-            calculateAndSetTarget(credits);
+        if (gpaRes.ok) {
+          const gpaData = await gpaRes.json();
+          const credits = gpaData.cumulative?.credits || 0;
+          setCurrentCredits(credits);
+          calculateAndSetTarget(credits);
         } else {
-            calculateAndSetTarget(0);
+          calculateAndSetTarget(0);
         }
 
         await fetchCurrentPlan(uid);
@@ -159,40 +161,40 @@ export default function Planner() {
 
   const fetchCurrentPlan = async (uid: number) => {
     try {
-        const res = await fetch(`${BASE}/api/planner/${uid}`, { credentials: 'include' });
-        if (!res.ok) throw new Error("Failed to fetch current plan.");
+      const res = await fetch(`${BASE}/api/planner/${uid}`, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch current plan.");
 
-        const data = await res.json();
+      const data = await res.json();
 
-        const newPlan: { [term: string]: Course[] } = {};
-        
-        if (data.plannedCourses && data.plannedCourses.length > 0) {
-            data.plannedCourses.forEach((d: PlannerCourseDto) => {
-                const termKey = `${d.semester} ${d.year}`;
-                if (!newPlan[termKey]) newPlan[termKey] = [];
-                
-                const courseCode = `${d.department} ${d.courseNum}`;
-                newPlan[termKey].push({
-                    id: d.id || undefined,
-                    department: d.department,
-                    courseNum: d.courseNum,
-                    code: courseCode,
-                    title: d.title,
-                    credits: d.credits,
-                    tags: d.sbcs,
-                    isNonRequired: false, 
-                    prereqWarnings: d.unsatisfiedPrerequisites,
-                });
-            });
-        }
-        setPlan(newPlan);
-        
-        if (data.degreeRequirementForecast) {
-            setDegreeStatus(data.degreeRequirementForecast);
-        }
-        
+      const newPlan: { [term: string]: Course[] } = {};
+
+      if (data.plannedCourses && data.plannedCourses.length > 0) {
+        data.plannedCourses.forEach((d: PlannerCourseDto) => {
+          const termKey = `${d.semester} ${d.year}`;
+          if (!newPlan[termKey]) newPlan[termKey] = [];
+
+          const courseCode = `${d.department} ${d.courseNum}`;
+          newPlan[termKey].push({
+            id: d.id || undefined,
+            department: d.department,
+            courseNum: d.courseNum,
+            code: courseCode,
+            title: d.title,
+            credits: d.credits,
+            tags: d.sbcs,
+            isNonRequired: false,
+            prereqWarnings: d.unsatisfiedPrerequisites,
+          });
+        });
+      }
+      setPlan(newPlan);
+
+      if (data.degreeRequirementForecast) {
+        setDegreeStatus(data.degreeRequirementForecast);
+      }
+
     } catch (e) {
-        console.error("Failed to load plan:", e);
+      console.error("Failed to load plan:", e);
     }
   }
 
@@ -202,23 +204,23 @@ export default function Planner() {
 
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); 
+    const currentMonth = now.getMonth();
 
-    let nextSem = currentMonth < 8 ? "Fall" : "Spring";
-    let nextYear = currentMonth < 8 ? currentYear : currentYear + 1;
+    const nextSem = currentMonth < 8 ? "Fall" : "Spring";
+    const nextYear = currentMonth < 8 ? currentYear : currentYear + 1;
 
     let finalSem = nextSem;
     let finalYear = nextYear;
-    
+
     for (let i = 1; i < semestersNeeded; i++) {
-        if (finalSem === "Spring") {
-            finalSem = "Fall";
-        } else {
-            finalSem = "Spring";
-            finalYear += 1;
-        }
+      if (finalSem === "Spring") {
+        finalSem = "Fall";
+      } else {
+        finalSem = "Spring";
+        finalYear += 1;
+      }
     }
-    if (semestersNeeded <= 0) finalYear += 1; 
+    if (semestersNeeded <= 0) finalYear += 1;
 
     setTargetGraduation({ semester: finalSem, year: finalYear.toString() });
   }
@@ -229,9 +231,9 @@ export default function Planner() {
     const now = new Date();
     const currentMonth = now.getMonth();
     let y = now.getFullYear();
-    
-    if (currentMonth >= 7) { 
-        y += 1; 
+
+    if (currentMonth >= 7) {
+      y += 1;
     }
 
     while (y <= targetYear) {
@@ -240,19 +242,19 @@ export default function Planner() {
         if (y < now.getFullYear()) continue;
         if (y === now.getFullYear() && currentMonth >= 7 && s === 'Spring') continue;
         if (y > targetYear) break;
-        
+
         if (y === targetYear) {
-            if (s === 'Spring' && targetSem === 'Spring') {
-                semesters.push(`${s} ${y}`);
-                break;
-            } else if (s === 'Fall' && targetSem === 'Fall') {
-                semesters.push(`${s} ${y}`);
-                break;
-            } else if (s === 'Spring' && targetSem === 'Fall') {
-                semesters.push(`${s} ${y}`);
-            }
-        } else {
+          if (s === 'Spring' && targetSem === 'Spring') {
             semesters.push(`${s} ${y}`);
+            break;
+          } else if (s === 'Fall' && targetSem === 'Fall') {
+            semesters.push(`${s} ${y}`);
+            break;
+          } else if (s === 'Spring' && targetSem === 'Fall') {
+            semesters.push(`${s} ${y}`);
+          }
+        } else {
+          semesters.push(`${s} ${y}`);
         }
       }
       y++;
@@ -264,7 +266,7 @@ export default function Planner() {
   useEffect(() => {
     const targetYear = parseInt(targetGraduation.year);
     const semesterList = generateSemesterList(targetGraduation.semester, targetYear);
-    
+
     setWorkloadLimits(prev => {
       const newLimits: { [term: string]: number } = {};
       semesterList.forEach(term => {
@@ -276,21 +278,21 @@ export default function Planner() {
   }, [targetGraduation.semester, targetGraduation.year]);
 
   const totalByTerm = useMemo(() =>
-      Object.fromEntries(
-        Object.entries(plan).map(([t, arr]) => [t, arr.reduce((s, c) => s + c.credits, 0)])
-      ), [plan]
+    Object.fromEntries(
+      Object.entries(plan).map(([t, arr]) => [t, arr.reduce((s, c) => s + c.credits, 0)])
+    ), [plan]
   )
 
   // ✅ Updated: Handles "Code|Credits|Term" format
   const parseManual = (text: string): ManualCourseInput[] => {
     return text.split(',').map(s => s.trim()).filter(Boolean).map(line => {
-        const parts = line.split('|').map(x => x?.trim())
-        const code = (parts[0] || '').replace(/\s+/g, ' ')
-        const credits = Number(parts[1] || 3) || 3
-        const term = parts[2] || undefined; // e.g. "Spring 2026"
-        
-        return { code, credits, term }
-      })
+      const parts = line.split('|').map(x => x?.trim())
+      const code = (parts[0] || '').replace(/\s+/g, ' ')
+      const credits = Number(parts[1] || 3) || 3
+      const term = parts[2] || undefined; // e.g. "Spring 2026"
+
+      return { code, credits, term }
+    })
   }
 
   const generateWorkloadLimits = (targetSem: string, targetYear: number) => {
@@ -298,12 +300,12 @@ export default function Planner() {
     const now = new Date();
     const currentMonth = now.getMonth();
     let y = now.getFullYear();
-    
-    if (currentMonth >= 7) { 
-        y += 1; 
+
+    if (currentMonth >= 7) {
+      y += 1;
     }
 
-    const safetyLimitYear = targetYear + 5; 
+    const safetyLimitYear = targetYear + 5;
 
     while (y <= safetyLimitYear) {
       const semesters = ['Spring', 'Fall'];
@@ -313,18 +315,18 @@ export default function Planner() {
         if (y > targetYear) return limits;
 
         if (y === targetYear) {
-            if (s === 'Spring') {
-                limits[`${s} ${y}`] = 17;
-                if (targetSem === 'Spring') return limits; 
-            }
-            else if (s === 'Fall') {
-                if (targetSem === 'Fall') {
-                    limits[`${s} ${y}`] = 17;
-                    return limits; 
-                }
-            }
-        } else {
+          if (s === 'Spring') {
             limits[`${s} ${y}`] = 17;
+            if (targetSem === 'Spring') return limits;
+          }
+          else if (s === 'Fall') {
+            if (targetSem === 'Fall') {
+              limits[`${s} ${y}`] = 17;
+              return limits;
+            }
+          }
+        } else {
+          limits[`${s} ${y}`] = 17;
         }
       }
       y++;
@@ -337,6 +339,7 @@ export default function Planner() {
     if (!userId) { alert('Please log in first.'); return; }
 
     setBusy(true);
+    setProcessingMessage('Generating plan...');
     setErrorMsg(null);
     setSuccessMsg(null);
     setWarnings([]);
@@ -346,16 +349,16 @@ export default function Planner() {
     try {
       const avoidList = options.avoidCourses.split(',').map(s => s.trim()).filter(Boolean);
       const prefList = options.preferredCourses.split(',').map(s => s.trim()).filter(Boolean);
-      
+
       // Parse manual courses
       const manualInputList = parseManual(manualCourses);
       // Only send code to backend as preference
-      const manualCodes = manualInputList.map(m => m.code); 
+      const manualCodes = manualInputList.map(m => m.code);
       const combinedPref = [...new Set([...prefList, ...manualCodes])];
 
       // Use user-defined workload limits if available, otherwise generate defaults
-      const workloads = Object.keys(workloadLimits).length > 0 
-        ? workloadLimits 
+      const workloads = Object.keys(workloadLimits).length > 0
+        ? workloadLimits
         : generateWorkloadLimits(targetGraduation.semester, parseInt(targetGraduation.year));
 
       const payload = {
@@ -387,7 +390,7 @@ export default function Planner() {
         data.proposedPlan.forEach(d => {
           const termKey = `${d.semester} ${d.year}`;
           if (!newPlan[termKey]) newPlan[termKey] = [];
-          
+
           const courseCode = `${d.department} ${d.courseNum}`;
           newPlan[termKey].push({
             id: d.id || undefined,
@@ -406,29 +409,29 @@ export default function Planner() {
       // 2. ✅ Force Add Manual Courses (if specified with term)
       manualInputList.forEach(m => {
         if (m.term) {
-            const termKey = m.term; // e.g., "Spring 2026"
-            if (!newPlan[termKey]) newPlan[termKey] = [];
-            
-            // Check duplicates
-            const exists = newPlan[termKey].some(c => c.code === m.code);
-            if (!exists) {
-                const parts = m.code.split(' ');
-                newPlan[termKey].push({
-                    department: parts[0] || 'MANUAL',
-                    courseNum: parseInt(parts[1]) || 0,
-                    code: m.code,
-                    title: m.code,
-                    credits: m.credits,
-                    tags: ['Force-Added'],
-                    isNonRequired: true, // Assume non-required until validated
-                    prereqWarnings: []
-                });
-            }
+          const termKey = m.term; // e.g., "Spring 2026"
+          if (!newPlan[termKey]) newPlan[termKey] = [];
+
+          // Check duplicates
+          const exists = newPlan[termKey].some(c => c.code === m.code);
+          if (!exists) {
+            const parts = m.code.split(' ');
+            newPlan[termKey].push({
+              department: parts[0] || 'MANUAL',
+              courseNum: parseInt(parts[1]) || 0,
+              code: m.code,
+              title: m.code,
+              credits: m.credits,
+              tags: ['Force-Added'],
+              isNonRequired: true, // Assume non-required until validated
+              prereqWarnings: []
+            });
+          }
         }
       });
 
       if (Object.keys(newPlan).length === 0 && data.totalCredits === 0) {
-          setWarnings(prev => [...prev, 'No courses were planned.']);
+        setWarnings(prev => [...prev, 'No courses were planned.']);
       }
 
       setPlan(newPlan);
@@ -456,6 +459,7 @@ export default function Planner() {
     if (Object.keys(plan).length === 0) { alert('No plan to save.'); return; }
 
     setBusy(true);
+    setProcessingMessage('Saving plan...');
     setSuccessMsg(null);
     setErrorMsg(null);
 
@@ -477,7 +481,7 @@ export default function Planner() {
             year: year,
             credits: c.credits,
             sbcs: c.tags || [],
-            unsatisfiedPrerequisites: [], 
+            unsatisfiedPrerequisites: [],
           });
         });
       });
@@ -494,7 +498,7 @@ export default function Planner() {
         throw new Error(`Failed to save plan: ${errText}`);
       }
 
-      await fetchCurrentPlan(userId); 
+      await fetchCurrentPlan(userId);
       setSuccessMsg('Plan saved successfully!');
       setWarnings([]);
       setValidationResult(null);
@@ -511,6 +515,7 @@ export default function Planner() {
     if (!userId) return;
 
     setBusy(true);
+    setProcessingMessage('Validating plan...');
     setValidationResult(null);
     setErrorMsg(null);
     setWarnings([]);
@@ -532,39 +537,39 @@ export default function Planner() {
         setValidationResult(data.validation);
 
         if (data.validation.degreeRequirementStatus) {
-          setDegreeStatus({ declaredMajors: data.validation.degreeRequirementStatus }); 
+          setDegreeStatus({ declaredMajors: data.validation.degreeRequirementStatus });
         }
 
         const nonRequiredSet = new Set(data.validation.nonRequiredClasses.map(i => i.course));
-        
+
         const warningMap = new Map<string, string[]>();
         data.validation.unsatisfiedPrerequisites.forEach(issue => {
-            const key = `${issue.course}|${issue.semester}|${issue.year}`; 
-            const msgs = [];
-            if(issue.missingPrerequisites) msgs.push(...issue.missingPrerequisites);
-            if(issue.missingCorequisites) msgs.push(...issue.missingCorequisites);
-            if(issue.violatedAntirequisites) msgs.push(...issue.violatedAntirequisites);
-            warningMap.set(key, msgs);
+          const key = `${issue.course}|${issue.semester}|${issue.year}`;
+          const msgs = [];
+          if (issue.missingPrerequisites) msgs.push(...issue.missingPrerequisites);
+          if (issue.missingCorequisites) msgs.push(...issue.missingCorequisites);
+          if (issue.violatedAntirequisites) msgs.push(...issue.violatedAntirequisites);
+          warningMap.set(key, msgs);
         });
 
         setPlan(prevPlan => {
-            const nextPlan = { ...prevPlan };
-            Object.keys(nextPlan).forEach(termKey => {
-                const [sem, yrStr] = termKey.split(' ');
-                const yr = parseInt(yrStr);
-                
-                nextPlan[termKey] = nextPlan[termKey].map(c => {
-                    const uniqueKey = `${c.code}|${sem}|${yr}`;
-                    const warnings = warningMap.get(uniqueKey);
-                    
-                    return {
-                        ...c,
-                        isNonRequired: nonRequiredSet.has(c.code),
-                        prereqWarnings: warnings
-                    };
-                });
+          const nextPlan = { ...prevPlan };
+          Object.keys(nextPlan).forEach(termKey => {
+            const [sem, yrStr] = termKey.split(' ');
+            const yr = parseInt(yrStr);
+
+            nextPlan[termKey] = nextPlan[termKey].map(c => {
+              const uniqueKey = `${c.code}|${sem}|${yr}`;
+              const warnings = warningMap.get(uniqueKey);
+
+              return {
+                ...c,
+                isNonRequired: nonRequiredSet.has(c.code),
+                prereqWarnings: warnings
+              };
             });
-            return nextPlan;
+          });
+          return nextPlan;
         });
 
         setSuccessMsg('Plan validation complete!');
@@ -720,7 +725,7 @@ export default function Planner() {
                 {major.overallStatus || 'PENDING'}
               </span>
             </div>
-            
+
             <div className="major-summary">
               <div className="summary-item">
                 <span className="summary-label">Credits:</span>
@@ -762,7 +767,7 @@ export default function Planner() {
                 </div>
               </div>
             )}
-            
+
             {major.sbcRequirements?.sbcCategories && (
               <div className="sbc-section">
                 <h5 className="section-title">Related SBCs</h5>
@@ -948,14 +953,14 @@ export default function Planner() {
     <div className="planner-page">
       <div className="generator-panel">
         <h2>Plan Generator</h2>
-        
+
         {successMsg && <div className="msg success">{successMsg}</div>}
         {errorMsg && <div className="msg error">{errorMsg}</div>}
         {warnings.length > 0 && (
-            <div className="msg warning">
-                <strong>Warnings:</strong>
-                <ul>{warnings.map((w,i) => <li key={i}>{w}</li>)}</ul>
-            </div>
+          <div className="msg warning">
+            <strong>Warnings:</strong>
+            <ul>{warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
+          </div>
         )}
 
         <div className="card">
@@ -963,35 +968,35 @@ export default function Planner() {
           <div className="grid-2">
             <label>
               <span>Semester</span>
-              <select value={targetGraduation.semester} onChange={e => setTargetGraduation({...targetGraduation, semester: e.target.value})}>
+              <select value={targetGraduation.semester} onChange={e => setTargetGraduation({ ...targetGraduation, semester: e.target.value })}>
                 <option>Spring</option><option>Fall</option>
               </select>
             </label>
             <label>
               <span>Year</span>
-              <input value={targetGraduation.year} onChange={e => setTargetGraduation({...targetGraduation, year: e.target.value})} />
+              <input value={targetGraduation.year} onChange={e => setTargetGraduation({ ...targetGraduation, year: e.target.value })} />
             </label>
           </div>
         </div>
 
         <div className="card">
           <div className="card-title">Semester Max Credits</div>
-          <p style={{fontSize:'0.85em', color:'#666', marginBottom:'10px'}}>
+          <p style={{ fontSize: '0.85em', color: '#666', marginBottom: '10px' }}>
             Set maximum credits for each semester until graduation
           </p>
-          <div style={{maxHeight: '300px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '4px', padding: '10px'}}>
-            <table style={{width: '100%', borderCollapse: 'collapse'}}>
+          <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '4px', padding: '10px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{borderBottom: '2px solid #ddd'}}>
-                  <th style={{textAlign: 'left', padding: '8px', fontWeight: 'bold'}}>Semester</th>
-                  <th style={{textAlign: 'left', padding: '8px', fontWeight: 'bold'}}>Max Credits</th>
+                <tr style={{ borderBottom: '2px solid #ddd' }}>
+                  <th style={{ textAlign: 'left', padding: '8px', fontWeight: 'bold' }}>Semester</th>
+                  <th style={{ textAlign: 'left', padding: '8px', fontWeight: 'bold' }}>Max Credits</th>
                 </tr>
               </thead>
               <tbody>
                 {generateSemesterList(targetGraduation.semester, parseInt(targetGraduation.year)).map(term => (
-                  <tr key={term} style={{borderBottom: '1px solid #eee'}}>
-                    <td style={{padding: '8px'}}>{term}</td>
-                    <td style={{padding: '8px'}}>
+                  <tr key={term} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '8px' }}>{term}</td>
+                    <td style={{ padding: '8px' }}>
                       <input
                         type="number"
                         min="1"
@@ -1020,82 +1025,83 @@ export default function Planner() {
         </div>
 
         <div className="card">
-            <div className="card-title">Preferences</div>
-            <label>
-                <span>Preferred Courses</span>
-                <input placeholder="CSE 320, AMS 301" value={options.preferredCourses} onChange={e => setOptions({...options, preferredCourses: e.target.value})} />
-            </label>
-            <label>
-                <span>Avoid Courses</span>
-                <input placeholder="CSE 353" value={options.avoidCourses} onChange={e => setOptions({...options, avoidCourses: e.target.value})} />
-            </label>
-            <div className="subsection">
-                <div className="sub-title">SBC Priorities (1-5)</div>
-                <div className="sbc-grid">
-                    {options.sbcPrefs.map((p, i) => (
-                        <div key={p.area} className="sbc-row">
-                            <span>{p.area}</span>
-                            <select value={p.score} onChange={e => updateSbcScore(i, Number(e.target.value))}>
-                                {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
-                            </select>
-                        </div>
-                    ))}
+          <div className="card-title">Preferences</div>
+          <label>
+            <span>Preferred Courses</span>
+            <input placeholder="CSE 320, AMS 301" value={options.preferredCourses} onChange={e => setOptions({ ...options, preferredCourses: e.target.value })} />
+          </label>
+          <label>
+            <span>Avoid Courses</span>
+            <input placeholder="CSE 353" value={options.avoidCourses} onChange={e => setOptions({ ...options, avoidCourses: e.target.value })} />
+          </label>
+          <div className="subsection">
+            <div className="sub-title">SBC Priorities (1-5)</div>
+            <div className="sbc-grid">
+              {options.sbcPrefs.map((p, i) => (
+                <div key={p.area} className="sbc-row">
+                  <span>{p.area}</span>
+                  <select value={p.score} onChange={e => updateSbcScore(i, Number(e.target.value))}>
+                    {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
                 </div>
+              ))}
             </div>
+          </div>
         </div>
 
         <div className="card">
-            <div className="card-title">Manual Add</div>
-            <p style={{fontSize:'0.8em', color:'#666', marginBottom:'5px'}}>
-                Format: <code>CODE|CREDITS</code> (auto-place) or <code>CODE|CREDITS|TERM YEAR</code> (force-add)
-            </p>
-            <textarea placeholder="e.g., CSE 373|3|Spring 2026, CSE 327|3" value={manualCourses} onChange={e => setManualCourses(e.target.value)} />
-            <button className="apply-btn" onClick={handleGenerate} disabled={busy || !userId}>
-                {busy ? 'Generating...' : 'Generate Plan'}
-            </button>
+          <div className="card-title">Manual Add</div>
+          <p style={{ fontSize: '0.8em', color: '#666', marginBottom: '5px' }}>
+            Format: <code>CODE|CREDITS</code> (auto-place) or <code>CODE|CREDITS|TERM YEAR</code> (force-add)
+          </p>
+          <textarea placeholder="e.g., CSE 373|3|Spring 2026, CSE 327|3" value={manualCourses} onChange={e => setManualCourses(e.target.value)} />
+          <button className="apply-btn" onClick={handleGenerate} disabled={busy || !userId}>
+            {busy ? 'Generating...' : 'Generate Plan'}
+          </button>
         </div>
       </div>
 
       <div className="plan-panel">
         <div className="panel-header">
-            <h2>Generated Plan</h2>
-            <div className="action-buttons">
-                {Object.keys(plan).length > 0 && (
-                    <>
-                        <button className="btn-validate" onClick={handleValidate} disabled={busy}>Validate</button>
-                        <button className="btn-save" onClick={handleConfirm} disabled={busy}>Save</button>
-                    </>
-                )}
-            </div>
+          <h2>Generated Plan</h2>
+          <div className="action-buttons">
+            {Object.keys(plan).length > 0 && (
+              <>
+                <button className="btn-validate" onClick={handleValidate} disabled={busy}>Validate</button>
+                <button className="btn-save" onClick={handleConfirm} disabled={busy}>Save</button>
+              </>
+            )}
+          </div>
         </div>
 
         {(degreeStatus || validationResult) && (
-            <div className="report-panel">
-                {degreeStatus && (
-                    <div className="validation-section degree-status-section">
-                        <h3 className="panel-title">Degree Requirement Status</h3>
-                        {renderDegreeStatusDetails(degreeStatus)}
-                    </div>
-                )}
-                
-                {validationResult && (
-                    <div className="validation-section validation-details-section">
-                        <h3 className="panel-title">Validation Details</h3>
-                        {renderValidationDetails(validationResult)}
-                    </div>
-                )}
-            </div>
+          <div className="report-panel">
+            {degreeStatus && (
+              <div className="validation-section degree-status-section">
+                <h3 className="panel-title">Degree Requirement Status</h3>
+                {renderDegreeStatusDetails(degreeStatus)}
+              </div>
+            )}
+
+            {validationResult && (
+              <div className="validation-section validation-details-section">
+                <h3 className="panel-title">Validation Details</h3>
+                {renderValidationDetails(validationResult)}
+              </div>
+            )}
+          </div>
         )}
 
         <div className="term-grid">
-            {Object.keys(plan).sort((a,b) => {
-                const [sA, yA] = a.split(' '); const [sB, yB] = b.split(' ');
-                if (yA !== yB) return parseInt(yA) - parseInt(yB);
-                const order: any = {Spring: 1, Summer: 2, Fall: 3};
-                return (order[sA] || 9) - (order[sB] || 9);
-            }).map(col)}
+          {Object.keys(plan).sort((a, b) => {
+            const [sA, yA] = a.split(' '); const [sB, yB] = b.split(' ');
+            if (yA !== yB) return parseInt(yA) - parseInt(yB);
+            const order: any = { Spring: 1, Summer: 2, Fall: 3 };
+            return (order[sA] || 9) - (order[sB] || 9);
+          }).map(col)}
         </div>
       </div>
+      <LoadingModal isOpen={busy} message={processingMessage} />
     </div>
   )
 }

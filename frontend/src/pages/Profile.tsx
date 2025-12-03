@@ -3,6 +3,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import LoadingModal from "../components/LoadingModal";
 
 /**
  * Profile Page Component
@@ -10,7 +11,7 @@ import { useEffect, useMemo, useState } from "react";
  */
 
 /** ===== Types ===== */
-type Role = "STUDENT" | "ADVISOR" | "REGISTRAR" | "ADMIN"; 
+type Role = "STUDENT" | "ADVISOR" | "REGISTRAR" | "ADMIN";
 
 type CurrentUserInfo = { netId: string; roles: Role[] };
 
@@ -21,22 +22,22 @@ type PersonBasic = {
   lastName?: string | null;
   email?: string | null;
   role?: "student" | "advisor" | "registrar" | "instructor" | "unknown";
-  
+
   // Advisor-specific fields
-  unitLevel?: "university" | "college" | "department" | null;  
-  academicUnit?: string | null;  
-  
+  unitLevel?: "university" | "college" | "department" | null;
+  academicUnit?: string | null;
+
   // Additional fields from users table (Instructor/General fields)
   department?: string | null;
   officeHours?: string | null;
   officeLocation?: string | null;
 
   // Student/General fields
-  major?: string | null;  
-  gpa?: number | null;  
-  graduationYear?: number | null;  
+  major?: string | null;
+  gpa?: number | null;
+  graduationYear?: number | null;
   profilePictureUrl?: string | null;
-  
+
   // Additional fields for status display
   classStanding?: string | null; // Class Standing (e.g., U1, U2...)
 };
@@ -90,8 +91,6 @@ const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
   TSM: 'Technological Systems Management',
 };
 
-type AcademicEvent = { date: string; title: string; type: string };
-
 type GpaTerm = { term: string; gpa: number | null; credits: number };
 type GpaSummary = {
   terms: GpaTerm[];
@@ -130,12 +129,12 @@ type RequirementStatus = {
   note?: string | null;
 };
 
-type Hold = {  
+type Hold = {
   holdId?: number;
-  code?: string;  
-  title?: string;  
+  code?: string;
+  title?: string;
   holdType?: string;
-  placedAt: string;  
+  placedAt: string;
   placedBy?: string | { userId: number; name: string };
   reason?: string;
 };
@@ -214,7 +213,7 @@ function computeGpaFromHistory(history: HistoricClass[]): GpaSummary {
 
   const standing =
     cumulative.gpa == null ? "-" :
-    cumulative.gpa >= 2.0 ? "Good Standing" : "Probation";
+      cumulative.gpa >= 2.0 ? "Good Standing" : "Probation";
 
   return { terms, cumulative, standing };
 }
@@ -226,12 +225,12 @@ function normalizeReqs(raw: any): RequirementStatus[] {
   const arr = Array.isArray(raw)
     ? raw
     : Array.isArray(raw?.items)
-    ? raw.items
-    : Array.isArray(raw?.data)
-    ? raw.data
-    : Array.isArray(raw?.requirements)
-    ? raw.requirements
-    : [];
+      ? raw.items
+      : Array.isArray(raw?.data)
+        ? raw.data
+        : Array.isArray(raw?.requirements)
+          ? raw.requirements
+          : [];
 
   return (arr as any[]).map((r) => {
     let status: RequirementStatus["status"] = "pending";
@@ -243,11 +242,11 @@ function normalizeReqs(raw: any): RequirementStatus[] {
     const using =
       r.usingClasses && Array.isArray(r.usingClasses)
         ? r.usingClasses.map((c: any) => ({
-            subject: c.subject || c.department || "",
-            courseNum: Number(c.courseNum ?? c.course_num ?? 0),
-            term: c.term || c.termCode || undefined,
-            grade: c.grade ?? null,
-          }))
+          subject: c.subject || c.department || "",
+          courseNum: Number(c.courseNum ?? c.course_num ?? 0),
+          term: c.term || c.termCode || undefined,
+          grade: c.grade ?? null,
+        }))
         : [];
 
     return {
@@ -282,15 +281,15 @@ function transformFromStatus(statusData: any): RequirementStatus[] {
         for (const g of major.groups) {
           const stat: RequirementStatus["status"] =
             g.status === "SATISFIED" ? "satisfied" :
-            g.status === "NOT_SATISFIED" ? "unsatisfied" : "pending";
+              g.status === "NOT_SATISFIED" ? "unsatisfied" : "pending";
 
           const using = Array.isArray(g.satisfiedCourses)
             ? g.satisfiedCourses.map((c: any) => ({
-                subject: c.subject || c.department || "",
-                courseNum: Number(c.courseNum ?? c.course_num ?? 0),
-                term: c.term || c.termCode || undefined,
-                grade: c.grade ?? null,
-              }))
+              subject: c.subject || c.department || "",
+              courseNum: Number(c.courseNum ?? c.course_num ?? 0),
+              term: c.term || c.termCode || undefined,
+              grade: c.grade ?? null,
+            }))
             : [];
 
           out.push({
@@ -317,8 +316,8 @@ function transformFromStatus(statusData: any): RequirementStatus[] {
             major.overallStatus === "SATISFIED"
               ? "satisfied"
               : major.overallStatus === "IN_PROGRESS"
-              ? "pending"
-              : "unsatisfied",
+                ? "pending"
+                : "unsatisfied",
           usingClasses: [],
           note: `Progress: ${major.satisfiedGroups || 0}/${major.totalGroups || 0} groups satisfied`,
         });
@@ -336,15 +335,15 @@ function transformFromStatus(statusData: any): RequirementStatus[] {
         for (const g of minor.groups) {
           const stat: RequirementStatus["status"] =
             g.status === "SATISFIED" ? "satisfied" :
-            g.status === "NOT_SATISFIED" ? "unsatisfied" : "pending";
+              g.status === "NOT_SATISFIED" ? "unsatisfied" : "pending";
 
           const using = Array.isArray(g.satisfiedCourses)
             ? g.satisfiedCourses.map((c: any) => ({
-                subject: c.subject || c.department || "",
-                courseNum: Number(c.courseNum ?? c.course_num ?? 0),
-                term: c.term || c.termCode || undefined,
-                grade: c.grade ?? null,
-              }))
+              subject: c.subject || c.department || "",
+              courseNum: Number(c.courseNum ?? c.course_num ?? 0),
+              term: c.term || c.termCode || undefined,
+              grade: c.grade ?? null,
+            }))
             : [];
 
           out.push({
@@ -454,7 +453,8 @@ export default function ProfilePage() {
   const [coursePlan, setCoursePlan] = useState<PlannedCourse[]>([]);
 
   /** ===== Admin utils ===== */
-  const [events, setEvents] = useState<AcademicEvent[]>([]);
+  // events state removed
+
   const [sysDate, setSysDate] = useState<string>("");
   const [overridden, setOverridden] = useState(false);
 
@@ -494,28 +494,9 @@ export default function ProfilePage() {
     },
   };
 
-  /** ===== Upload YAML ===== */
-  async function onUploadYaml(file: File | null) {
-    if (!file) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const result = await safeFetch(`${BASE}/api/admin/academic-calendar/import`, { method: "POST", body: fd });
-      setMsg(
-        `Imported: ${result.imported} (skipped ${result.skipped})${
-          result.errors?.length ? "\nErrors:\n- " + result.errors.join("\n- ") : ""
-        }`
-      );
-      const ev = await safeFetch(`${BASE}/api/admin/academic-calendar`);
-      setEvents(Array.isArray(ev) ? ev : []);
-    } catch (e: any) {
-      setMsg(`Upload failed: ${e.message}`);
-    } finally {
-      setBusy(false);
-    }
-  }
+  /** ===== Upload YAML (Moved to DataImport) ===== */
+  // onUploadYaml removed
+
 
   /** ===== Initial load ===== */
   useEffect(() => {
@@ -551,7 +532,7 @@ export default function ProfilePage() {
           safeFetch(`${BASE}/api/admin/system-date`).catch(() => null),
           safeFetch(`${BASE}/api/classes/terms`).catch(() => []),
         ]);
-        
+
         let termStrings: string[] = [];
         if (Array.isArray(termsData) && termsData.length > 0) {
           termStrings = termsData.map((t: any) => {
@@ -565,20 +546,20 @@ export default function ProfilePage() {
             return null;
           }).filter((t: string | null) => t !== null) as string[];
         }
-        
+
         // TP: Used Cursor - Term logic updated: availableTerms uses only server response
         let uniqueTerms = [...new Set(termStrings)];
 
         // TP: Used Cursor - Provide temporary default values if loading fails (maintains previous logic)
         if (uniqueTerms.length === 0) {
-            const currentYear = new Date().getFullYear();
-            uniqueTerms = [
-                `${currentYear + 1}-Spring`,
-                `${currentYear}-Fall`,
-                `${currentYear}-SummerII`,
-                `${currentYear}-SummerI`,
-                `${currentYear}-Spring`,
-            ];
+          const currentYear = new Date().getFullYear();
+          uniqueTerms = [
+            `${currentYear + 1}-Spring`,
+            `${currentYear}-Fall`,
+            `${currentYear}-SummerII`,
+            `${currentYear}-SummerI`,
+            `${currentYear}-Spring`,
+          ];
         }
 
         uniqueTerms.sort((a, b) => {
@@ -588,7 +569,7 @@ export default function ProfilePage() {
           const semOrder: Record<string, number> = { 'Fall': 3, 'SummerII': 2, 'SummerI': 1.5, 'Spring': 1 };
           return (semOrder[semB] || 0) - (semOrder[semA] || 0);
         });
-        
+
         const defaultTerm = uniqueTerms.length > 0 ? uniqueTerms[0] : "2025-Fall";
         setAvailableTerms(uniqueTerms);
         setMyTerm(defaultTerm);
@@ -614,12 +595,11 @@ export default function ProfilePage() {
           });
         }
 
-        setEvents(Array.isArray(ev) ? ev : []);
         if (now) {
           setSysDate(now.currentDate ?? "");
           setOverridden(!!now.overridden);
         }
-        
+
       } catch (e: any) {
         setMsg(e.message || "Failed to load.");
         setMe(null);
@@ -638,13 +618,13 @@ export default function ProfilePage() {
         const termParts = myTerm.split('-');
         const termYear = termParts.length === 2 ? parseInt(termParts[0]) : null;
         const termSemester = termParts.length === 2 ? termParts[1] : null;
-        
+
         const sched = await safeFetch(
           `${buildSidPrefix(myProfile.studentId)}/schedule?term=${encodeURIComponent(myTerm)}`
         ).catch(() => []);
-        
+
         let scheduleData: ScheduleClass[] = Array.isArray(sched) ? (sched as ScheduleClass[]) : [];
-        
+
         if (scheduleData.length === 0 && currentUserId && termYear && termSemester) {
           try {
             const rosterData = await safeFetch(`${BASE}/api/roster/student/${currentUserId}`).catch(() => []);
@@ -652,7 +632,7 @@ export default function ProfilePage() {
               const normalizedSemester = termSemester?.charAt(0).toUpperCase() + termSemester?.slice(1).toLowerCase();
               const filteredRoster = rosterData.filter((item: any) => {
                 const itemYear = typeof item.year === 'number' ? item.year : parseInt(item.year);
-                const itemSemester = item.semester ? 
+                const itemSemester = item.semester ?
                   (item.semester.charAt(0).toUpperCase() + item.semester.slice(1).toLowerCase()) : null;
                 return itemYear === termYear && itemSemester === normalizedSemester;
               });
@@ -814,7 +794,7 @@ export default function ProfilePage() {
             grade: item.grade || null
           }));
         }
-      } catch {}
+      } catch { }
     }
 
     if (userId && (!cp || (Array.isArray(cp) && cp.length === 0))) {
@@ -829,7 +809,7 @@ export default function ProfilePage() {
             credits: item.credits || 0
           }));
         }
-      } catch {}
+      } catch { }
     }
 
     if (userId && (!ch || (Array.isArray(ch) && ch.length === 0))) {
@@ -866,7 +846,7 @@ export default function ProfilePage() {
             gpnc: false
           }));
         }
-      } catch {}
+      } catch { }
     } else {
       if (Array.isArray(ch)) {
         ch = ch.map((item: any) => ({ ...item, gpnc: !!item.gpnc }));
@@ -918,7 +898,7 @@ export default function ProfilePage() {
         if (transformed.length > 0) {
           normalizedDeg = transformed;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // === Waivers normalize + userId fallback ===
@@ -928,7 +908,7 @@ export default function ProfilePage() {
         const waiversByUser = await safeFetch(`${BASE}/api/waivers/time-conflicts?studentId=${encodeURIComponent(String(userId))}`).catch(() => []);
         const w2 = normalizeWaivers(waiversByUser);
         if (w2.length > 0) w = w2;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (sid) sinks.setProfile(p as StudentProfile | null);
@@ -1044,6 +1024,7 @@ export default function ProfilePage() {
   };
 
   const isAdvisorOrRegistrar = (me?.roles || []).some(r => r === 'ADVISOR' || r === 'REGISTRAR');
+  const isRegistrar = (me?.roles || []).includes('REGISTRAR');
 
   return (
     <div style={{ maxWidth: 1200, margin: "24px auto", padding: "0 16px" }}>
@@ -1068,8 +1049,8 @@ export default function ProfilePage() {
             <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 160px 1fr", rowGap: 8, columnGap: 12 }}>
               <div style={{ color: "#666" }}>Name</div>
               <div>{fmt.fullName(myPerson || undefined)}</div>
-              <div style={{ color: "#666" }}>Roles</div> 
-              <div>{me?.roles?.length ? me.roles.join(", ") : "-"}</div> 
+              <div style={{ color: "#666" }}>Roles</div>
+              <div>{me?.roles?.length ? me.roles.join(", ") : "-"}</div>
               <div style={{ color: "#666" }}>SBU ID</div>
               <div>{myPerson?.sbuId || "-"}</div>
               <div style={{ color: "#666" }}>Email</div>
@@ -1095,10 +1076,10 @@ export default function ProfilePage() {
               )}
 
               {myPerson?.classStanding && (
-                  <>
-                    <div style={{ color: "#666" }}>Class Standing</div>
-                    <div>{myPerson.classStanding}</div>
-                  </>
+                <>
+                  <div style={{ color: "#666" }}>Class Standing</div>
+                  <div>{myPerson.classStanding}</div>
+                </>
               )}
 
               {myPerson?.department && (
@@ -1223,136 +1204,121 @@ export default function ProfilePage() {
 
       {/* ===== Panel 3: Student Search & Target Profile ===== */}
       {isAdvisorOrRegistrar && (
-      <section style={{ background: "#f0f5ff", border: "1px solid #adc6ff", borderRadius: 12, padding: 16, marginTop: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Find a Student</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Enter studentId or email"
-            style={{ flex: 1, padding: "8px 10px", border: "1px solid #ddd", borderRadius: 6 }}
-            disabled={searching || busy}
-          />
-          <button onClick={doSearchStudent} disabled={searching || busy || !search.trim()}>
-            {searching ? "Searching..." : "Search"}
-          </button>
-        </div>
-
-        {searchResult && (
-          <div style={{ border: "1px solid #e6f4ff", background: "#fff", borderRadius: 8, padding: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                  {searchResult.name} ({searchResult.studentId})
-                </div>
-                <div style={{ fontSize: 13, color: "#666" }}>
-                  {searchResult.email} • {searchResult.major} • {searchResult.status} • Entry {searchResult.entryYear}
-                </div>
-              </div>
-              <button onClick={useSearchedAsTarget}>View target profile</button>
-            </div>
+        <section style={{ background: "#f0f5ff", border: "1px solid #adc6ff", borderRadius: 12, padding: 16, marginTop: 16 }}>
+          <h2 style={{ marginTop: 0 }}>Find a Student</h2>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Enter studentId or email"
+              style={{ flex: 1, padding: "8px 10px", border: "1px solid #ddd", borderRadius: 6 }}
+              disabled={searching || busy}
+            />
+            <button onClick={doSearchStudent} disabled={searching || busy || !search.trim()}>
+              {searching ? "Searching..." : "Search"}
+            </button>
           </div>
-        )}
-      </section>
+
+          {searchResult && (
+            <div style={{ border: "1px solid #e6f4ff", background: "#fff", borderRadius: 8, padding: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    {searchResult.name} ({searchResult.studentId})
+                  </div>
+                  <div style={{ fontSize: 13, color: "#666" }}>
+                    {searchResult.email} • {searchResult.major} • {searchResult.status} • Entry {searchResult.entryYear}
+                  </div>
+                </div>
+                <button onClick={useSearchedAsTarget}>View target profile</button>
+              </div>
+            </div>
+          )}
+        </section>
       )}
 
       {isAdvisorOrRegistrar && (
-      <StudentBundleView
-        title={`Target Student Profile${targetSid ? ` (${targetSid})` : ""}`}
-        term={term}
-        setTerm={setTerm}
-        availableTerms={availableTerms}
-        profile={profile}
-        details={details}
-        plans={plans}
-        summary={summary}
-        schedule={schedule}
-        admissionReqs={admissionReqs}
-        degreeReqs={degreeReqs}
-        holds={holds}
-        waivedConflicts={waivedConflicts}
-        audit={audit}
-        transfers={transfers}
-        classHistory={classHistory}
-        coursePlan={coursePlan}
-        fmt={fmt}
-        busy={busy}
-        isAdvisorOrRegistrar={isAdvisorOrRegistrar}
-        studentId={targetSid}
-        currentUserId={currentUserId}
-        onHoldsUpdate={async () => {
-          if (targetSid) {
-            await loadStudentBundle(targetSid, term, {
-              setProfile: setProfile,
-              setDetails: setDetails,
-              setSummary: setSummary,
-              setSchedule: setSchedule,
-              setPlans: setPlans,
-              setAdmissionReqs: setAdmissionReqs,
-              setDegreeReqs: setDegreeReqs,
-              setHolds: setHolds,
-              setWaived: setWaivedConflicts,
-              setAudit: setAudit,
-              setTransfers: setTransfers,
-              setClassHistory: setClassHistory,
-              setCoursePlan: setCoursePlan,
-            });
-          }
-        }}
-        onScheduleUpdate={async () => {
-          if (targetSid) {
-            await loadStudentBundle(targetSid, term, {
-              setProfile: setProfile,
-              setDetails: setDetails,
-              setSummary: setSummary,
-              setSchedule: setSchedule,
-              setPlans: setPlans,
-              setAdmissionReqs: setAdmissionReqs,
-              setDegreeReqs: setDegreeReqs,
-              setHolds: setHolds,
-              setWaived: setWaivedConflicts,
-              setAudit: setAudit,
-              setTransfers: setTransfers,
-              setClassHistory: setClassHistory,
-              setCoursePlan: setCoursePlan,
-            });
-          }
-        }}
-      />)}
+        <StudentBundleView
+          title={`Target Student Profile${targetSid ? ` (${targetSid})` : ""}`}
+          term={term}
+          setTerm={setTerm}
+          availableTerms={availableTerms}
+          profile={profile}
+          details={details}
+          plans={plans}
+          summary={summary}
+          schedule={schedule}
+          admissionReqs={admissionReqs}
+          degreeReqs={degreeReqs}
+          holds={holds}
+          waivedConflicts={waivedConflicts}
+          audit={audit}
+          transfers={transfers}
+          classHistory={classHistory}
+          coursePlan={coursePlan}
+          fmt={fmt}
+          busy={busy}
+          isAdvisorOrRegistrar={isAdvisorOrRegistrar}
+          studentId={targetSid}
+          currentUserId={currentUserId}
+          onHoldsUpdate={async () => {
+            if (targetSid) {
+              await loadStudentBundle(targetSid, term, {
+                setProfile: setProfile,
+                setDetails: setDetails,
+                setSummary: setSummary,
+                setSchedule: setSchedule,
+                setPlans: setPlans,
+                setAdmissionReqs: setAdmissionReqs,
+                setDegreeReqs: setDegreeReqs,
+                setHolds: setHolds,
+                setWaived: setWaivedConflicts,
+                setAudit: setAudit,
+                setTransfers: setTransfers,
+                setClassHistory: setClassHistory,
+                setCoursePlan: setCoursePlan,
+              });
+            }
+          }}
+          onScheduleUpdate={async () => {
+            if (targetSid) {
+              await loadStudentBundle(targetSid, term, {
+                setProfile: setProfile,
+                setDetails: setDetails,
+                setSummary: setSummary,
+                setSchedule: setSchedule,
+                setPlans: setPlans,
+                setAdmissionReqs: setAdmissionReqs,
+                setDegreeReqs: setDegreeReqs,
+                setHolds: setHolds,
+                setWaived: setWaivedConflicts,
+                setAudit: setAudit,
+                setTransfers: setTransfers,
+                setClassHistory: setClassHistory,
+                setCoursePlan: setCoursePlan,
+              });
+            }
+          }}
+        />)}
 
-      {/* ===== Admin: Academic calendar ===== */}
-      {isAdvisorOrRegistrar && (
-      <section style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Academic Calendar Import (YAML)</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="file" accept=".yaml,.yml" onChange={(e) => onUploadYaml(e.target.files?.[0] || null)} disabled={busy} />
-          <span style={{ fontSize: 12, color: "#888" }}>Fields: date (yyyy-MM-dd), title, type</span>
-        </div>
+      {/* ===== Admin: Academic calendar (MOVED TO DATA IMPORT) ===== */}
+      {/* 
+         TP: Used Cursor - Academic Calendar Import moved to DataImport page for Registrar only.
+         Removed from Profile page.
+      */}
 
-        <div style={{ marginTop: 12 }}>
-          <strong>Current Events ({events.length})</strong>
-          <ul style={{ marginTop: 8 }}>
-            {events.map((ev, i) => (
-              <li key={`${ev.date}-${ev.title}-${i}`}>[{ev.type}] {ev.date} — {ev.title}</li>
-            ))}
-            {!events.length && <li>No events imported</li>}
-          </ul>
-        </div>
-      </section>
-      )}
-
-      {isAdvisorOrRegistrar && (
-      <section style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Test System Date</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="date" value={sysDate ?? ""} onChange={(e) => setSysDate(e.target.value)} disabled={busy} />
-          <button onClick={applySystemDate} disabled={busy || !sysDate}>Apply Date</button>
-          <button onClick={clearSystemDate} disabled={busy || !overridden}>Clear Override</button>
-          <span style={{ fontSize: 12, color: overridden ? "#fa541c" : "#52c41a", marginLeft: 8 }}>
-            {overridden ? "Overridden" : "System Time"}
-          </span>
-        </div>
-      </section>
+      {isRegistrar && (
+        <section style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: 12, padding: 16, marginTop: 16 }}>
+          <h2 style={{ marginTop: 0 }}>Test System Date</h2>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input type="date" value={sysDate ?? ""} onChange={(e) => setSysDate(e.target.value)} disabled={busy} />
+            <button onClick={applySystemDate} disabled={busy || !sysDate}>Apply Date</button>
+            <button onClick={clearSystemDate} disabled={busy || !overridden}>Clear Override</button>
+            <span style={{ fontSize: 12, color: overridden ? "#fa541c" : "#52c41a", marginLeft: 8 }}>
+              {overridden ? "Overridden" : "System Time"}
+            </span>
+          </div>
+        </section>
       )}
     </div>
   );
@@ -1426,16 +1392,18 @@ function StudentBundleView(props: {
   const [holdType, setHoldType] = useState<'ACADEMIC_ADVISING' | 'FINANCIAL'>('ACADEMIC_ADVISING');
   const [holdReason, setHoldReason] = useState('');
   const [holdLoading, setHoldLoading] = useState(false);
-  
+
   // Drop class
   const [droppingClassId, setDroppingClassId] = useState<number | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('Processing...');
 
   // Filters for requirement tables
-  const [admFilter, setAdmFilter] = useState<'all'|'satisfied'|'pending'|'unsatisfied'>('all');
-  const [degFilter, setDegFilter] = useState<'all'|'satisfied'|'pending'|'unsatisfied'>('all');
+  const [admFilter, setAdmFilter] = useState<'all' | 'satisfied' | 'pending' | 'unsatisfied'>('all');
+  const [degFilter, setDegFilter] = useState<'all' | 'satisfied' | 'pending' | 'unsatisfied'>('all');
 
-  const filteredAdmission = admissionReqs.filter(r => admFilter==='all' ? true : r.status===admFilter);
-  const filteredDegree = degreeReqs.filter(r => degFilter==='all' ? true : r.status===degFilter);
+  const filteredAdmission = admissionReqs.filter(r => admFilter === 'all' ? true : r.status === admFilter);
+  const filteredDegree = degreeReqs.filter(r => degFilter === 'all' ? true : r.status === degFilter);
 
   const handleCreateHold = async () => {
     if (!studentId || !currentUserId) {
@@ -1460,6 +1428,8 @@ function StudentBundleView(props: {
     }
 
     setHoldLoading(true);
+    setIsProcessing(true);
+    setProcessingMessage('Creating hold...');
     try {
       const response = await fetch(`${backendBase}/api/holds`, {
         method: 'POST',
@@ -1486,6 +1456,7 @@ function StudentBundleView(props: {
       alert('Error creating hold: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setHoldLoading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -1498,6 +1469,8 @@ function StudentBundleView(props: {
       return;
     }
     setDroppingClassId(classId);
+    setIsProcessing(true);
+    setProcessingMessage('Dropping class...');
     try {
       const response = await fetch(`${backendBase}/api/users/${currentUserId}/classes/${classId}/drop`, {
         method: 'POST',
@@ -1518,12 +1491,15 @@ function StudentBundleView(props: {
       alert('Error dropping class. Please try again.');
     } finally {
       setDroppingClassId(null);
+      setIsProcessing(false);
     }
   };
-  
+
   const handleRemoveHold = async (holdId: number) => {
     if (!currentUserId) return;
     if (!confirm('Are you sure you want to remove this hold?')) return;
+    setIsProcessing(true);
+    setProcessingMessage('Removing hold...');
     try {
       const response = await fetch(`${backendBase}/api/holds/${holdId}?removedById=${currentUserId}`, {
         method: 'DELETE',
@@ -1538,6 +1514,8 @@ function StudentBundleView(props: {
       }
     } catch (error) {
       alert('Error removing hold: ' + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -1556,7 +1534,7 @@ function StudentBundleView(props: {
     if (k.startsWith("summerii") || k === "summer2" || k === "summer ii") return "SummerII";
     return "Fall";
   };
-  
+
   // TP: Used Cursor - Decompose current term
   const [curYearStr, curSemStr] = (term || "").split("-");
   const currentYear = curYearStr || "";
@@ -1573,7 +1551,7 @@ function StudentBundleView(props: {
     .map(c => String(c.year))
     .filter(Boolean);
   const yearsFromTermProp = currentYear ? [currentYear] : [];
-  
+
   const allYears = Array.from(new Set([
     ...yearsFromTerms, ...yearsFromHistory, ...yearsFromPlan, ...yearsFromTermProp
   ])).sort((a, b) => parseInt(b) - parseInt(a));
@@ -1588,7 +1566,7 @@ function StudentBundleView(props: {
   const semsFromPlan = (coursePlan || [])
     .filter(c => String(c.year) === currentYear && c.semester)
     .map(c => normSem(String(c.semester)));
-    
+
   const displayedSemesters = Array.from(new Set([
     ...semsFromTerms, ...semsFromHistory, ...semsFromPlan
   ]));
@@ -1618,15 +1596,15 @@ function StudentBundleView(props: {
         .map(c => normSem(String(c.semester))))
     ]));
     semsForYear.sort((a, b) => semesterOrder(b) - semesterOrder(a));
-    
+
     // TP: Used Cursor - New semester options list for this year
     const nextSemesterOptions = semsForYear.length ? semsForYear : [...ALL_SEMS];
-    
+
     // TP: Used Cursor - If current semester is in new options, keep it; otherwise select first option
     const previousSem = (term || "").split("-")[1] || "Fall";
     const nextSem = nextSemesterOptions.includes(normSem(previousSem))
-        ? normSem(previousSem)
-        : nextSemesterOptions[0];
+      ? normSem(previousSem)
+      : nextSemesterOptions[0];
 
     setTerm(`${y}-${nextSem}`);
   };
@@ -1650,7 +1628,7 @@ function StudentBundleView(props: {
         <div>No student profile loaded.</div>
       ) : (
         <>
-          {}
+          { }
           <div style={{ display: "grid", gridTemplateColumns: "150px 1fr", rowGap: 8, columnGap: 12, marginTop: 8 }}>
             <div style={{ color: "#666" }}>Name</div>
             <div>{profile.name}</div>
@@ -1709,12 +1687,12 @@ function StudentBundleView(props: {
                       if (details.degrees?.[index]) {
                         return details.degrees[index];
                       }
-                      
+
                       // If not found, try to find from plans array
                       const matchingPlan = plans.find(
                         p => p.kind === "MAJOR" && p.code === majorCode && p.declared === true
                       );
-                      
+
                       if (matchingPlan && matchingPlan.name) {
                         // Extract degree type from plan name (e.g., "CSE BS" -> "BS", "AMS BA" -> "BA")
                         const nameParts = matchingPlan.name.trim().split(/\s+/);
@@ -1725,11 +1703,11 @@ function StudentBundleView(props: {
                           }
                         }
                       }
-                      
+
                       // Default to BS if not found
                       return "BS";
                     };
-                    
+
                     return (
                       <div key={`${m}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 160px 160px", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
                         <div>{m}</div>
@@ -1834,7 +1812,7 @@ function StudentBundleView(props: {
               </h3>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                 <label style={{ fontSize: 12, color: '#666' }}>Filter</label>
-                <select value={admFilter} onChange={e=>setAdmFilter(e.target.value as any)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #ddd' }}>
+                <select value={admFilter} onChange={e => setAdmFilter(e.target.value as any)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #ddd' }}>
                   <option value="all">All</option>
                   <option value="satisfied">Satisfied</option>
                   <option value="pending">Pending</option>
@@ -1854,7 +1832,7 @@ function StudentBundleView(props: {
               </h3>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                 <label style={{ fontSize: 12, color: '#666' }}>Filter</label>
-                <select value={degFilter} onChange={e=>setDegFilter(e.target.value as any)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #ddd' }}>
+                <select value={degFilter} onChange={e => setDegFilter(e.target.value as any)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #ddd' }}>
                   <option value="all">All</option>
                   <option value="satisfied">Satisfied</option>
                   <option value="pending">Pending</option>
@@ -1912,7 +1890,7 @@ function StudentBundleView(props: {
                   style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd" }}
                   disabled={busy}
                 >
-                  {(allYears.length ? allYears : ["2026","2025","2024","2023"]).map((y) => (
+                  {(allYears.length ? allYears : ["2026", "2025", "2024", "2023"]).map((y) => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
@@ -2067,7 +2045,7 @@ function StudentBundleView(props: {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h3 style={{ marginTop: 0 }}>Registration Holds</h3>
               {isAdvisorOrRegistrar && studentId && currentUserId && (
-                <button 
+                <button
                   onClick={() => setShowHoldModal(true)}
                   disabled={busy || holdLoading}
                   style={{
@@ -2237,7 +2215,7 @@ function StudentBundleView(props: {
                   } else {
                     detailsDisplay = String(a.details);
                   }
-                  
+
                   return (
                     <div key={a.id} style={{ display: "grid", gridTemplateColumns: "200px 140px 180px 1fr", padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
                       <div>{fmt.date(a.timestamp)}</div>
@@ -2252,6 +2230,8 @@ function StudentBundleView(props: {
           </section>
         </>
       )}
+
+      <LoadingModal isOpen={isProcessing} message={processingMessage} />
     </section>
   );
 }

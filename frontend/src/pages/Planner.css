@@ -738,3 +738,41 @@ textarea {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   }
 }
+
+@media (max-width: 768px) {
+  .planner-page {
+    padding: 1.5rem;
+  }
+
+  .time-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .time-row select,
+  .time-row input {
+    width: 100%;
+  }
+
+  .time-row .icon-btn {
+    width: 100%;
+  }
+
+  .sbc-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sbc-area {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .card {
+    padding: 1.5rem;
+  }
+
+  .grid-2,
+  .grid-3 {
+    grid-template-columns: 1fr;
+  }
+}

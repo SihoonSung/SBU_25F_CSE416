@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import './DegreeRequirements.css';
+import LoadingModal from '../components/LoadingModal';
 
 interface DegreeRequirement {
   requirementId: number;
@@ -26,25 +27,27 @@ interface DegreeRequirement {
 const DegreeRequirements: React.FC = () => {
   const [requirements, setRequirements] = useState<DegreeRequirement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [expandedRequirementId, setExpandedRequirementId] = useState<number | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
-  
+
   // Filter states
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedDegreeType, setSelectedDegreeType] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [showRestrictedOnly, setShowRestrictedOnly] = useState(false);
-  
+
   // Available filter options
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [availableDegreeTypes, setAvailableDegreeTypes] = useState<string[]>([]);
   const [availableTerms, setAvailableTerms] = useState<string[]>([]);
-  
+
   const handleRequirementClick = (requirementId: number) => {
     setExpandedRequirementId(expandedRequirementId === requirementId ? null : requirementId);
   };
-  
+
   const handleSectionToggle = (sectionKey: string, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
@@ -59,7 +62,7 @@ const DegreeRequirements: React.FC = () => {
       return newSet;
     });
   };
-  
+
   const isSectionExpanded = (sectionKey: string) => {
     return expandedSections.has(sectionKey);
   };
@@ -73,7 +76,7 @@ const DegreeRequirements: React.FC = () => {
     const subjects = [...new Set(requirements.map(req => req.subjectCode))].sort();
     const degreeTypes = [...new Set(requirements.map(req => req.degreeType))].sort();
     const terms = [...new Set(requirements.map(req => req.effectiveTerm))].sort();
-    
+
     setAvailableSubjects(subjects);
     setAvailableDegreeTypes(degreeTypes);
     setAvailableTerms(terms);
@@ -87,7 +90,7 @@ const DegreeRequirements: React.FC = () => {
         credentials: 'include'
       });
       const data = await response.json();
-      
+
       if (data.success) {
         setRequirements(data.requirements);
       } else {
@@ -108,7 +111,7 @@ const DegreeRequirements: React.FC = () => {
         credentials: 'include'
       });
       const data = await response.json();
-      
+
       if (data.success) {
         setRequirements(data.requirements);
       } else {
@@ -124,7 +127,7 @@ const DegreeRequirements: React.FC = () => {
     try {
       const response = await fetch(`/api/degree-requirements/term/${effectiveTerm}`);
       const data = await response.json();
-      
+
       if (data.success) {
         setRequirements(data.requirements);
       } else {
@@ -143,7 +146,7 @@ const DegreeRequirements: React.FC = () => {
         credentials: 'include'
       });
       const data = await response.json();
-      
+
       if (data.success) {
         setRequirements(data.requirements);
       } else {
@@ -160,7 +163,7 @@ const DegreeRequirements: React.FC = () => {
     setSelectedDegreeType('');
     setSelectedTerm('');
     setShowRestrictedOnly(false);
-    
+
     if (subjectCode) {
       fetchRequirementsBySubject(subjectCode);
     } else {
@@ -173,7 +176,7 @@ const DegreeRequirements: React.FC = () => {
     setSelectedSubject('');
     setSelectedDegreeType('');
     setShowRestrictedOnly(false);
-    
+
     if (effectiveTerm) {
       fetchRequirementsByTerm(effectiveTerm);
     } else {
@@ -186,7 +189,7 @@ const DegreeRequirements: React.FC = () => {
     setSelectedSubject('');
     setSelectedDegreeType('');
     setSelectedTerm('');
-    
+
     if (!showRestrictedOnly) {
       fetchRestrictedRequirements();
     } else {
@@ -208,6 +211,9 @@ const DegreeRequirements: React.FC = () => {
       return;
     }
 
+    setIsProcessing(true);
+    setProcessingMessage('Deleting requirement...');
+
     try {
       const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
       const response = await fetch(`${backendBase}/api/degree-requirements/${requirementId}`, {
@@ -225,6 +231,8 @@ const DegreeRequirements: React.FC = () => {
     } catch (err) {
       setError('Error deleting degree requirement');
       console.error('Error:', err);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -232,6 +240,9 @@ const DegreeRequirements: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete ALL degree requirements? This action cannot be undone.')) {
       return;
     }
+
+    setIsProcessing(true);
+    setProcessingMessage('Deleting all requirements...');
 
     try {
       const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
@@ -250,6 +261,8 @@ const DegreeRequirements: React.FC = () => {
     } catch (err) {
       setError('Error deleting all degree requirements');
       console.error('Error:', err);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -290,13 +303,7 @@ const DegreeRequirements: React.FC = () => {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="degree-requirements">
-        <div className="loading">Loading degree requirements...</div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="degree-requirements">
@@ -389,7 +396,7 @@ const DegreeRequirements: React.FC = () => {
               {getFilteredRequirements().length} requirement(s) found
             </div>
             {getFilteredRequirements().length > 0 && (
-              <button 
+              <button
                 className="delete-all-button"
                 onClick={deleteAllRequirements}
                 title="Delete all requirements"
@@ -408,10 +415,10 @@ const DegreeRequirements: React.FC = () => {
           <div className="requirements-grid">
             {getFilteredRequirements().map(requirement => {
               const isExpanded = expandedRequirementId === requirement.requirementId;
-              
+
               return (
-                <div 
-                  key={requirement.requirementId} 
+                <div
+                  key={requirement.requirementId}
                   className={`requirement-card ${isExpanded ? 'expanded' : 'collapsed'}`}
                   onClick={() => handleRequirementClick(requirement.requirementId)}
                 >
@@ -434,271 +441,271 @@ const DegreeRequirements: React.FC = () => {
                   {isExpanded && (
                     <div className="requirement-content-wrapper">
                       <div className="requirement-details">
-                  <div className="detail-row">
-                    <span className="detail-label">Total Credits:</span>
-                    <span className="detail-value">{requirement.totalCreditsRequired}</span>
-                  </div>
-                  
-                  {requirement.gpaRequirement && (
-                    <div className="detail-row">
-                      <span className="detail-label">GPA Requirement:</span>
-                      <span className="detail-value">{requirement.gpaRequirement}</span>
-                    </div>
-                  )}
+                        <div className="detail-row">
+                          <span className="detail-label">Total Credits:</span>
+                          <span className="detail-value">{requirement.totalCreditsRequired}</span>
+                        </div>
 
-                  <div className="detail-row">
-                    <span className="detail-label">Program Type:</span>
-                    <span className="detail-value">
-                      {requirement.isRestricted ? 'Restricted' : 'Open'}
-                    </span>
-                  </div>
-                </div>
+                        {requirement.gpaRequirement && (
+                          <div className="detail-row">
+                            <span className="detail-label">GPA Requirement:</span>
+                            <span className="detail-value">{requirement.gpaRequirement}</span>
+                          </div>
+                        )}
 
-                {/* Admission Requirements */}
-                {requirement.admissionRequirements && (
-                  <div className="requirement-section">
-                    <div 
-                      className="requirement-section-header"
-                      onClick={(e) => handleSectionToggle(`admission-${requirement.requirementId}`, e)}
-                    >
-                      <h4>Admission Requirements</h4>
-                      <span className="section-toggle-icon">
-                        {isSectionExpanded(`admission-${requirement.requirementId}`) ? '▼' : '▶'}
-                      </span>
-                    </div>
-                    {isSectionExpanded(`admission-${requirement.requirementId}`) && (
-                      <div className="requirement-content">
-                      {(() => {
-                        const admissionReqs = parseJsonField(requirement.admissionRequirements);
-                        if (admissionReqs) {
-                          return (
-                            <div>
-                              {admissionReqs.core_courses && (
-                                <div>
-                                  <strong>Core Courses:</strong>
-                                  <div className="course-list">
-                                    {admissionReqs.core_courses.map((course: any, index: number) => (
-                                      <span key={index} className="course-tag">{course.code}</span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {admissionReqs.minimum_cumulative_gpa && (
-                                <p><strong>Minimum Cumulative GPA:</strong> {admissionReqs.minimum_cumulative_gpa}</p>
-                              )}
-                              {admissionReqs.minimum_core_avg_gpa && (
-                                <p><strong>Minimum Core Avg GPA:</strong> {admissionReqs.minimum_core_avg_gpa}</p>
-                              )}
-                              {admissionReqs.minimum_core_grade && (
-                                <p><strong>Minimum Core Grade:</strong> {admissionReqs.minimum_core_grade}</p>
-                              )}
-                              {admissionReqs.retake_in_core !== undefined && (
-                                <p><strong>Retake Allowed:</strong> {admissionReqs.retake_in_core}</p>
-                              )}
-                              {admissionReqs.excluded_majors && (
-                                <div>
-                                  <strong>Excluded Majors:</strong>
-                                  <div className="course-list">
-                                    {admissionReqs.excluded_majors.map((maj: any, index: number) => (
-                                      <span key={index} className="course-tag">{maj.subject_code}</span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {admissionReqs.note && (
-                                <p><em>{admissionReqs.note}</em></p>
-                              )}
-                            </div>
-                          );
-                        }
-                        return <p>{requirement.admissionRequirements}</p>;
-                      })()}
+                        <div className="detail-row">
+                          <span className="detail-label">Program Type:</span>
+                          <span className="detail-value">
+                            {requirement.isRestricted ? 'Restricted' : 'Open'}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                )}
 
-                {/* Course Requirements */}
-                {requirement.courseRequirements && (
-                  <div className="requirement-section">
-                    <div 
-                      className="requirement-section-header"
-                      onClick={(e) => handleSectionToggle(`course-${requirement.requirementId}`, e)}
-                    >
-                      <h4>Course Requirements</h4>
-                      <span className="section-toggle-icon">
-                        {isSectionExpanded(`course-${requirement.requirementId}`) ? '▼' : '▶'}
-                      </span>
-                    </div>
-                    {isSectionExpanded(`course-${requirement.requirementId}`) && (
-                      <div className="requirement-content">
-                      {(() => {
-                        const courseReqs = parseJsonField(requirement.courseRequirements);
-                        if (courseReqs && courseReqs.groups) {
-                          return (
-                            <div className="groups-container">
-                              {courseReqs.groups.map((group: any, groupIndex: number) => (
-                                <div key={groupIndex} className="course-group">
-                                  <div className="group-header">
-                                    <strong>{group.id?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</strong>{' '}
-                                    <span className="group-type">{group.type?.replace(/_/g, ' ')}</span>
-                                    {group.credits_required && (
-                                      <span className="credits-badge">{group.credits_required} credits</span>
-                                    )}
-                                  </div>
-                                  
-                                  {group.courses && (
-                                    <div className="course-list">
-                                      {group.courses.map((course: any, courseIndex: number) => (
-                                        <span key={courseIndex} className="course-tag">{course.code}</span>
-                                      ))}
-                                    </div>
-                                  )}
-                                  
-                                  {group.sequences && (
-                                    <div className="sequences-container">
-                                      {group.sequences.map((sequence: any[], seqIndex: number) => (
-                                        <div key={seqIndex} className="sequence-module">
-                                          <div className="sequence-path">
-                                            {sequence.map((course: any, courseIndex: number) => (
-                                              <React.Fragment key={courseIndex}>
-                                                <span className="course-tag sequence-course">{course.code}</span>
-                                                {courseIndex < sequence.length - 1 && (
-                                                  <span className="sequence-arrow">→</span>
-                                                )}
-                                              </React.Fragment>
+                      {/* Admission Requirements */}
+                      {requirement.admissionRequirements && (
+                        <div className="requirement-section">
+                          <div
+                            className="requirement-section-header"
+                            onClick={(e) => handleSectionToggle(`admission-${requirement.requirementId}`, e)}
+                          >
+                            <h4>Admission Requirements</h4>
+                            <span className="section-toggle-icon">
+                              {isSectionExpanded(`admission-${requirement.requirementId}`) ? '▼' : '▶'}
+                            </span>
+                          </div>
+                          {isSectionExpanded(`admission-${requirement.requirementId}`) && (
+                            <div className="requirement-content">
+                              {(() => {
+                                const admissionReqs = parseJsonField(requirement.admissionRequirements);
+                                if (admissionReqs) {
+                                  return (
+                                    <div>
+                                      {admissionReqs.core_courses && (
+                                        <div>
+                                          <strong>Core Courses:</strong>
+                                          <div className="course-list">
+                                            {admissionReqs.core_courses.map((course: any, index: number) => (
+                                              <span key={index} className="course-tag">{course.code}</span>
                                             ))}
                                           </div>
                                         </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  
-                                  {group.additional_courses && (
-                                    <div>
-                                      <strong>Additional Options:</strong>
-                                      <div className="course-list">
-                                        {group.additional_courses.map((course: any, courseIndex: number) => (
-                                          <span key={courseIndex} className="course-tag">{course.code}</span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-                                  {group.excluded_courses && (
-                                    <div className="excluded-courses">
-                                      <em>Excluded: </em>
-                                      {group.excluded_courses.map((course: any, courseIndex: number) => (
-                                        <span key={courseIndex} className="excluded-tag">{course.code}</span>
-                                      ))}
-                                    </div>
-                                  )}
-                                  
-                                  {group.note && (
-                                    <p className="group-note"><em>{group.note}</em></p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return <p>{requirement.courseRequirements}</p>;
-                      })()}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* SBC Requirements */}
-                {requirement.sbcRequirements && (
-                  <div className="requirement-section">
-                    <div 
-                      className="requirement-section-header"
-                      onClick={(e) => handleSectionToggle(`sbc-${requirement.requirementId}`, e)}
-                    >
-                      <h4>SBC Categories</h4>
-                      <span className="section-toggle-icon">
-                        {isSectionExpanded(`sbc-${requirement.requirementId}`) ? '▼' : '▶'}
-                      </span>
-                    </div>
-                    {isSectionExpanded(`sbc-${requirement.requirementId}`) && (
-                      <div className="requirement-content">
-                      {(() => {
-                        const sbcReqs = parseJsonField(requirement.sbcRequirements);
-                        if (sbcReqs && Array.isArray(sbcReqs)) {
-                          return (
-                            <div className="sbc-container">
-                              {sbcReqs.map((sbc: any, index: number) => {
-                                const hasCourses = sbc.required_major_courses || sbc.optional_major_courses || 
-                                                  sbc.required_major_courses_partial || sbc.optional_major_courses_partial;
-                                
-                                if (!hasCourses) {
-                                  return (
-                                    <div key={index} className="sbc-item-simple">
-                                      <span className="sbc-code">{sbc.sbc}</span>
+                                      )}
+                                      {admissionReqs.minimum_cumulative_gpa && (
+                                        <p><strong>Minimum Cumulative GPA:</strong> {admissionReqs.minimum_cumulative_gpa}</p>
+                                      )}
+                                      {admissionReqs.minimum_core_avg_gpa && (
+                                        <p><strong>Minimum Core Avg GPA:</strong> {admissionReqs.minimum_core_avg_gpa}</p>
+                                      )}
+                                      {admissionReqs.minimum_core_grade && (
+                                        <p><strong>Minimum Core Grade:</strong> {admissionReqs.minimum_core_grade}</p>
+                                      )}
+                                      {admissionReqs.retake_in_core !== undefined && (
+                                        <p><strong>Retake Allowed:</strong> {admissionReqs.retake_in_core}</p>
+                                      )}
+                                      {admissionReqs.excluded_majors && (
+                                        <div>
+                                          <strong>Excluded Majors:</strong>
+                                          <div className="course-list">
+                                            {admissionReqs.excluded_majors.map((maj: any, index: number) => (
+                                              <span key={index} className="course-tag">{maj.subject_code}</span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {admissionReqs.note && (
+                                        <p><em>{admissionReqs.note}</em></p>
+                                      )}
                                     </div>
                                   );
                                 }
-                                
-                                return (
-                                  <div key={index} className="sbc-item-detail">
-                                    <strong className="sbc-code">{sbc.sbc}</strong>
-                                    {sbc.required_major_courses && (
-                                      <div className="sbc-courses-section">
-                                        <em>Required:</em>
-                                        <div className="course-list">
-                                          {sbc.required_major_courses.map((course: any, courseIndex: number) => (
-                                            <span key={courseIndex} className="course-tag">{course.code}</span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {sbc.optional_major_courses && (
-                                      <div className="sbc-courses-section">
-                                        <em>Optional:</em>
-                                        <div className="course-list">
-                                          {sbc.optional_major_courses.map((course: any, courseIndex: number) => (
-                                            <span key={courseIndex} className="course-tag optional">{course.code}</span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {sbc.required_major_courses_partial && (
-                                      <div className="sbc-courses-section">
-                                        <em>Required (Partial):</em>
-                                        <div className="course-list">
-                                          {sbc.required_major_courses_partial.map((course: any, courseIndex: number) => (
-                                            <span key={courseIndex} className="course-tag partial">{course.code}</span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {sbc.optional_major_courses_partial && (
-                                      <div className="sbc-courses-section">
-                                        <em>Optional (Partial):</em>
-                                        <div className="course-list">
-                                          {sbc.optional_major_courses_partial.map((course: any, courseIndex: number) => (
-                                            <span key={courseIndex} className="course-tag optional partial">{course.code}</span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                                return <p>{requirement.admissionRequirements}</p>;
+                              })()}
                             </div>
-                          );
-                        }
-                        return <p>{requirement.sbcRequirements}</p>;
-                      })()}
-                      </div>
-                    )}
-                  </div>
-                )}
+                          )}
+                        </div>
+                      )}
+
+                      {/* Course Requirements */}
+                      {requirement.courseRequirements && (
+                        <div className="requirement-section">
+                          <div
+                            className="requirement-section-header"
+                            onClick={(e) => handleSectionToggle(`course-${requirement.requirementId}`, e)}
+                          >
+                            <h4>Course Requirements</h4>
+                            <span className="section-toggle-icon">
+                              {isSectionExpanded(`course-${requirement.requirementId}`) ? '▼' : '▶'}
+                            </span>
+                          </div>
+                          {isSectionExpanded(`course-${requirement.requirementId}`) && (
+                            <div className="requirement-content">
+                              {(() => {
+                                const courseReqs = parseJsonField(requirement.courseRequirements);
+                                if (courseReqs && courseReqs.groups) {
+                                  return (
+                                    <div className="groups-container">
+                                      {courseReqs.groups.map((group: any, groupIndex: number) => (
+                                        <div key={groupIndex} className="course-group">
+                                          <div className="group-header">
+                                            <strong>{group.id?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</strong>{' '}
+                                            <span className="group-type">{group.type?.replace(/_/g, ' ')}</span>
+                                            {group.credits_required && (
+                                              <span className="credits-badge">{group.credits_required} credits</span>
+                                            )}
+                                          </div>
+
+                                          {group.courses && (
+                                            <div className="course-list">
+                                              {group.courses.map((course: any, courseIndex: number) => (
+                                                <span key={courseIndex} className="course-tag">{course.code}</span>
+                                              ))}
+                                            </div>
+                                          )}
+
+                                          {group.sequences && (
+                                            <div className="sequences-container">
+                                              {group.sequences.map((sequence: any[], seqIndex: number) => (
+                                                <div key={seqIndex} className="sequence-module">
+                                                  <div className="sequence-path">
+                                                    {sequence.map((course: any, courseIndex: number) => (
+                                                      <React.Fragment key={courseIndex}>
+                                                        <span className="course-tag sequence-course">{course.code}</span>
+                                                        {courseIndex < sequence.length - 1 && (
+                                                          <span className="sequence-arrow">→</span>
+                                                        )}
+                                                      </React.Fragment>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+
+                                          {group.additional_courses && (
+                                            <div>
+                                              <strong>Additional Options:</strong>
+                                              <div className="course-list">
+                                                {group.additional_courses.map((course: any, courseIndex: number) => (
+                                                  <span key={courseIndex} className="course-tag">{course.code}</span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {group.excluded_courses && (
+                                            <div className="excluded-courses">
+                                              <em>Excluded: </em>
+                                              {group.excluded_courses.map((course: any, courseIndex: number) => (
+                                                <span key={courseIndex} className="excluded-tag">{course.code}</span>
+                                              ))}
+                                            </div>
+                                          )}
+
+                                          {group.note && (
+                                            <p className="group-note"><em>{group.note}</em></p>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                }
+                                return <p>{requirement.courseRequirements}</p>;
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* SBC Requirements */}
+                      {requirement.sbcRequirements && (
+                        <div className="requirement-section">
+                          <div
+                            className="requirement-section-header"
+                            onClick={(e) => handleSectionToggle(`sbc-${requirement.requirementId}`, e)}
+                          >
+                            <h4>SBC Categories</h4>
+                            <span className="section-toggle-icon">
+                              {isSectionExpanded(`sbc-${requirement.requirementId}`) ? '▼' : '▶'}
+                            </span>
+                          </div>
+                          {isSectionExpanded(`sbc-${requirement.requirementId}`) && (
+                            <div className="requirement-content">
+                              {(() => {
+                                const sbcReqs = parseJsonField(requirement.sbcRequirements);
+                                if (sbcReqs && Array.isArray(sbcReqs)) {
+                                  return (
+                                    <div className="sbc-container">
+                                      {sbcReqs.map((sbc: any, index: number) => {
+                                        const hasCourses = sbc.required_major_courses || sbc.optional_major_courses ||
+                                          sbc.required_major_courses_partial || sbc.optional_major_courses_partial;
+
+                                        if (!hasCourses) {
+                                          return (
+                                            <div key={index} className="sbc-item-simple">
+                                              <span className="sbc-code">{sbc.sbc}</span>
+                                            </div>
+                                          );
+                                        }
+
+                                        return (
+                                          <div key={index} className="sbc-item-detail">
+                                            <strong className="sbc-code">{sbc.sbc}</strong>
+                                            {sbc.required_major_courses && (
+                                              <div className="sbc-courses-section">
+                                                <em>Required:</em>
+                                                <div className="course-list">
+                                                  {sbc.required_major_courses.map((course: any, courseIndex: number) => (
+                                                    <span key={courseIndex} className="course-tag">{course.code}</span>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                            {sbc.optional_major_courses && (
+                                              <div className="sbc-courses-section">
+                                                <em>Optional:</em>
+                                                <div className="course-list">
+                                                  {sbc.optional_major_courses.map((course: any, courseIndex: number) => (
+                                                    <span key={courseIndex} className="course-tag optional">{course.code}</span>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                            {sbc.required_major_courses_partial && (
+                                              <div className="sbc-courses-section">
+                                                <em>Required (Partial):</em>
+                                                <div className="course-list">
+                                                  {sbc.required_major_courses_partial.map((course: any, courseIndex: number) => (
+                                                    <span key={courseIndex} className="course-tag partial">{course.code}</span>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                            {sbc.optional_major_courses_partial && (
+                                              <div className="sbc-courses-section">
+                                                <em>Optional (Partial):</em>
+                                                <div className="course-list">
+                                                  {sbc.optional_major_courses_partial.map((course: any, courseIndex: number) => (
+                                                    <span key={courseIndex} className="course-tag optional partial">{course.code}</span>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                }
+                                return <p>{requirement.sbcRequirements}</p>;
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <div className="requirement-footer">
                         <span className="created-by">Created by: {requirement.createdBy}</span>
-                        <button 
+                        <button
                           className="delete-button"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -717,6 +724,7 @@ const DegreeRequirements: React.FC = () => {
           </div>
         )}
       </div>
+      <LoadingModal isOpen={loading || isProcessing} message={loading ? "Loading degree requirements..." : processingMessage} />
     </div>
   );
 };

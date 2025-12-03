@@ -183,19 +183,21 @@ public class UserController {
     // ================= Registrar/Admin APIs =================
 
     /**
-     * Get all users (for registrar)
+     * Get all users (accessible to all authenticated users)
      */
     @GetMapping
-    // TP: Used cursor to list all users (registrar)
+    // TP: Used cursor to list all users - accessible to all users for initial setup
     public ResponseEntity<List<User>> getAllUsers(
             @AuthenticationPrincipal Object principal) {
         
-        // Temporarily disable authorization for testing
-        // if (!isRegistrar(principal)) {
-        //     return ResponseEntity.status(403).build();
-        // }
+        System.out.println("[UserController] getAllUsers called");
+        System.out.println("[UserController] Principal: " + (principal != null ? principal.getClass().getSimpleName() : "null"));
+        
+        // Allow all authenticated users to view user list (for initial setup and user management)
+        // TODO: Add role-based filtering in the future if needed
         
         List<User> users = userService.getAllUsers();
+        System.out.println("[UserController] Returning " + users.size() + " users");
         return ResponseEntity.ok(users);
     }
 
@@ -259,21 +261,31 @@ public class UserController {
             response.put("success", true);
             response.put("importedCount", importedUsers.size());
             response.put("users", importedUsers);
+            
+            if (importedUsers.isEmpty()) {
+                response.put("warning", "No users were imported. Please check that your YAML file has the correct format and all users have 'SBU_ID' field.");
+            }
+            
             return ResponseEntity.ok(response);
         } catch (IOException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Failed to process file: " + e.getMessage()));
+            System.err.println("Error importing users from YAML: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to process file: " + e.getMessage(), "exception", e.getClass().getSimpleName()));
+        } catch (Exception e) {
+            System.err.println("Unexpected error importing users from YAML: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to import users: " + e.getMessage(), "exception", e.getClass().getSimpleName()));
         }
     }
 
     /** Get user statistics */
     @GetMapping("/statistics")
-    // TP: Used cursor to provide user statistics
+    // TP: Used cursor to provide user statistics - accessible to all users for initial setup
     public ResponseEntity<Map<String, Object>> getUserStatistics(
             @AuthenticationPrincipal Object principal) {
 
-        if (!isRegistrar(principal)) {
-            return ResponseEntity.status(403).build();
-        }
+        // Allow all authenticated users to view statistics (for initial setup)
+        // TODO: Add role-based access control in the future if needed
 
         Map<String, Object> stats = userService.getUserStatistics();
         return ResponseEntity.ok(stats);
@@ -292,10 +304,9 @@ public class UserController {
             @RequestParam(value = "academicUnit", required = false) String academicUnit,
             @AuthenticationPrincipal Object principal) {
         
-        // Temporarily disable authorization for testing
-        // if (!isRegistrar(principal) && !isAdvisor(principal)) {
-        //     return ResponseEntity.status(403).build();
-        // }
+        if (!isRegistrar(principal) && !isAdvisor(principal)) {
+            return ResponseEntity.status(403).build();
+        }
         
         List<User> users = userService.searchUsers(name, role, major, minor, 
                                                  graduationTerm, advisorLevel, academicUnit);
@@ -361,6 +372,32 @@ public class UserController {
             String googleId = oauth2User.getName();
             var userOpt = userService.getUserByGoogleId(googleId);
             return userOpt.isPresent() && userOpt.get().isAdvisor();
+        }
+        
+        return false;
+    }
+
+    /** Check if current user is university-level advisor */
+    // TP: Used cursor to check university-level advisor role
+    private boolean isUniversityLevelAdvisor(Object principal) {
+        if (principal == null) return false;
+        
+        // Handle bypass mode authentication (UserPrincipal)
+        if (principal instanceof UserPrincipal userPrincipal) {
+            User user = userPrincipal.getUser();
+            return user != null && user.isAdvisor() && 
+                   user.getLevel() != null && "university".equalsIgnoreCase(user.getLevel());
+        }
+        
+        // Handle OAuth2 authentication (OAuth2User)
+        if (principal instanceof OAuth2User oauth2User) {
+            String googleId = oauth2User.getName();
+            var userOpt = userService.getUserByGoogleId(googleId);
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
+                return user.isAdvisor() && 
+                       user.getLevel() != null && "university".equalsIgnoreCase(user.getLevel());
+            }
         }
         
         return false;

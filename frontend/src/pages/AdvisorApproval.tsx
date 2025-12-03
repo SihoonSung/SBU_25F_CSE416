@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import LoadingModal from '../components/LoadingModal';
 import './AdvisorApproval.css';
 
 /**
@@ -72,19 +73,19 @@ const AdvisorApproval: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  
+
   // User role
   const [userRole, setUserRole] = useState<'ADVISOR' | 'INSTRUCTOR' | null>(null);
-  
+
   // Filter states
   const [selectedStatus, setSelectedStatus] = useState<'PENDING' | 'ALL'>('PENDING');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedDeclarationType, setSelectedDeclarationType] = useState('');
-  
+
   // Action states
   const [selectedDeclaration, setSelectedDeclaration] = useState<MajorMinorDeclaration | null>(null);
   const [selectedWaiver, setSelectedWaiver] = useState<TimeConflictWaiver | null>(null);
-  
+
   // Advisor type and permissions
   const [advisorType, setAdvisorType] = useState<'CEAS' | 'DEPARTMENT' | 'UNIVERSITY'>('DEPARTMENT');
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -122,7 +123,7 @@ const AdvisorApproval: React.FC = () => {
           'Pragma': 'no-cache'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         const userData = data.user || data;
@@ -158,7 +159,7 @@ const AdvisorApproval: React.FC = () => {
 
   const canApproveDeclaration = (declaration: MajorMinorDeclaration): boolean => {
     const ceasSubjects = ['AMS', 'BME', 'CME', 'CIV', 'ECE', 'CSE', 'ESE', 'ESG', 'ISE', 'MEC', 'TSM']; // CEAS subjects
-    
+
     if (advisorType === 'UNIVERSITY') {
       return true; // University advisors can approve all
     } else if (advisorType === 'CEAS') {
@@ -167,7 +168,7 @@ const AdvisorApproval: React.FC = () => {
       // Department advisors can approve their subjects
       return true; // Will be validated by backend
     }
-    
+
     return false;
   };
 
@@ -188,7 +189,7 @@ const AdvisorApproval: React.FC = () => {
     // Update filter options when declarations change
     const subjects = [...new Set(allDeclarations.map(decl => decl.subjectCode))].sort();
     const declarationTypes = [...new Set(allDeclarations.map(decl => decl.declarationType))].sort();
-    
+
     setAvailableSubjects(subjects);
     setAvailableDeclarationTypes(declarationTypes);
   }, [allDeclarations]);
@@ -200,7 +201,7 @@ const AdvisorApproval: React.FC = () => {
         credentials: 'include'
       });
       const pendingData = await pendingResponse.json();
-      
+
       if (pendingData.success) {
         setPendingDeclarations(pendingData.declarations);
       }
@@ -210,7 +211,7 @@ const AdvisorApproval: React.FC = () => {
         credentials: 'include'
       });
       const allData = await allResponse.json();
-      
+
       if (allData.success) {
         setAllDeclarations(allData.declarations);
       }
@@ -232,7 +233,7 @@ const AdvisorApproval: React.FC = () => {
       const response = await fetch(`${backendBase}/api/waivers/instructor/${currentUser.userId}`, {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const waivers: TimeConflictWaiver[] = await response.json();
         setAllWaivers(waivers);
@@ -262,7 +263,7 @@ const AdvisorApproval: React.FC = () => {
       const response = await fetch(`${backendBase}/api/waivers/advisor/${currentUser.userId}`, {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const waivers: TimeConflictWaiver[] = await response.json();
         setAllWaivers(waivers);
@@ -282,7 +283,7 @@ const AdvisorApproval: React.FC = () => {
 
   const handleApprove = async () => {
     if (!selectedDeclaration) return;
-    
+
     setProcessing(true);
     try {
       const response = await fetch(`${backendBase}/api/major-minor-declarations/${selectedDeclaration.declarationId}/approve`, {
@@ -317,7 +318,7 @@ const AdvisorApproval: React.FC = () => {
 
   const handleReject = async () => {
     if (!selectedDeclaration) return;
-    
+
     setProcessing(true);
     try {
       const response = await fetch(`${backendBase}/api/major-minor-declarations/${selectedDeclaration.declarationId}/reject`, {
@@ -364,17 +365,17 @@ const AdvisorApproval: React.FC = () => {
 
   const canApproveWaiver = (waiver: TimeConflictWaiver): { canApprove: boolean; approvalType: 'enrolled' | 'conflicting' | null } => {
     if (!currentUser?.userId) return { canApprove: false, approvalType: null };
-    
+
     const instructorName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim();
-    
+
     if (waiver.enrolledClass.instructor === instructorName && waiver.enrolledInstructorApproved === null) {
       return { canApprove: true, approvalType: 'enrolled' };
     }
-    
+
     if (waiver.conflictingClass.instructor === instructorName && waiver.conflictingInstructorApproved === null) {
       return { canApprove: true, approvalType: 'conflicting' };
     }
-    
+
     return { canApprove: false, approvalType: null };
   };
 
@@ -392,16 +393,16 @@ const AdvisorApproval: React.FC = () => {
 
   const handleWaiverApprove = async () => {
     if (!selectedWaiver || !currentUser?.userId) return;
-    
+
     const approval = canApproveWaiver(selectedWaiver);
     if (!approval.canApprove || !approval.approvalType) return;
-    
+
     setProcessing(true);
     try {
-      const endpoint = approval.approvalType === 'enrolled' 
+      const endpoint = approval.approvalType === 'enrolled'
         ? `${backendBase}/api/waivers/${selectedWaiver.waiverId}/approve/enrolled-instructor`
         : `${backendBase}/api/waivers/${selectedWaiver.waiverId}/approve/conflicting-instructor`;
-      
+
       const response = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
@@ -434,14 +435,14 @@ const AdvisorApproval: React.FC = () => {
 
   const handleWaiverReject = async () => {
     if (!selectedWaiver || !currentUser?.userId) return;
-    
+
     // Check if this is an advisor rejection
     if (userRole === 'ADVISOR') {
       if (!comments.trim()) {
         alert('Please provide a reason for rejection.');
         return;
       }
-      
+
       setProcessing(true);
       try {
         const response = await fetch(`${backendBase}/api/waivers/${selectedWaiver.waiverId}/reject/advisor`, {
@@ -475,17 +476,17 @@ const AdvisorApproval: React.FC = () => {
       }
       return;
     }
-    
+
     // Instructor rejection logic
     const approval = canApproveWaiver(selectedWaiver);
     if (!approval.canApprove || !approval.approvalType) return;
-    
+
     setProcessing(true);
     try {
       const endpoint = approval.approvalType === 'enrolled'
         ? `${backendBase}/api/waivers/${selectedWaiver.waiverId}/reject/enrolled-instructor`
         : `${backendBase}/api/waivers/${selectedWaiver.waiverId}/reject/conflicting-instructor`;
-      
+
       const response = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
@@ -596,7 +597,7 @@ const AdvisorApproval: React.FC = () => {
   };
 
   const getFilteredWaivers = () => {
-    let filtered = selectedStatus === 'PENDING' ? pendingWaivers : allWaivers;
+    const filtered = selectedStatus === 'PENDING' ? pendingWaivers : allWaivers;
     return filtered;
   };
 
@@ -944,7 +945,7 @@ const AdvisorApproval: React.FC = () => {
                         <div className="student-name">{declaration.studentNetId}</div>
                         <div className="student-id">NetID: {declaration.studentNetId}</div>
                         {isChangeRequest(declaration) && (
-                          <div className="change-badge" style={{color: 'orange', fontWeight: 'bold', marginTop: '4px'}}>
+                          <div className="change-badge" style={{ color: 'orange', fontWeight: 'bold', marginTop: '4px' }}>
                             Change Request
                           </div>
                         )}
@@ -953,7 +954,7 @@ const AdvisorApproval: React.FC = () => {
                     <td className="subject-cell">
                       {declaration.subjectCode}
                       {isChangeRequest(declaration) && getFromSubject(declaration) && (
-                        <div style={{fontSize: '0.85em', color: '#666', marginTop: '2px'}}>
+                        <div style={{ fontSize: '0.85em', color: '#666', marginTop: '2px' }}>
                           From: {getFromSubject(declaration)}
                         </div>
                       )}
@@ -1162,7 +1163,7 @@ const AdvisorApproval: React.FC = () => {
       {/* Approval Modal */}
       {showApprovalModal && selectedDeclaration && (
         <div className="modal-overlay">
-          <div className="modal">
+          <div className="modal-content">
             <div className="modal-header">
               <h3>Approve Declaration</h3>
               <button className="close-button" onClick={closeModals}>×</button>
@@ -1170,12 +1171,12 @@ const AdvisorApproval: React.FC = () => {
             <div className="modal-body">
               <div className="declaration-summary">
                 {isChangeRequest(selectedDeclaration) && (
-                  <div style={{backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', padding: '10px', marginBottom: '15px'}}>
-                    <p style={{margin: 0, fontWeight: 'bold', color: '#856404'}}>
+                  <div style={{ backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', padding: '10px', marginBottom: '15px' }}>
+                    <p style={{ margin: 0, fontWeight: 'bold', color: '#856404' }}>
                       CHANGE REQUEST
                     </p>
                     {getFromSubject(selectedDeclaration) && (
-                      <p style={{margin: '5px 0 0 0', color: '#856404'}}>
+                      <p style={{ margin: '5px 0 0 0', color: '#856404' }}>
                         Changing from <strong>{getFromSubject(selectedDeclaration)}</strong> to <strong>{selectedDeclaration.subjectCode}</strong>
                       </p>
                     )}
@@ -1197,12 +1198,12 @@ const AdvisorApproval: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="cancel-button" onClick={closeModals}>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={closeModals}>
                 Cancel
               </button>
-              <button 
-                className="approve-button"
+              <button
+                className="btn-primary"
                 onClick={handleApprove}
                 disabled={processing}
               >
@@ -1216,7 +1217,7 @@ const AdvisorApproval: React.FC = () => {
       {/* Rejection Modal */}
       {showRejectionModal && selectedDeclaration && (
         <div className="modal-overlay">
-          <div className="modal">
+          <div className="modal-content">
             <div className="modal-header">
               <h3>Reject Declaration</h3>
               <button className="close-button" onClick={closeModals}>×</button>
@@ -1224,12 +1225,12 @@ const AdvisorApproval: React.FC = () => {
             <div className="modal-body">
               <div className="declaration-summary">
                 {isChangeRequest(selectedDeclaration) && (
-                  <div style={{backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', padding: '10px', marginBottom: '15px'}}>
-                    <p style={{margin: 0, fontWeight: 'bold', color: '#856404'}}>
+                  <div style={{ backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', padding: '10px', marginBottom: '15px' }}>
+                    <p style={{ margin: 0, fontWeight: 'bold', color: '#856404' }}>
                       CHANGE REQUEST
                     </p>
                     {getFromSubject(selectedDeclaration) && (
-                      <p style={{margin: '5px 0 0 0', color: '#856404'}}>
+                      <p style={{ margin: '5px 0 0 0', color: '#856404' }}>
                         Changing from <strong>{getFromSubject(selectedDeclaration)}</strong> to <strong>{selectedDeclaration.subjectCode}</strong>
                       </p>
                     )}
@@ -1252,12 +1253,12 @@ const AdvisorApproval: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="cancel-button" onClick={closeModals}>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={closeModals}>
                 Cancel
               </button>
-              <button 
-                className="reject-button"
+              <button
+                className="btn-danger"
                 onClick={handleReject}
                 disabled={processing || !comments.trim()}
               >
@@ -1267,6 +1268,9 @@ const AdvisorApproval: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Global Loading Modal */}
+      <LoadingModal isOpen={processing} message="Processing request..." />
     </div>
   );
 };

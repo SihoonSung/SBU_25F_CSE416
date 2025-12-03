@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import './Roster.css';
 import { getCurrentUser } from '../utils/auth';
+import LoadingModal from '../components/LoadingModal';
 
 /**
  * Roster Component
@@ -81,7 +82,7 @@ const Roster: React.FC = () => {
 
       // Get instructor name from current user
       const instructorName = `${currentUser.firstName} ${currentUser.lastName}`.trim();
-      
+
       const response = await fetch(`${backendBase}/api/classes/instructor/${encodeURIComponent(instructorName)}`, {
         credentials: 'include'
       });
@@ -149,13 +150,7 @@ const Roster: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="roster-page">
-        <div className="loading">Loading classes...</div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="roster-page">
@@ -226,9 +221,7 @@ const Roster: React.FC = () => {
                 )}
               </div>
 
-              {rosterLoading ? (
-                <div className="loading">Loading roster...</div>
-              ) : roster.length === 0 ? (
+              {roster.length === 0 ? (
                 <div className="no-roster">
                   <p>No students enrolled in this class.</p>
                 </div>
@@ -277,6 +270,7 @@ const Roster: React.FC = () => {
           )}
         </div>
       </div>
+      <LoadingModal isOpen={loading || rosterLoading} message={loading ? "Loading classes..." : "Loading roster..."} />
     </div>
   );
 };

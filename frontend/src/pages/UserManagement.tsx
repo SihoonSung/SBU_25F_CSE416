@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import './UserManagement.css';
+import LoadingModal from '../components/LoadingModal';
 
 /**
  * User Management Component
@@ -33,6 +34,8 @@ const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -65,15 +68,43 @@ const UserManagement: React.FC = () => {
       const response = await fetch(`${backendBase}/api/users`, {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const data = await response.json();
-        setUsers(data);
+        console.log('Fetched users:', data.length, 'users');
+        // Transform backend User objects to frontend User interface
+        const transformedUsers = data.map((user: any) => ({
+          userId: user.userId,
+          email: user.email,
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          fullName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown',
+          role: user.role,
+          isActive: user.isActive !== undefined ? user.isActive : true,
+          studentId: user.studentId,
+          major: user.major,
+          gpa: user.gpa,
+          graduationYear: user.graduationYear,
+          department: user.department,
+          officeLocation: user.officeLocation,
+          createdAt: user.createdAt,
+          lastLogin: user.lastLogin
+        }));
+        console.log('Transformed users:', transformedUsers.length);
+        setUsers(transformedUsers);
       } else {
-        console.error('Failed to fetch users');
+        const errorText = await response.text();
+        console.error('Failed to fetch users:', response.status, errorText);
+        if (response.status === 403) {
+          console.error('Access denied: You need REGISTRAR or university-level advisor role to view users');
+          setImportMessage('Error: Access denied. You need REGISTRAR or university-level advisor role to view users.');
+        } else {
+          setImportMessage(`Error fetching users: ${response.status} ${response.statusText}`);
+        }
       }
     } catch (error) {
       console.error('Error fetching users:', error);
+      setImportMessage('Error: Failed to fetch users. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -84,7 +115,7 @@ const UserManagement: React.FC = () => {
       const response = await fetch(`${backendBase}/api/users/statistics`, {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setStatistics(data);
@@ -95,9 +126,9 @@ const UserManagement: React.FC = () => {
   };
 
   const filterUsers = async () => {
-    if (useBackendSearch && (searchFilters.name || searchFilters.role || searchFilters.major || 
-        searchFilters.minor || searchFilters.graduationTerm || searchFilters.advisorLevel || 
-        searchFilters.academicUnit)) {
+    if (useBackendSearch && (searchFilters.name || searchFilters.role || searchFilters.major ||
+      searchFilters.minor || searchFilters.graduationTerm || searchFilters.advisorLevel ||
+      searchFilters.academicUnit)) {
       // Use backend search API
       try {
         const params = new URLSearchParams();
@@ -108,11 +139,11 @@ const UserManagement: React.FC = () => {
         if (searchFilters.graduationTerm) params.append('graduationTerm', searchFilters.graduationTerm);
         if (searchFilters.advisorLevel) params.append('advisorLevel', searchFilters.advisorLevel);
         if (searchFilters.academicUnit) params.append('academicUnit', searchFilters.academicUnit);
-        
+
         const response = await fetch(`${backendBase}/api/users/search?${params.toString()}`, {
           credentials: 'include'
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           // Transform backend response to match frontend User interface
@@ -166,6 +197,9 @@ const UserManagement: React.FC = () => {
       return;
     }
 
+    setIsProcessing(true);
+    setProcessingMessage('Importing users...');
+
     const formData = new FormData();
     formData.append('file', selectedFile);
 
@@ -178,7 +212,7 @@ const UserManagement: React.FC = () => {
 
       const contentType = response.headers.get('content-type');
       let data;
-      
+
       if (contentType && contentType.includes('application/json')) {
         try {
           data = await response.json();
@@ -206,24 +240,28 @@ const UserManagement: React.FC = () => {
         const errorMsg = data.error || data.message || data.message || 'Unknown error';
         const errorDetails = data.exception ? ` (${data.exception})` : '';
         const fullError = `${errorMsg}${errorDetails}`;
-        
+
         console.error('Import error details:', {
           status: response.status,
           statusText: response.statusText,
           data: data,
           responseHeaders: Object.fromEntries(response.headers.entries())
         });
-        
+
         setImportMessage(`Error: ${fullError}. Please check the browser console and backend logs for more details.`);
       }
     } catch (error) {
       setImportMessage('Error uploading file: Network error or server unavailable');
       console.error('Error uploading file:', error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const toggleUserStatus = async (userId: number, isActive: boolean) => {
     try {
+      setIsProcessing(true);
+      setProcessingMessage(isActive ? 'Deactivating user...' : 'Activating user...');
       const endpoint = isActive ? 'deactivate' : 'activate';
       const response = await fetch(`${backendBase}/api/users/${userId}/${endpoint}`, {
         method: 'PUT',
@@ -238,15 +276,19 @@ const UserManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating user status:', error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleExportUser = async (userId: number) => {
     try {
+      setIsProcessing(true);
+      setProcessingMessage('Exporting user data...');
       const response = await fetch(`${backendBase}/api/users/${userId}/export`, {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         // Create downloadable JSON file
@@ -265,6 +307,8 @@ const UserManagement: React.FC = () => {
     } catch (error) {
       console.error('Error exporting user:', error);
       alert('Error exporting user data');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -272,9 +316,7 @@ const UserManagement: React.FC = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  if (loading) {
-    return <div className="loading">Loading users...</div>;
-  }
+
 
   return (
     <div className="user-management">
@@ -330,12 +372,12 @@ const UserManagement: React.FC = () => {
               type="text"
               placeholder="Name"
               value={searchFilters.name}
-              onChange={(e) => setSearchFilters({...searchFilters, name: e.target.value})}
+              onChange={(e) => setSearchFilters({ ...searchFilters, name: e.target.value })}
               className="search-input"
             />
             <select
               value={searchFilters.role}
-              onChange={(e) => setSearchFilters({...searchFilters, role: e.target.value})}
+              onChange={(e) => setSearchFilters({ ...searchFilters, role: e.target.value })}
               className="role-filter"
             >
               <option value="">All Roles</option>
@@ -348,35 +390,35 @@ const UserManagement: React.FC = () => {
               type="text"
               placeholder="Major"
               value={searchFilters.major}
-              onChange={(e) => setSearchFilters({...searchFilters, major: e.target.value})}
+              onChange={(e) => setSearchFilters({ ...searchFilters, major: e.target.value })}
               className="search-input"
             />
             <input
               type="text"
               placeholder="Minor"
               value={searchFilters.minor}
-              onChange={(e) => setSearchFilters({...searchFilters, minor: e.target.value})}
+              onChange={(e) => setSearchFilters({ ...searchFilters, minor: e.target.value })}
               className="search-input"
             />
             <input
               type="text"
               placeholder="Graduation Term (e.g., Fall 2025)"
               value={searchFilters.graduationTerm}
-              onChange={(e) => setSearchFilters({...searchFilters, graduationTerm: e.target.value})}
+              onChange={(e) => setSearchFilters({ ...searchFilters, graduationTerm: e.target.value })}
               className="search-input"
             />
             <input
               type="text"
               placeholder="Advisor Level"
               value={searchFilters.advisorLevel}
-              onChange={(e) => setSearchFilters({...searchFilters, advisorLevel: e.target.value})}
+              onChange={(e) => setSearchFilters({ ...searchFilters, advisorLevel: e.target.value })}
               className="search-input"
             />
             <input
               type="text"
               placeholder="Academic Unit"
               value={searchFilters.academicUnit}
-              onChange={(e) => setSearchFilters({...searchFilters, academicUnit: e.target.value})}
+              onChange={(e) => setSearchFilters({ ...searchFilters, academicUnit: e.target.value })}
               className="search-input"
             />
             <button
@@ -504,6 +546,7 @@ const UserManagement: React.FC = () => {
           <p>No users found matching your criteria.</p>
         </div>
       )}
+      <LoadingModal isOpen={loading || isProcessing} message={loading ? "Loading users..." : processingMessage} />
     </div>
   );
 };

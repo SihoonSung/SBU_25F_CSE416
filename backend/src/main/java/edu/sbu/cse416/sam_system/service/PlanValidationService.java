@@ -54,6 +54,9 @@ public class PlanValidationService {
     @Autowired
     private ClassRosterRepository classRosterRepository;
 
+    @Autowired
+    private UserTransferCoursesRepository userTransferCoursesRepository;
+
     /**
      * Helper method to resolve course by subject and course number.
      * Handles cases where multiple courses exist (same course in different terms) by returning the most recent one.
@@ -727,6 +730,11 @@ public class PlanValidationService {
         // Get all user classes (both completed and in-progress)
         List<UserClasses> allUserClasses = userClassesRepository.findByUserId(userId);
         
+        // Get transfer courses with SBU equivalents and convert to UserClasses format
+        List<UserTransferCourses> transferCourses = userTransferCoursesRepository.findWithSbuequivalentsByUserId(userId);
+        List<UserClasses> transferClasses = convertTransferCoursesToUserClasses(student, transferCourses);
+        allUserClasses.addAll(transferClasses);
+        
         // Separate completed courses (with grades) and in-progress courses (grade is null)
         List<UserClasses> completedCourses = new ArrayList<>();
         List<UserClasses> inProgressClasses = new ArrayList<>();
@@ -768,8 +776,9 @@ public class PlanValidationService {
         // Add enrolled courses to allCourses
         allCourses.addAll(enrolledCourseCodes);
 
-        // Calculate total credits (from completed courses, enrolled courses, and in-progress courses, not planned)
+        // Calculate total credits (from completed courses, enrolled courses, in-progress courses, and transfer courses, not planned)
         // Avoid double counting: enrolledRosters and inProgressClasses may overlap
+        // Transfer courses are already included in completedCourses or inProgressClasses above
         int totalCredits = 0;
         Set<String> processedCourseCodes = new HashSet<>(); // Track processed courses to avoid duplicates
         
@@ -814,6 +823,7 @@ public class PlanValidationService {
         totalCredits += inProgressCredits;
         System.out.println("[DEBUG calculateDegreeRequirementStatus] In-progress courses credits: " + inProgressCredits);
         System.out.println("[DEBUG calculateDegreeRequirementStatus] Total credits calculated: " + totalCredits);
+        // Transfer courses are already included in completedCourses or inProgressClasses above
 
         // Process declared majors
         for (Map<String, Object> declaredMajor : declaredMajors) {
@@ -1660,22 +1670,92 @@ public class PlanValidationService {
     }
 
     /**
-     * Calculate GPA from completed courses.
+     * Calculate GPA from completed courses and transfer courses.
+     * Includes transfer courses with letter grades (A, B, C, etc.) in GPA calculation.
+     * Excludes transfer credits (grade 'T') and placement exam grades (numeric 1-9) from GPA calculation.
+     * @param completedCourses List of completed UserClasses
+     * @param userId User ID to fetch transfer courses (can be null if completedCourses is not empty)
      */
-    private double calculateGPA(List<UserClasses> completedCourses) {
+    private double calculateGPA(List<UserClasses> completedCourses, Long userId) {
         double totalPoints = 0.0;
         int totalCredits = 0;
         
+        // Process regular classes
         for (UserClasses uc : completedCourses) {
             if (uc.getGrade() != null && uc.getCredits() != null) {
+                String grade = uc.getGrade().trim().toUpperCase();
+                
+                // Exclude transfer credit ('T') and placement exam grades (numeric 1-9) from GPA
+                if (grade.equals("T")) {
+                    continue; // Transfer credit - does not affect GPA
+                }
+                
+                // Check if it's a placement exam grade (single digit 1-9)
+                try {
+                    double numericGrade = Double.parseDouble(grade);
+                    if (numericGrade >= 1 && numericGrade <= 9 && grade.length() == 1) {
+                        continue; // Placement exam - does not affect GPA
+                    }
+                } catch (NumberFormatException e) {
+                    // Not a numeric grade, continue processing
+                }
+                
                 double gradePoints = getGradePoints(uc.getGrade());
                 totalPoints += gradePoints * uc.getCredits();
                 totalCredits += uc.getCredits();
             }
         }
         
+        // Process transfer courses with letter grades (A, B, C, etc.)
+        // Get userId from completedCourses if not provided
+        Long actualUserId = userId;
+        if (actualUserId == null && !completedCourses.isEmpty() && completedCourses.get(0).getUser() != null) {
+            actualUserId = completedCourses.get(0).getUser().getUserId();
+        }
+        
+        if (actualUserId != null) {
+            List<UserTransferCourses> transferCourses = userTransferCoursesRepository.findByUserId(actualUserId);
+            
+            for (UserTransferCourses transferCourse : transferCourses) {
+                if (transferCourse.getGrade() != null && transferCourse.getCredits() != null) {
+                    String grade = transferCourse.getGrade().trim().toUpperCase();
+                    
+                    // Exclude transfer credit ('T') and placement exam grades (numeric 1-9) from GPA
+                    if (grade.equals("T")) {
+                        continue; // Transfer credit - does not affect GPA
+                    }
+                    
+                    // Check if it's a placement exam grade (single digit 1-9)
+                    try {
+                        double numericGrade = Double.parseDouble(grade);
+                        if (numericGrade >= 1 && numericGrade <= 9 && grade.length() == 1) {
+                            continue; // Placement exam - does not affect GPA
+                        }
+                    } catch (NumberFormatException e) {
+                        // Not a numeric grade, continue processing
+                    }
+                    
+                    // Include transfer courses with letter grades (A, B, C, etc.) in GPA
+                    double gradePoints = getGradePoints(transferCourse.getGrade());
+                    totalPoints += gradePoints * transferCourse.getCredits();
+                    totalCredits += transferCourse.getCredits();
+                }
+            }
+        }
+        
         if (totalCredits == 0) return 0.0;
         return totalPoints / totalCredits;
+    }
+    
+    /**
+     * Overloaded method for backward compatibility - extracts userId from completedCourses
+     */
+    private double calculateGPA(List<UserClasses> completedCourses) {
+        Long userId = null;
+        if (!completedCourses.isEmpty() && completedCourses.get(0).getUser() != null) {
+            userId = completedCourses.get(0).getUser().getUserId();
+        }
+        return calculateGPA(completedCourses, userId);
     }
 
     /**
@@ -4190,6 +4270,9 @@ public class PlanValidationService {
     
     /**
      * Check if grade meets minimum requirement.
+     * Handles special grades:
+     * - 'T' = Transfer credit (credit granted, counts for course requirements and SBC, equivalent to C or higher)
+     * - Numeric grades (1-9) = Placement exam levels (counts for course requirements)
      */
     private boolean isGradeSufficientForRequirement(String actualGrade, String requiredGrade) {
         if (actualGrade == null || requiredGrade == null) {
@@ -4198,6 +4281,41 @@ public class PlanValidationService {
         
         actualGrade = actualGrade.trim().toUpperCase();
         requiredGrade = requiredGrade.trim().toUpperCase();
+        
+        // Handle transfer credit 'T' - counts for course requirements and SBC (equivalent to C or higher)
+        if (actualGrade.equals("T")) {
+            // 'T' is equivalent to C or higher, so it satisfies any requirement that needs C or higher
+            // For requirements higher than C (e.g., B), 'T' may not satisfy, but typically transfer credits
+            // are accepted for course requirements regardless of the specific grade requirement
+            // We'll treat 'T' as equivalent to C (2.0), which satisfies C or higher requirements
+            Map<String, Double> gradePoints = new HashMap<>();
+            gradePoints.put("A", 4.0);
+            gradePoints.put("A-", 3.7);
+            gradePoints.put("B+", 3.3);
+            gradePoints.put("B", 3.0);
+            gradePoints.put("B-", 2.7);
+            gradePoints.put("C+", 2.3);
+            gradePoints.put("C", 2.0);
+            gradePoints.put("C-", 1.7);
+            gradePoints.put("D+", 1.3);
+            gradePoints.put("D", 1.0);
+            gradePoints.put("D-", 0.7);
+            gradePoints.put("F", 0.0);
+            
+            Double requiredPoints = gradePoints.get(requiredGrade);
+            if (requiredPoints != null) {
+                // 'T' is equivalent to C (2.0), so it satisfies C or lower requirements
+                return 2.0 >= requiredPoints;
+            }
+            // If requiredGrade is not a standard letter grade, try numeric comparison
+            try {
+                double requiredNumeric = Double.parseDouble(requiredGrade);
+                return 2.0 >= requiredNumeric; // 'T' = 2.0 (C)
+            } catch (NumberFormatException e) {
+                // If we can't parse requiredGrade, default to true (T counts for requirements)
+                return true;
+            }
+        }
         
         Map<String, Double> gradePoints = new HashMap<>();
         gradePoints.put("A", 4.0);
@@ -4223,10 +4341,81 @@ public class PlanValidationService {
         try {
             double actualNumeric = Double.parseDouble(actualGrade);
             double requiredNumeric = Double.parseDouble(requiredGrade);
+            // Handle placement exam grades (1-9) - they count for course requirements
+            if (actualNumeric >= 1 && actualNumeric <= 9 && actualGrade.length() == 1) {
+                // Placement exam - counts for course requirements (equivalent to C or higher)
+                return 2.0 >= requiredNumeric;
+            }
             return actualNumeric >= requiredNumeric;
         } catch (NumberFormatException e) {
             return false;
         }
+    }
+    
+    /**
+     * Convert transfer courses with SBU equivalents to UserClasses format for final degree requirement checking.
+     * Only includes transfer courses that have SBU equivalents (department and courseNum)
+     * and satisfy grade requirements (C or higher by default).
+     * Handles special grades: 'T' (transfer credit) and numeric grades (placement exams) are included if they meet grade requirements.
+     */
+    private List<UserClasses> convertTransferCoursesToUserClasses(User student, List<UserTransferCourses> transferCourses) {
+        if (transferCourses == null || transferCourses.isEmpty()) {
+            return Collections.emptyList();
+        }
+        
+        List<UserClasses> converted = new ArrayList<>();
+        for (UserTransferCourses transferCourse : transferCourses) {
+            // Only include transfer courses with SBU equivalents
+            if (transferCourse.getDepartment() == null || transferCourse.getCourseNum() == null) {
+                continue;
+            }
+            
+            // Check if grade is sufficient (C or higher by default, same logic as regular classes)
+            String grade = transferCourse.getGrade();
+            if (grade != null && !grade.trim().isEmpty() && !grade.equals("I")) {
+                // Check if grade is sufficient - handle 'T' and numeric grades (placement exams)
+                // 'T' is transfer credit - counts for course requirements but not GPA
+                // Numeric grades (1-9) are placement exams - also count for course requirements
+                String gradeUpper = grade.trim().toUpperCase();
+                boolean isSufficient = false;
+                
+                if (gradeUpper.equals("T")) {
+                    // Transfer credit 'T' - counts for course requirements
+                    isSufficient = true;
+                } else {
+                    // Check if it's a placement exam grade (numeric 1-9)
+                    try {
+                        double numericGrade = Double.parseDouble(gradeUpper);
+                        if (numericGrade >= 1 && numericGrade <= 9 && gradeUpper.length() == 1) {
+                            // Placement exam - counts for course requirements
+                            isSufficient = true;
+                        } else {
+                            // Regular numeric grade or letter grade - check against minimum
+                            isSufficient = isGradeSufficientForRequirement(grade, "C");
+                        }
+                    } catch (NumberFormatException e) {
+                        // Letter grade - check against minimum
+                        isSufficient = isGradeSufficientForRequirement(grade, "C");
+                    }
+                }
+                
+                if (isSufficient) {
+                    UserClasses uc = new UserClasses();
+                    uc.setUser(student);
+                    uc.setClassId(null); // Transfer courses have no class ID
+                    uc.setDepartment(transferCourse.getDepartment());
+                    uc.setCourseNum(transferCourse.getCourseNum());
+                    uc.setSection(null);
+                    uc.setSemester(null); // Transfer courses don't have semester
+                    uc.setYear(null); // Transfer courses don't have year
+                    uc.setCredits(transferCourse.getCredits());
+                    uc.setGpnc(null);
+                    uc.setGrade(grade);
+                    converted.add(uc);
+                }
+            }
+        }
+        return converted;
     }
 }
 

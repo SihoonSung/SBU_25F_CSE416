@@ -149,6 +149,58 @@
 					</dependency>
 				</dependencies>
 			</plugin>
+			
+			<!-- JaCoCo Maven Plugin for code coverage -->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.13</version>
+				<configuration>
+					<excludes>
+						<exclude>**/SamSystemApplication.class</exclude>
+					</excludes>
+					<!-- 과제 요구사항: degree requirement checking과 class schedule generation 기능만 측정 -->
+					<!-- 리포트에서 해당 클래스만 확인하도록 설정 -->
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>jacoco-check</id>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<rule>
+									<element>CLASS</element>
+									<limits>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>0.70</minimum>
+										</limit>
+									</limits>
+									<includes>
+										<include>**/service/DegreeRequirementStatusService</include>
+										<include>**/service/RegistrationScheduleService</include>
+									</includes>
+								</rule>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 

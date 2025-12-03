@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import './CourseCatalogManagement.css';
 import { getBackendBase, API_ENDPOINTS } from '../constants';
+import LoadingModal from '../components/LoadingModal';
 
 /**
  * Course Catalog Management Component
@@ -62,9 +63,9 @@ const CourseCatalogManagement: React.FC = () => {
     const newSelectedSubjects = selectedSubjects.includes(subject)
       ? selectedSubjects.filter(s => s !== subject)
       : [...selectedSubjects, subject];
-    
+
     setSelectedSubjects(newSelectedSubjects);
-    checkForUnsupportedSubjects(newSelectedSubjects);
+    checkForUnsupportedSubjects();
   };
 
   const handleAddCustomSubject = () => {
@@ -72,26 +73,26 @@ const CourseCatalogManagement: React.FC = () => {
     if (!trimmed) {
       return;
     }
-    
+
     if (selectedSubjects.includes(trimmed)) {
       setMessage({ type: 'warning', text: `Subject "${trimmed}" is already selected.` });
       return;
     }
-    
+
     const newSelectedSubjects = [...selectedSubjects, trimmed];
     setSelectedSubjects(newSelectedSubjects);
     setCustomSubject('');
-    checkForUnsupportedSubjects(newSelectedSubjects);
+    checkForUnsupportedSubjects();
   };
 
   const handleRemoveSubject = (subject: string) => {
     const newSelectedSubjects = selectedSubjects.filter(s => s !== subject);
     setSelectedSubjects(newSelectedSubjects);
-    checkForUnsupportedSubjects(newSelectedSubjects);
+    checkForUnsupportedSubjects();
   };
 
 
-  const checkForUnsupportedSubjects = (subjects: string[]) => {
+  const checkForUnsupportedSubjects = () => {
     // All subjects are now fully supported - no warning needed
     // Clear any previous warnings about unsupported subjects
     if (message?.type === 'warning' && message.text.includes('are not fully supported')) {
@@ -125,6 +126,7 @@ const CourseCatalogManagement: React.FC = () => {
     setMessage(null);
 
     try {
+      const backendBase = getBackendBase();
       const response = await fetch(`${backendBase}/api/scraping/scrape`, {
         credentials: 'include',
         method: 'POST',
@@ -142,11 +144,11 @@ const CourseCatalogManagement: React.FC = () => {
       if (result.success) {
         // Determine message type based on results
         let messageType: 'success' | 'warning' = 'success';
-        
+
         if (result.skippedSubjects && result.skippedSubjects.length > 0) {
           messageType = 'warning'; // Show warning if some subjects were skipped
         }
-        
+
         setMessage({ type: messageType, text: result.message });
         await fetchTerms(); // Refresh terms to update isScraped status
       } else {
@@ -221,7 +223,7 @@ const CourseCatalogManagement: React.FC = () => {
 
         <div className="form-group">
           <label>Select Subjects:</label>
-         
+
           {/* Supported Subjects (Quick Select) */}
           <div className="subjects-section">
             <h4>Quick Select Subjects</h4>
@@ -256,7 +258,7 @@ const CourseCatalogManagement: React.FC = () => {
                 className="custom-subject-textbox"
                 maxLength={10}
               />
-              <button 
+              <button
                 type="button"
                 onClick={handleAddCustomSubject}
                 className="add-custom-btn"
@@ -267,9 +269,9 @@ const CourseCatalogManagement: React.FC = () => {
             </div>
             <div className="custom-subject-help">
               <strong>All subjects are fully supported:</strong> All course details (description, credits, SBCs, prerequisites, corequisites, antirequisites, advisory prerequisites) will be extracted for any subject.
-              <br/><br/>
-              <strong>Instructions:</strong> Enter <strong>ONE subject at a time</strong> (e.g., MAT, PHY, CHE). 
-              Do <strong>NOT</strong> use commas or multiple subjects. Add one subject, click "Add Subject", 
+              <br /><br />
+              <strong>Instructions:</strong> Enter <strong>ONE subject at a time</strong> (e.g., MAT, PHY, CHE).
+              Do <strong>NOT</strong> use commas or multiple subjects. Add one subject, click "Add Subject",
               then repeat for additional subjects.
             </div>
           </div>
@@ -296,7 +298,7 @@ const CourseCatalogManagement: React.FC = () => {
             </div>
           )}
 
-        
+
         </div>
 
         <div className="action-buttons">
@@ -309,7 +311,8 @@ const CourseCatalogManagement: React.FC = () => {
           </button>
         </div>
       </div>
-    </div>
+      <LoadingModal isOpen={isLoading} message="Scraping course catalog..." />
+    </div >
   );
 };
 
