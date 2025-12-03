@@ -74,6 +74,16 @@ public interface UserClassesRepository extends JpaRepository<UserClasses, Long> 
     boolean existsByUserIdAndClassId(@Param("userId") Long userId, @Param("classId") Long classId);
 
     /**
+     * Check if a user has already taken a course (by department and course number, regardless of section)
+     * @param userId User ID
+     * @param department Department code (e.g., "CSE")
+     * @param courseNum Course number (e.g., 101)
+     * @return true if user has already taken this course, false otherwise
+     */
+    @Query("SELECT COUNT(uc) > 0 FROM UserClasses uc WHERE uc.user.userId = :userId AND uc.department = :department AND uc.courseNum = :courseNum")
+    boolean existsByUserIdAndDepartmentAndCourseNum(@Param("userId") Long userId, @Param("department") String department, @Param("courseNum") Integer courseNum);
+
+    /**
      * Find a specific class record for a user (for grading)
      */
     @Query("SELECT uc FROM UserClasses uc WHERE uc.user.userId = :userId AND uc.classId = :classId")
