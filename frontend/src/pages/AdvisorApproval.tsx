@@ -562,13 +562,28 @@ const AdvisorApproval: React.FC = () => {
     }
   };
 
-  const getDegreeTypeDisplayName = (degreeType: string) => {
-    switch (degreeType) {
-      case 'BA': return 'Bachelor of Arts';
-      case 'BS': return 'Bachelor of Science';
-      case 'MINOR': return 'Minor';
-      default: return degreeType;
+  const getDegreeTypeDisplayName = (degreeType: string | null | undefined, declarationType?: string): string => {
+    // For MINOR declaration type, always return "Minor"
+    if (declarationType === 'MINOR') {
+      return 'Minor';
     }
+    
+    // If degreeType is provided, convert to full name
+    if (degreeType) {
+      switch (degreeType.toUpperCase()) {
+        case 'BA': return 'Bachelor of Arts';
+        case 'BS': return 'Bachelor of Science';
+        case 'MINOR': return 'Minor';
+        default: return degreeType;
+      }
+    }
+    
+    // For MAJOR without degreeType, default to "BS" (like Profile.tsx)
+    if (declarationType === 'MAJOR') {
+      return 'Bachelor of Science';
+    }
+    
+    return 'N/A';
   };
 
   const formatDate = (dateString: string) => {
@@ -960,7 +975,9 @@ const AdvisorApproval: React.FC = () => {
                       )}
                     </td>
                     <td className="type-cell">{declaration.declarationType}</td>
-                    <td className="degree-cell">{declaration.degreeType}</td>
+                    <td className="degree-cell">
+                      {getDegreeTypeDisplayName(declaration.degreeType, declaration.declarationType)}
+                    </td>
                     <td className="term-cell">{declaration.effectiveTerm}</td>
                     <td className="status-cell">
                       <span className={`status-badge ${getStatusColor(declaration.status)}`}>
@@ -1184,7 +1201,7 @@ const AdvisorApproval: React.FC = () => {
                 )}
                 <p><strong>Student:</strong> {selectedDeclaration.studentNetId}</p>
                 <p><strong>Declaration:</strong> {selectedDeclaration.subjectCode} {selectedDeclaration.declarationType}</p>
-                <p><strong>Degree Type:</strong> {getDegreeTypeDisplayName(selectedDeclaration.degreeType)}</p>
+                <p><strong>Degree Type:</strong> {getDegreeTypeDisplayName(selectedDeclaration.degreeType, selectedDeclaration.declarationType)}</p>
                 <p><strong>Effective Term:</strong> {selectedDeclaration.effectiveTerm}</p>
               </div>
               <div className="form-group">
@@ -1238,7 +1255,7 @@ const AdvisorApproval: React.FC = () => {
                 )}
                 <p><strong>Student:</strong> {selectedDeclaration.studentNetId}</p>
                 <p><strong>Declaration:</strong> {selectedDeclaration.subjectCode} {selectedDeclaration.declarationType}</p>
-                <p><strong>Degree Type:</strong> {getDegreeTypeDisplayName(selectedDeclaration.degreeType)}</p>
+                <p><strong>Degree Type:</strong> {getDegreeTypeDisplayName(selectedDeclaration.degreeType, selectedDeclaration.declarationType)}</p>
                 <p><strong>Effective Term:</strong> {selectedDeclaration.effectiveTerm}</p>
               </div>
               <div className="form-group">

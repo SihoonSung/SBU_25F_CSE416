@@ -1077,6 +1077,30 @@ const MajorMinorDeclaration: React.FC = () => {
     }
   };
 
+  const getDegreeTypeDisplayName = (degreeType: string | null | undefined, declarationType: string): string => {
+    // For MINOR declaration type, always return "Minor"
+    if (declarationType === 'MINOR') {
+      return 'Minor';
+    }
+    
+    // If degreeType is provided, convert to full name
+    if (degreeType) {
+      switch (degreeType.toUpperCase()) {
+        case 'BA': return 'Bachelor of Arts';
+        case 'BS': return 'Bachelor of Science';
+        case 'MINOR': return 'Minor';
+        default: return degreeType;
+      }
+    }
+    
+    // For MAJOR without degreeType, default to "BS" (like Profile.tsx)
+    if (declarationType === 'MAJOR') {
+      return 'Bachelor of Science';
+    }
+    
+    return 'N/A';
+  };
+
   const getCurrentDeclarationsCount = (declarationType: 'MAJOR' | 'MINOR') => {
     return myDeclarations.filter(decl =>
       decl.declarationType === declarationType &&
@@ -1707,7 +1731,9 @@ const MajorMinorDeclaration: React.FC = () => {
                   <tr key={declaration.declarationId}>
                     <td className="subject-cell">{declaration.subjectCode}</td>
                     <td className="type-cell">{declaration.declarationType}</td>
-                    <td className="degree-cell">{declaration.degreeType}</td>
+                    <td className="degree-cell">
+                      {getDegreeTypeDisplayName(declaration.degreeType, declaration.declarationType)}
+                    </td>
                     <td className="term-cell">{declaration.effectiveTerm}</td>
                     <td className="status-cell">
                       <span className={`status-badge ${getStatusColor(declaration.status)}`}>
