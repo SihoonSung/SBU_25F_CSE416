@@ -83,11 +83,22 @@ export default function DegreeAudit() {
                 'P': 0.0, 'NP': 0.0, 'S': 0.0, 'U': 0.0
               }
               
-              // Filter classes with valid grades (exclude pass/fail and incomplete)
+              // Filter classes with valid grades (exclude pass/fail, incomplete, transfer credits, and placement exams)
               const gradedClasses = completedClasses.filter(cls => {
                 const grade = cls.grade?.trim().toUpperCase()
-                return grade && 
-                       grade !== 'P' && 
+                if (!grade) return false
+                
+                // Exclude transfer credit ('T') - does not affect GPA
+                if (grade === 'T') return false
+                
+                // Exclude placement exam grades (numeric 1-9) - does not affect GPA
+                const numericGrade = parseFloat(grade)
+                if (!isNaN(numericGrade) && numericGrade >= 1 && numericGrade <= 9 && grade.length === 1) {
+                  return false
+                }
+                
+                // Exclude pass/fail and incomplete grades
+                return grade !== 'P' && 
                        grade !== 'NP' && 
                        grade !== 'S' && 
                        grade !== 'U' && 

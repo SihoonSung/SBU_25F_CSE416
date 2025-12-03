@@ -145,7 +145,6 @@ students:
     - {class_id: 51973, department: AMS, course_num: 311, section: 01, semester: Spring, year: 2025, credits: 3, GPNC: null, grade: A}
     - {class_id: 53869, department: AMS, course_num: 326, section: 01, semester: Spring, year: 2025, credits: 3, GPNC: null, grade: A}
     - {class_id: 41507, department: CHE, course_num: 131, section: R01, semester: Spring, year: 2025, credits: 4, GPNC: null, grade: A}
-    -
     - {class_id: 57105, department: CSE, course_num: 323, section: 01, semester: Spring, year: 2025, credits: 3, GPNC: null, grade: A}
     - {class_id: 47733, department: EGL, course_num: 130, section: 01, semester: Spring, year: 2025, credits: 3, GPNC: null, grade: A}
 - SBU_ID: 100000006
