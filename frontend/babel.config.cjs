@@ -4,16 +4,17 @@ module.exports = {
     ['@babel/preset-react', { runtime: 'automatic' }],
     '@babel/preset-typescript',
   ],
-  plugins: [
-    [
-      'babel-plugin-transform-import-meta',
-      {
-        module: 'CommonJS',
-        replace: {
-          'import.meta.env.VITE_BACKEND_URL': 'process.env.VITE_BACKEND_URL',
-        },
+  plugins: [({ types }) => ({
+    visitor: {
+      MetaProperty(path) {
+        const parent = path.parentPath;
+        if (path.node.meta.name === 'import' && path.node.property.name === 'meta' &&
+            parent.isMemberExpression({ object: path.node }) &&
+            types.isIdentifier(parent.node.property, { name: 'env' }) && !parent.node.computed) {
+          parent.replaceWith(types.memberExpression(types.identifier('process'), types.identifier('env')));
+        }
       },
-    ],
-  ],
+    },
+  })],
 };
 

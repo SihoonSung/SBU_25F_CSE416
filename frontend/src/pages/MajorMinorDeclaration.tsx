@@ -9,18 +9,6 @@ import LoadingModal from '../components/LoadingModal';
  * Provides interface for students to declare majors and minors.
  */
 
-interface DegreeRequirement {
-  requirementId: number;
-  subjectCode: string;
-  degreeType: 'BA' | 'BS' | 'MINOR';
-  totalCreditsRequired: number;
-  isRestricted: boolean;
-  gpaRequirement?: number;
-  admissionRequirements?: any;
-  courseRequirements?: any;
-  sbcRequirements?: any;
-}
-
 interface MajorMinorDeclaration {
   declarationId: number;
   studentNetId: string;
@@ -832,17 +820,6 @@ const MajorMinorDeclaration: React.FC = () => {
         setEnrolledClasses(filteredEnrolled)
       }
 
-      // Load available classes for the term
-      const classesResponse = await fetch(`${backendBase}/api/classes/by-term?semester=${semester}&year=${year}`, {
-        credentials: 'include'
-      })
-
-      if (classesResponse.ok) {
-        const classesData = await classesResponse.json()
-        // setAvailableClasses(Array.isArray(classesData) ? classesData : [])
-      } else {
-        // setAvailableClasses([])
-      }
     } catch (error) {
       console.error('Error loading classes for waiver:', error)
       setEnrolledClasses([])

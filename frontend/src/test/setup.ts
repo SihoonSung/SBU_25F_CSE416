@@ -7,14 +7,3 @@ if (typeof global.TextEncoder === 'undefined') {
   global.TextDecoder = TextDecoder
 }
 
-// Mock import.meta for Vite in Jest environment
-if (typeof global.import === 'undefined') {
-  (global as any).import = {
-    meta: {
-      env: {
-        VITE_BACKEND_URL: 'http://localhost:8080'
-      }
-    }
-  }
-}
-

@@ -5,18 +5,7 @@
 
 // Backend URL - use environment variable with fallback
 export const getBackendBase = (): string => {
-  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL) {
-    return import.meta.env.VITE_BACKEND_URL;
-  }
-  // Fallback for Jest/testing environment
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore - process is available in Jest environment
-  if (typeof process !== 'undefined' && process.env?.VITE_BACKEND_URL) {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    return process.env.VITE_BACKEND_URL;
-  }
-  return 'http://localhost:8080';
+  return import.meta.env?.VITE_BACKEND_URL || 'http://localhost:8080';
 };
 
 // External URLs

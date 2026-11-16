@@ -23,6 +23,7 @@ type Me = {
 interface RegistrationEligibility {
   canRegister: boolean
   message?: string
+  schedule?: { endDate?: string | null } | null
 }
 
 interface Hold {
@@ -34,8 +35,6 @@ interface Hold {
 }
 
 interface UserStats {
-  gpa: number
-  credits: number
   totalUsers?: number
   activeUsers?: number
   students?: number
@@ -45,15 +44,12 @@ interface UserStats {
 }
 
 interface DbStats {
-  users: number
-  classes: number
   status?: string
   totalTerms?: number
   totalCourses?: number
 }
 
 interface ScrapingStats {
-  lastScraped: string
   totalCourses: number
   scrapedTerms?: number
   totalTerms?: number
@@ -104,6 +100,8 @@ interface CoursePlanItem {
   courses: Array<{
     subject: string
     courseNum: number
+    department?: string
+    courseNumber?: number | string
     credits: number
   }>
 }
@@ -312,7 +310,7 @@ function Dashboard() {
       } else {
         setActiveHolds([])
       }
-    } catch {
+    } catch (error) {
       console.error('Error checking holds:', error)
       setActiveHolds([])
     }
@@ -763,7 +761,7 @@ function Dashboard() {
           } else {
             console.log('[Dashboard] Roster API failed:', rosterResponse.status)
           }
-        } catch { // Added error variable
+        } catch (error) {
           console.error('[Dashboard] Error fetching roster data for schedule:', error)
         }
       }
@@ -771,7 +769,7 @@ function Dashboard() {
       // If nothing found, set empty array
       console.log('[Dashboard] No schedule data found, setting empty array')
       setStudentSchedule([])
-    } catch {
+    } catch (error) {
       console.error('Error fetching student schedule:', error)
       setStudentSchedule([])
     }
