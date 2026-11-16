@@ -2,7 +2,7 @@
  * TP: Used Cursor to implement admin registration schedule management page
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./AdminRegistrationSchedule.css";
 import {
   getBackendBase,

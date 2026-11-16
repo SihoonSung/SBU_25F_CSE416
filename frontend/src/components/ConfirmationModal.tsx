@@ -21,6 +21,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     cancelText = 'Cancel',
     type = 'primary'
 }) => {
+    const titleId = React.useId();
     if (!isOpen) return null;
 
     return (
@@ -37,7 +38,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             zIndex: 10000,
             backdropFilter: 'blur(4px)'
         }}>
-            <div style={{
+            <div role="dialog" aria-modal="true" aria-labelledby={titleId} style={{
                 backgroundColor: 'var(--bg-elevated)',
                 borderRadius: 'var(--radius-lg)',
                 boxShadow: 'var(--shadow-premium)',
@@ -46,7 +47,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 width: '90%',
                 animation: 'fadeIn 0.2s ease-out'
             }}>
-                <h3 style={{
+                <h3 id={titleId} style={{
                     marginTop: 0,
                     marginBottom: '12px',
                     fontSize: '1.25rem',
@@ -69,7 +70,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     justifyContent: 'flex-end',
                     gap: '12px'
                 }}>
-                    <button
+                    {cancelText && <button
                         onClick={onCancel}
                         style={{
                             backgroundColor: 'var(--button-secondary-bg)',
@@ -78,7 +79,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                         }}
                     >
                         {cancelText}
-                    </button>
+                    </button>}
                     <button
                         onClick={onConfirm}
                         style={{

@@ -71,7 +71,6 @@ const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 export default function Planner() {
   // --- State ---
   const [userId, setUserId] = useState<number | null>(null);
-  const [currentCredits, setCurrentCredits] = useState<number>(0);
   const [busy, setBusy] = useState(false);
   const [processingMessage, setProcessingMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -124,7 +123,6 @@ export default function Planner() {
         if (gpaRes.ok) {
           const gpaData = await gpaRes.json();
           const credits = gpaData.cumulative?.credits || 0;
-          setCurrentCredits(credits);
           calculateAndSetTarget(credits);
         } else {
           calculateAndSetTarget(0);

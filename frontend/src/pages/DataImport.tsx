@@ -798,7 +798,6 @@ const UsersTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
 const RequirementsTab: React.FC<{ backendBase: string }> = ({ backendBase }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadMessage, setUploadMessage] = useState('');
   const [result, setResult] = useState<any>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -816,7 +815,6 @@ const RequirementsTab: React.FC<{ backendBase: string }> = ({ backendBase }) => 
       }
       setSelectedFile(file);
       setResult(null);
-      setUploadMessage('');
     }
   };
 
@@ -828,7 +826,6 @@ const RequirementsTab: React.FC<{ backendBase: string }> = ({ backendBase }) => 
 
     setUploading(true);
     setResult(null);
-    setUploadMessage('');
 
     const formData = new FormData();
     formData.append('file', selectedFile);

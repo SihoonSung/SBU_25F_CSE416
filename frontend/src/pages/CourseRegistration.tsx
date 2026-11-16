@@ -1598,21 +1598,13 @@ function CourseRegistration() {
           modalConfig.onConfirm()
           closeModal()
         }}
-        onCancel={closeModal}
-        type={modalConfig.type}
-        confirmText={modalConfig.confirmText}
-      />
-      <ConfirmationModal
-        isOpen={modalConfig.isOpen}
-        title={modalConfig.title}
-        message={modalConfig.message}
-        onConfirm={() => {
-          modalConfig.onConfirm()
+        onCancel={() => {
+          modalConfig.onCancel?.()
           closeModal()
         }}
-        onCancel={closeModal}
         type={modalConfig.type}
         confirmText={modalConfig.confirmText}
+        cancelText={modalConfig.cancelText}
       />
 
       <LoadingModal isOpen={isProcessing} message={processingMessage} />

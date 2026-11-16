@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import CourseRegistration from './CourseRegistration'
@@ -48,7 +48,8 @@ const createMockFetch = (overrides: Record<string, any>) => {
     const url = String(input)
     for (const [pattern, response] of Object.entries(overrides)) {
       if (url.includes(pattern) || url.match(pattern)) {
-        return typeof response === 'function' ? response() : ok(response)
+        const result = typeof response === 'function' ? await response() : response
+        return typeof result?.json === 'function' ? result : ok(result)
       }
     }
     return defaultRouting(input)
@@ -67,11 +68,16 @@ beforeEach(() => {
   jest.clearAllMocks()
   mockGetCurrentUser.mockResolvedValue({ user: { userId: 1, role: 'STUDENT' } } as any)
   mockCheckTimeConflict.mockResolvedValue({ hasConflict: false, message: '' })
-  window.confirm = jest.fn(() => true)
-  window.alert = jest.fn()
+
+
   window.prompt = jest.fn(() => 'Test reason')
   mockFetch.mockImplementation(defaultRouting)
 })
+
+const clickDialogButton = async (dialogName: string, buttonName: string) => {
+  const dialog = await screen.findByRole('dialog', { name: dialogName })
+  await userEvent.click(within(dialog).getByRole('button', { name: buttonName, exact: true }))
+}
 
 describe('CourseRegistration', () => {
   test('loading state', async () => {
@@ -106,42 +112,32 @@ describe('CourseRegistration', () => {
     renderWithRouter(<CourseRegistration />)
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
+    await clickDialogButton('Confirm Registration', 'Register')
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/cart\/submit-registration/), expect.any(Object)))
   })
 
-  test('empty cart warning', async () => {
-    createMockFetch({ '/api/cart/items': { success: true, items: [] } })
+  test('empty cart disables registration', async () => {
     renderWithRouter(<CourseRegistration />)
-    await waitForCourseSearch()
-    await waitFor(() => {
-      const cartCalls = mockFetch.mock.calls.filter(c => String(c[0]).includes('/api/cart/items'))
-      return cartCalls.length >= 2
-    }, { timeout: 5000 })
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    const submit = screen.queryByText(/Submit Registration/i)
-    expect(submit).toBeInTheDocument()
+    const submit = await screen.findByRole('button', { name: 'Submit Registration' })
     expect(submit).toBeDisabled()
-    fireEvent.click(submit!)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith('Your cart is empty. Add classes to register.'), { timeout: 5000 })
-  }, 15000)
+    await userEvent.click(submit)
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringMatching(/\/api\/cart\/submit-registration/), expect.any(Object))
+  })
 
-  test('duplicate add warning', async () => {
+  test('a class already in the cart cannot be added again', async () => {
     const c = course()
     createMockFetch({ '/api/cart/items': { success: true, items: [c] }, '/api/classes/search': [c] })
     renderWithRouter(<CourseRegistration />)
     await waitForCourseSearch()
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/cart\/items/), expect.any(Object)), { timeout: 5000 })
-    await new Promise(resolve => setTimeout(resolve, 1500))
     const input = await screen.findByPlaceholderText(/Search by class ID/i, {}, { timeout: 5000 })
     const user = userEvent.setup()
     await user.type(input, 'CSE101')
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/classes\/search/), expect.any(Object)), { timeout: 5000 })
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    const btns = screen.queryAllByText(/Add to Cart/i)
-    if (btns.length > 0) {
-      await user.click(btns[0])
-      await waitFor(() => expect(window.alert).toHaveBeenCalledWith('This class is already in your cart!'), { timeout: 3000 })
-    }
+    const added = await screen.findByRole('button', { name: 'Added', exact: true })
+    expect(added).toBeDisabled()
+    await user.click(added)
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/cart/add'), expect.any(Object))
   }, 15000)
 
   test('time conflict confirm', async () => {
@@ -149,7 +145,7 @@ describe('CourseRegistration', () => {
     const b = course({ id: 2, classId: 2, code: 'CSE102.01', schedule: 'MWF 10:00-11:00' })
     mockCheckTimeConflict.mockResolvedValue({ hasConflict: true, message: 'conflict' })
     createMockFetch({ '/api/cart/items': { success: true, items: [a] }, '/api/classes/search': [b] })
-    ;(window.confirm as jest.Mock).mockReturnValueOnce(false)
+
     renderWithRouter(<CourseRegistration />)
     const input = await screen.findByPlaceholderText(/Search by class ID/i)
     await userEvent.type(input, 'CSE102')
@@ -157,17 +153,15 @@ describe('CourseRegistration', () => {
       const btn = screen.getAllByText(/Add to Cart/i)[0]
       await userEvent.click(btn)
     })
-    await waitFor(() => expect(window.confirm).toHaveBeenCalled())
+    expect(await screen.findByRole('dialog', { name: 'Time Conflict Detected' })).toBeInTheDocument()
   })
 
   test('drop registered class', async () => {
     const enrolled = course({ status: 'Enrolled' })
     createMockFetch({ '/api/roster/student/\\d+': [toRosterData(enrolled)] })
     renderWithRouter(<CourseRegistration />)
-    await waitFor(async () => {
-      const dropBtns = screen.getAllByText(/Drop/i)
-      await userEvent.click(dropBtns[0])
-    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Drop', exact: true }))
+    await clickDialogButton('Drop Class', 'Drop Class')
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/users\/1\/classes\/1\/drop/), expect.any(Object)))
   })
 
@@ -180,7 +174,7 @@ describe('CourseRegistration', () => {
     renderWithRouter(<CourseRegistration />)
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Registration is blocked due to active holds:')))
+    expect(await screen.findByText((text) => text.includes('Registration is blocked due to active holds:'))).toBeInTheDocument()
   })
 
   test('server error on add to cart', async () => {
@@ -193,7 +187,7 @@ describe('CourseRegistration', () => {
       const btn = screen.getAllByText(/Add to Cart/i)[0]
       await userEvent.click(btn)
     })
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith('Error adding class to cart. Please try again.'))
+    expect(await screen.findByText('Error adding class to cart. Please try again.')).toBeInTheDocument()
   })
 
   test('empty search results', async () => {
@@ -221,29 +215,27 @@ describe('CourseRegistration', () => {
     renderWithRouter(<CourseRegistration />)
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('prerequisites not met')))
+    await clickDialogButton('Confirm Registration', 'Register')
+    expect(await screen.findByText((text) => text.includes('prerequisites not met'))).toBeInTheDocument()
   })
 
   test('registration success reloads lists', async () => {
     const c = course()
-    let cartReloaded = false
-    let registeredReloaded = false
+    let registered = false
     createMockFetch({
-      '/api/cart/items': () => {
-        if (!cartReloaded) { cartReloaded = true; return { success: true, items: [c] } }
-        return { success: true, items: [] }
-      },
-      '/api/roster/student/': () => {
-        if (!registeredReloaded) { registeredReloaded = true; return [] }
-        return [c]
-      },
-      '/api/cart/submit-registration': { success: true, registeredCount: 1, waitlistedClasses: [] }
+      '/api/cart/items': () => ({ success: true, items: registered ? [] : [c] }),
+      '/api/roster/student/': () => registered ? [toRosterData(c)] : [],
+      '/api/cart/submit-registration': () => {
+        registered = true
+        return { success: true, registeredCount: 1, waitlistedClasses: [] }
+      }
     })
     renderWithRouter(<CourseRegistration />)
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/cart\/items/), expect.any(Object)))
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/roster\/student\/\d+/), expect.any(Object)))
+    await clickDialogButton('Confirm Registration', 'Register')
+    expect(await screen.findByText('Enrolled', { exact: true })).toBeInTheDocument()
+    expect(submit).toBeDisabled()
   })
 
   test('unauthorized user', async () => {
@@ -261,7 +253,7 @@ describe('CourseRegistration', () => {
     renderWithRouter(<CourseRegistration />)
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Cannot register classes due to time conflicts with enrolled classes')))
+    expect(await screen.findByText((text) => text.includes('Cannot register classes due to time conflicts with enrolled classes'))).toBeInTheDocument()
   })
 
   test('remove from cart', async () => {
@@ -295,27 +287,24 @@ describe('CourseRegistration', () => {
     renderWithRouter(<CourseRegistration />)
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith('Error submitting registration. Please try again.'))
+    await clickDialogButton('Confirm Registration', 'Register')
+    expect(await screen.findByText('Error submitting registration. Please try again.')).toBeInTheDocument()
   })
 
   test('cancel waitlist', async () => {
-    const waitlistItem = course({ status: 'Waitlist', classId: 1 })
+    const waitlistItem = course({ classId: 2, courseNum: '200' })
     createMockFetch({
-      '/api/roster/student/\\d+': [{ ...toRosterData(waitlistItem), status: 'Waitlist' }],
+      '/api/cart/items': { success: true, items: [course()] },
+      '/api/cart/submit-registration': { success: true, registeredCount: 0, waitlistedClasses: [waitlistItem] },
       '/waitlist/cancel': { success: true }
     })
-    window.confirm = jest.fn(() => true)
     renderWithRouter(<CourseRegistration />)
-    await waitForCourseSearch()
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/roster\/student\/\d+/), expect.any(Object)), { timeout: 3000 })
-    await new Promise(resolve => setTimeout(resolve, 500))
-    const cancelBtns = screen.queryAllByText(/Cancel/i)
-    if (cancelBtns.length > 0) {
-      const user = userEvent.setup()
-      await user.click(cancelBtns[0])
-      await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/waitlist\/cancel/), expect.any(Object)), { timeout: 3000 })
-    }
-  }, 10000)
+    await userEvent.click(await screen.findByRole('button', { name: 'Submit Registration' }))
+    await clickDialogButton('Confirm Registration', 'Register')
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel', exact: true }))
+    await clickDialogButton('Cancel Waitlist', 'Cancel Waitlist')
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/classes/2/waitlist/cancel'), expect.any(Object)))
+  })
 
   test('semester selection loads classes', async () => {
     const c = course()
@@ -336,6 +325,7 @@ describe('CourseRegistration', () => {
     renderWithRouter(<CourseRegistration />)
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
+    await clickDialogButton('Confirm Registration', 'Register')
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/cart\/submit-registration/), expect.any(Object)))
   })
 
@@ -394,6 +384,7 @@ describe('CourseRegistration', () => {
     await waitForCourseSearch()
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
+    await clickDialogButton('Confirm Registration', 'Register')
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/cart\/submit-registration/), expect.any(Object)))
   })
 
@@ -409,7 +400,8 @@ describe('CourseRegistration', () => {
     await waitForCourseSearch()
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Registration failed due to time conflicts')))
+    await clickDialogButton('Confirm Registration', 'Register')
+    expect(await screen.findByText((text) => text.includes('Registration failed due to time conflicts'))).toBeInTheDocument()
   })
 
   test('duplicate classes error', async () => {
@@ -421,7 +413,8 @@ describe('CourseRegistration', () => {
     renderWithRouter(<CourseRegistration />)
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Registration failed - these classes are already registered')))
+    await clickDialogButton('Confirm Registration', 'Register')
+    expect(await screen.findByText((text) => text.includes('Registration failed - these classes are already registered'))).toBeInTheDocument()
   })
 
   test('antirequisite error', async () => {
@@ -433,7 +426,8 @@ describe('CourseRegistration', () => {
     renderWithRouter(<CourseRegistration />)
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('antirequisites conflict')))
+    await clickDialogButton('Confirm Registration', 'Register')
+    expect(await screen.findByText((text) => text.includes('antirequisites conflict'))).toBeInTheDocument()
   })
 
   test('corequisite error', async () => {
@@ -445,7 +439,8 @@ describe('CourseRegistration', () => {
     renderWithRouter(<CourseRegistration />)
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('corequisites not met')))
+    await clickDialogButton('Confirm Registration', 'Register')
+    expect(await screen.findByText((text) => text.includes('corequisites not met'))).toBeInTheDocument()
   })
 
   test('loadRegisteredClasses conflict check', async () => {
@@ -464,37 +459,29 @@ describe('CourseRegistration', () => {
       '/api/roster/student/\\d+': [toRosterData(enrolled)],
       '/api/users/\\d+/classes/\\d+/drop': { success: false, message: 'Failed to drop' }
     })
-    window.confirm = jest.fn(() => true)
+
     renderWithRouter(<CourseRegistration />)
     await waitForCourseSearch()
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/roster\/student\/\d+/), expect.any(Object)), { timeout: 5000 })
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    const dropBtns = screen.queryAllByText(/Drop/i)
-    if (dropBtns.length > 0) {
-      const user = userEvent.setup()
-      await user.click(dropBtns[0])
-      await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Failed to drop class')), { timeout: 5000 })
-    }
+    await userEvent.click(await screen.findByRole('button', { name: 'Drop', exact: true }))
+    await clickDialogButton('Drop Class', 'Drop Class')
+    expect(await screen.findByText((text) => text.includes('Failed to drop class'))).toBeInTheDocument()
   })
 
   test('cancel waitlist failure', async () => {
-    const waitlistItem = course({ status: 'Waitlist', classId: 1 })
+    const waitlistItem = course({ classId: 2, courseNum: '200' })
     createMockFetch({
-      '/api/roster/student/\\d+': [{ ...toRosterData(waitlistItem), status: 'Waitlist' }],
-      '/waitlist/cancel': { success: false, message: 'Failed' }
+      '/api/cart/items': { success: true, items: [course()] },
+      '/api/cart/submit-registration': { success: true, registeredCount: 0, waitlistedClasses: [waitlistItem] },
+      '/waitlist/cancel': async () => ({ ok: false, json: async () => ({ success: false, message: 'Failed' }) })
     })
-    window.confirm = jest.fn(() => true)
     renderWithRouter(<CourseRegistration />)
-    await waitForCourseSearch()
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/roster\/student\/\d+/), expect.any(Object)), { timeout: 3000 })
-    await new Promise(resolve => setTimeout(resolve, 500))
-    const cancelBtns = screen.queryAllByText(/Cancel/i)
-    if (cancelBtns.length > 0) {
-      const user = userEvent.setup()
-      await user.click(cancelBtns[0])
-      await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Failed to cancel waitlist')), { timeout: 3000 })
-    }
-  }, 10000)
+    await userEvent.click(await screen.findByRole('button', { name: 'Submit Registration' }))
+    await clickDialogButton('Confirm Registration', 'Register')
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel', exact: true }))
+    await clickDialogButton('Cancel Waitlist', 'Cancel Waitlist')
+    expect(await screen.findByText('Failed to cancel waitlist: Failed')).toBeInTheDocument()
+  })
 
   test('waiver request success message', async () => {
     const enrolled = course({ id: 1, classId: 1 })
@@ -505,7 +492,7 @@ describe('CourseRegistration', () => {
       '/api/classes/search': [conflicting],
       '/api/waivers': { success: true }
     })
-    ;(window.confirm as jest.Mock).mockReturnValueOnce(true)
+
     window.prompt = jest.fn(() => 'Test reason')
     renderWithRouter(<CourseRegistration />)
     const input = await screen.findByPlaceholderText(/Search by class ID/i)
@@ -514,7 +501,9 @@ describe('CourseRegistration', () => {
       const btn = screen.getAllByText(/Add to Cart/i)[0]
       await userEvent.click(btn)
     })
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Waiver request created successfully')), { timeout: 5000 })
+    await clickDialogButton('Time Conflict Detected', 'Request Waiver')
+
+    expect(await screen.findByText((text) => text.includes('Waiver request created successfully'))).toBeInTheDocument()
   })
 
   test('waiver request failure message', async () => {
@@ -526,22 +515,18 @@ describe('CourseRegistration', () => {
       '/api/classes/search': [conflicting],
       '/api/waivers': () => { throw new Error('Network error') }
     })
-    ;(window.confirm as jest.Mock).mockReturnValueOnce(true)
+
     window.prompt = jest.fn(() => 'Test reason')
     renderWithRouter(<CourseRegistration />)
     await waitForCourseSearch()
-    await new Promise(resolve => setTimeout(resolve, 1000))
     const input = await screen.findByPlaceholderText(/Search by class ID/i, {}, { timeout: 5000 })
     const user = userEvent.setup()
     await user.type(input, 'CSE102')
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/classes\/search/), expect.any(Object)), { timeout: 5000 })
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    const btns = screen.queryAllByText(/Add to Cart/i)
-    if (btns.length > 0) {
-      await user.click(btns[0])
-      await waitFor(() => expect(window.confirm).toHaveBeenCalled(), { timeout: 5000 })
-      await waitFor(() => expect(window.alert).toHaveBeenCalledWith('Error creating waiver request. Please try again.'), { timeout: 5000 })
-    }
+    await user.click(await screen.findByRole('button', { name: 'Add to Cart' }))
+    await clickDialogButton('Time Conflict Detected', 'Request Waiver')
+
+    expect(await screen.findByText('Error creating waiver request. Please try again.')).toBeInTheDocument()
   }, 15000)
 
   test('drop registered class success', async () => {
@@ -550,37 +535,29 @@ describe('CourseRegistration', () => {
       '/api/roster/student/\\d+': [toRosterData(enrolled)],
       '/api/users/\\d+/classes/\\d+/drop': { success: true, department: 'CSE', courseNum: '101' }
     })
-    window.confirm = jest.fn(() => true)
+
     renderWithRouter(<CourseRegistration />)
     await waitForCourseSearch()
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/roster\/student\/\d+/), expect.any(Object)), { timeout: 5000 })
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    const dropBtns = screen.queryAllByText(/Drop/i)
-    if (dropBtns.length > 0) {
-      const user = userEvent.setup()
-      await user.click(dropBtns[0])
-      await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/users\/\d+\/classes\/\d+\/drop/), expect.any(Object)), { timeout: 5000 })
-    }
+    await userEvent.click(await screen.findByRole('button', { name: 'Drop', exact: true }))
+    await clickDialogButton('Drop Class', 'Drop Class')
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/users\/\d+\/classes\/\d+\/drop/), expect.any(Object)), { timeout: 5000 })
   }, 15000)
 
   test('cancel waitlist success', async () => {
-    const waitlistItem = course({ status: 'Waitlist', classId: 1 })
+    const waitlistItem = course({ classId: 2, courseNum: '200' })
     createMockFetch({
-      '/api/roster/student/\\d+': [{ ...toRosterData(waitlistItem), status: 'Waitlist' }],
-      '/api/users/\\d+/classes/\\d+/waitlist/cancel': { success: true }
+      '/api/cart/items': { success: true, items: [course()] },
+      '/api/cart/submit-registration': { success: true, registeredCount: 0, waitlistedClasses: [waitlistItem] },
+      '/waitlist/cancel': { success: true }
     })
-    window.confirm = jest.fn(() => true)
     renderWithRouter(<CourseRegistration />)
-    await waitForCourseSearch()
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/roster\/student\/\d+/), expect.any(Object)), { timeout: 3000 })
-    await new Promise(resolve => setTimeout(resolve, 500))
-    const cancelBtns = screen.queryAllByText(/Cancel/i)
-    if (cancelBtns.length > 0) {
-      const user = userEvent.setup()
-      await user.click(cancelBtns[0])
-      await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/waitlist\/cancel/), expect.any(Object)), { timeout: 3000 })
-    }
-  }, 10000)
+    await userEvent.click(await screen.findByRole('button', { name: 'Submit Registration' }))
+    await clickDialogButton('Confirm Registration', 'Register')
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel', exact: true }))
+    await clickDialogButton('Cancel Waitlist', 'Cancel Waitlist')
+    expect(await screen.findByText('Waitlist entry removed successfully')).toBeInTheDocument()
+  })
 
   test('drop course success with reload', async () => {
     const c = course()
@@ -622,7 +599,7 @@ describe('CourseRegistration', () => {
     if (allDrops.length > 0) {
       const user = userEvent.setup()
       await user.click(allDrops[0])
-      await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Error removing class from cart')), { timeout: 3000 })
+      expect(await screen.findByText((text) => text.includes('Error removing class from cart'))).toBeInTheDocument()
     }
   }, 10000)
 
@@ -640,7 +617,7 @@ describe('CourseRegistration', () => {
     if (allDrops.length > 0) {
       const user = userEvent.setup()
       await user.click(allDrops[0])
-      await waitFor(() => expect(window.alert).toHaveBeenCalledWith('Error removing class from cart. Please try again.'), { timeout: 3000 })
+      expect(await screen.findByText('Error removing class from cart. Please try again.')).toBeInTheDocument()
     }
   }, 10000)
 
@@ -674,7 +651,7 @@ describe('CourseRegistration', () => {
     await waitForCourseSearch()
   })
 
-  test('add to cart with conflict and confirm false', async () => {
+  test('add to cart anyway after a conflict', async () => {
     const a = course({ id: 1, classId: 1, code: 'CSE101.01', schedule: 'MWF 10:00-11:00' })
     const b = course({ id: 2, classId: 2, code: 'CSE102.01', schedule: 'MWF 10:00-11:00' })
     mockCheckTimeConflict.mockResolvedValue({ hasConflict: true, message: 'conflict' })
@@ -683,7 +660,7 @@ describe('CourseRegistration', () => {
       '/api/classes/search': [b],
       '/api/cart/add': { success: true }
     })
-    ;(window.confirm as jest.Mock).mockReturnValueOnce(false)
+
     renderWithRouter(<CourseRegistration />)
     const input = await screen.findByPlaceholderText(/Search by class ID/i)
     await userEvent.type(input, 'CSE102')
@@ -691,6 +668,7 @@ describe('CourseRegistration', () => {
       const btn = screen.getAllByText(/Add to Cart/i)[0]
       await userEvent.click(btn)
     })
+    await clickDialogButton('Time Conflict Detected', 'Add to Cart Anyway')
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/cart\/add/), expect.any(Object)), { timeout: 5000 })
   })
 
@@ -707,7 +685,7 @@ describe('CourseRegistration', () => {
       const btn = screen.getAllByText(/Add to Cart/i)[0]
       await userEvent.click(btn)
     })
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('This class is already in your cart!')), { timeout: 5000 })
+    expect(await screen.findByText((text) => text.includes('This class is already in your cart!'))).toBeInTheDocument()
   })
 
   test('registration eligibility check fails', async () => {
@@ -734,7 +712,8 @@ describe('CourseRegistration', () => {
     await new Promise(resolve => setTimeout(resolve, 1000))
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Registration failed: General error')), { timeout: 5000 })
+    await clickDialogButton('Confirm Registration', 'Register')
+    expect(await screen.findByText((text) => text.includes('Registration failed: General error'))).toBeInTheDocument()
   })
 
   test('submit with conflicts only', async () => {
@@ -746,7 +725,7 @@ describe('CourseRegistration', () => {
     await new Promise(resolve => setTimeout(resolve, 1000))
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Cannot register classes with time conflicts')), { timeout: 5000 })
+    expect(await screen.findByText((text) => text.includes('Cannot register classes with time conflicts'))).toBeInTheDocument()
   })
 
   test('submit with conflicts confirm false', async () => {
@@ -756,14 +735,15 @@ describe('CourseRegistration', () => {
       '/api/cart/items': { success: true, items: [conflictItem, normalItem] },
       '/api/cart/submit-registration': { success: true, registeredCount: 1, waitlistedClasses: [] }
     })
-    ;(window.confirm as jest.Mock).mockReturnValueOnce(false)
+
     renderWithRouter(<CourseRegistration />)
     await waitForCourseSearch()
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/cart\/items/), expect.any(Object)), { timeout: 5000 })
     await new Promise(resolve => setTimeout(resolve, 1000))
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
-    await waitFor(() => expect(window.confirm).toHaveBeenCalled(), { timeout: 5000 })
+    await clickDialogButton('Confirm Registration', 'Cancel')
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringMatching(/\/api\/cart\/submit-registration/), expect.any(Object))
   })
 
   test('add to cart with conflict and request waiver', async () => {
@@ -775,7 +755,7 @@ describe('CourseRegistration', () => {
       '/api/classes/search': [b],
       '/api/waivers': { success: true }
     })
-    ;(window.confirm as jest.Mock).mockReturnValueOnce(true)
+
     window.prompt = jest.fn(() => 'Test reason')
     renderWithRouter(<CourseRegistration />)
     const input = await screen.findByPlaceholderText(/Search by class ID/i)
@@ -784,7 +764,8 @@ describe('CourseRegistration', () => {
       const btn = screen.getAllByText(/Add to Cart/i)[0]
       await userEvent.click(btn)
     })
-    await waitFor(() => expect(window.confirm).toHaveBeenCalled(), { timeout: 5000 })
+    await clickDialogButton('Time Conflict Detected', 'Request Waiver')
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/waivers/), expect.any(Object)))
   })
 
   test('loadRegisteredClasses no userId', async () => {
@@ -893,7 +874,7 @@ describe('CourseRegistration', () => {
       const btn = screen.getAllByText(/Add to Cart/i)[0]
       await userEvent.click(btn)
     })
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Error adding class to cart: Other error')), { timeout: 5000 })
+    expect(await screen.findByText((text) => text.includes('Error adding class to cart: Other error'))).toBeInTheDocument()
   })
 
   test('handleDropRegisteredClass no userId', async () => {
@@ -910,20 +891,16 @@ describe('CourseRegistration', () => {
   test('handleDropRegisteredClass confirm false', async () => {
     const enrolled = course({ status: 'Enrolled' })
     createMockFetch({ '/api/roster/student/\\d+': [toRosterData(enrolled)] })
-    ;(window.confirm as jest.Mock).mockReturnValueOnce(false)
+
     renderWithRouter(<CourseRegistration />)
     await waitForCourseSearch()
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/roster\/student\/\d+/), expect.any(Object)), { timeout: 5000 })
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    const dropBtns = screen.queryAllByText(/Drop/i)
-    if (dropBtns.length > 0) {
-      const user = userEvent.setup()
-      await user.click(dropBtns[0])
-      await waitFor(() => expect(window.confirm).toHaveBeenCalled(), { timeout: 5000 })
-      await waitFor(() => {
-        expect(mockFetch).not.toHaveBeenCalledWith(expect.stringMatching(/\/api\/users\/\d+\/classes\/\d+\/drop/), expect.any(Object))
-      }, { timeout: 1000 })
-    }
+    await userEvent.click(await screen.findByRole('button', { name: 'Drop', exact: true }))
+    await clickDialogButton('Drop Class', 'Cancel')
+
+    await waitFor(() => {
+      expect(mockFetch).not.toHaveBeenCalledWith(expect.stringMatching(/\/api\/users\/\d+\/classes\/\d+\/drop/), expect.any(Object))
+    }, { timeout: 1000 })
   }, 15000)
 
   test('handleSubmitRegistration holds check error', async () => {
@@ -939,6 +916,7 @@ describe('CourseRegistration', () => {
     await new Promise(resolve => setTimeout(resolve, 1500))
     const submit = await screen.findByText(/Submit Registration/i)
     await userEvent.click(submit)
+    await clickDialogButton('Confirm Registration', 'Register')
     await waitFor(() => {
       const holdsCalls = mockFetch.mock.calls.filter(c => String(c[0]).includes('/api/holds/check/'))
       return holdsCalls.length >= 1

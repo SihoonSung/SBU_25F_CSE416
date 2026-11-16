@@ -527,8 +527,7 @@ export default function ProfilePage() {
         setMyPerson(person as PersonBasic | null);
 
         // Term data load
-        const [ev, now, termsData] = await Promise.all([
-          safeFetch(`${BASE}/api/admin/academic-calendar`).catch(() => []),
+        const [now, termsData] = await Promise.all([
           safeFetch(`${BASE}/api/admin/system-date`).catch(() => null),
           safeFetch(`${BASE}/api/classes/terms`).catch(() => []),
         ]);

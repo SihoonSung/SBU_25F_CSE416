@@ -2,12 +2,12 @@
  * TP: Used Cursor to implement protected route component with authentication check
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { isAuthenticated } from '../utils/auth';
 
 type ProtectedRouteProps = {
-  children: JSX.Element;
+  children: ReactElement;
 };
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
